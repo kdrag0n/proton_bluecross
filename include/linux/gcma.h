@@ -33,11 +33,32 @@
 
 struct gcma;
 
+#ifndef CONFIG_GCMA
+
+inline int gcma_init(unsigned long start_pfn, unsigned long size,
+		     struct gcma **res_gcma)
+{
+	return 0;
+}
+
+inline int gcma_alloc_contig(struct gcma *gcma,
+			     unsigned long start, unsigned long end)
+{
+	return 0;
+}
+
+void gcma_free_contig(struct gcma *gcma,
+		      unsigned long pfn, unsigned long nr_pages) { }
+
+#else
+
 int gcma_init(unsigned long start_pfn, unsigned long size,
 	      struct gcma **res_gcma);
 int gcma_alloc_contig(struct gcma *gcma,
 		      unsigned long start_pfn, unsigned long size);
 void gcma_free_contig(struct gcma *gcma,
 		      unsigned long start_pfn, unsigned long size);
+
+#endif
 
 #endif /* _LINUX_GCMA_H */

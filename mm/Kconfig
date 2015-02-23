@@ -544,6 +544,30 @@ config CMA_AREAS
 
 	  If unsure, leave the default value "7".
 
+config GCMA
+	bool "Guaranteed Contiguous Memory Allocator (EXPERIMENTAL)"
+	default n
+	select FRONTSWAP
+	select CLEANCACHE
+	select CMA
+	help
+	  A contiguous memory allocator which guarantees success and
+	  predictable latency for allocation request.
+	  It carves out large amount of memory and let them be allocated
+	  to the contiguous memory request while it can be used as backend
+	  for frontswap.
+
+	  This is marked experimental because it is a new feature that
+	  interacts heavily with memory reclaim.
+
+config GCMA_DEFAULT
+	bool "Set GCMA as default CMA facility (EXPERIMENTA)"
+	default n
+	depends on GCMA
+	help
+	  Set older CMA interfaces to work as GCMA rather than CMA without any
+	  client code change.
+
 config MEM_SOFT_DIRTY
 	bool "Track memory changes"
 	depends on CHECKPOINT_RESTORE && HAVE_ARCH_SOFT_DIRTY && PROC_FS
