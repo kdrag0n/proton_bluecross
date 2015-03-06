@@ -1117,7 +1117,9 @@ static int __set_oom_adj(struct file *file, int oom_adj, bool legacy)
 		}
 	}
 
+	delete_from_adj_tree(task);
 	task->signal->oom_score_adj = oom_adj;
+	add_2_adj_tree(task);
 	if (!legacy && has_capability_noaudit(current, CAP_SYS_RESOURCE))
 		task->signal->oom_score_adj_min = (short)oom_adj;
 	trace_oom_score_adj_update(task);
