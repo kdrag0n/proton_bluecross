@@ -46,4 +46,3 @@ obj-$(CONFIG_BCM15602)		+= bcm15602/
 obj-$(CONFIG_S2MPB04)		+= s2mpb04/
 obj-$(CONFIG_GOOGLE_WLAN_MAC)	+= wlan_mac/
 obj-$(CONFIG_QCA_CLD_WLAN)	+= qcacld-3.0/
-obj-$(CONFIG_FRANDOM)		+= frandom/
