@@ -32,7 +32,6 @@ struct rt_mutex {
 	struct rb_node          *waiters_leftmost;
 	struct task_struct	*owner;
 #ifdef CONFIG_DEBUG_RT_MUTEXES
-	int			save_state;
 	const char 		*name, *file;
 	int			line;
 	void			*magic;
