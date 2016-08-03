@@ -16,6 +16,7 @@
 #include <linux/jump_label_ratelimit.h>
 #include <linux/bug.h>
 #include <asm/sections.h>
+#include <linux/bug.h>
 
 #ifdef HAVE_JUMP_LABEL
 
