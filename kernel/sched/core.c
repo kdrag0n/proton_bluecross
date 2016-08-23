@@ -78,11 +78,11 @@
 #include <linux/irq.h>
 #include <linux/safestack.h>
 #include <linux/cpufreq_times.h>
+#include <linux/mutex.h>
 
 #include <asm/switch_to.h>
 #include <asm/tlb.h>
 #include <asm/irq_regs.h>
-#include <asm/mutex.h>
 #ifdef CONFIG_PARAVIRT
 #include <asm/paravirt.h>
 #endif
