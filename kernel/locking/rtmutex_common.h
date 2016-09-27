@@ -49,7 +49,7 @@ rt_mutex_top_waiter(struct rt_mutex *lock)
 {
 	struct rt_mutex_waiter *w;
 
-	w = rb_entry(lock->waiters_leftmost, struct rt_mutex_waiter,
+	w = rb_entry(READ_ONCE(lock->waiters_leftmost), struct rt_mutex_waiter,
 		     tree_entry);
 	BUG_ON(w->lock != lock);
 
