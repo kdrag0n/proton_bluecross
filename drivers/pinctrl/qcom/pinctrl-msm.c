@@ -826,6 +826,7 @@ static void msm_gpiochip_irq_relres(struct irq_data *d)
 static struct irq_chip msm_gpio_irq_chip = {
 	.name           = "msmgpio",
 	.irq_enable     = msm_gpio_irq_enable,
+	.flags          = IRQCHIP_MASK_ON_SUSPEND,
 	.irq_mask       = msm_gpio_irq_mask,
 	.irq_unmask     = msm_gpio_irq_unmask,
 	.irq_ack        = msm_gpio_irq_ack,
