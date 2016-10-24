@@ -136,14 +136,6 @@ const struct nla_policy tipc_nl_udp_policy[TIPC_NLA_UDP_MAX + 1] = {
 /* Users of the legacy API (tipc-config) can't handle that we add operations,
  * so we have a separate genl handling for the new API.
  */
-struct genl_family tipc_genl_family = {
-	.name		= TIPC_GENL_V2_NAME,
-	.version	= TIPC_GENL_V2_VERSION,
-	.hdrsize	= 0,
-	.maxattr	= TIPC_NLA_MAX,
-	.netnsok	= true,
-};
-
 static const struct genl_ops tipc_genl_v2_ops[] = {
 	{
 		.cmd	= TIPC_NL_BEARER_DISABLE,
@@ -258,6 +250,17 @@ static const struct genl_ops tipc_genl_v2_ops[] = {
 #endif
 };
 
+struct genl_family tipc_genl_family = {
+	.name		= TIPC_GENL_V2_NAME,
+	.version	= TIPC_GENL_V2_VERSION,
+	.hdrsize	= 0,
+	.maxattr	= TIPC_NLA_MAX,
+	.netnsok	= true,
+	.module		= THIS_MODULE,
+	.ops		= tipc_genl_v2_ops,
+	.n_ops		= ARRAY_SIZE(tipc_genl_v2_ops),
+};
+
 int tipc_nlmsg_parse(const struct nlmsghdr *nlh, struct nlattr ***attr)
 {
 	u32 maxattr = tipc_genl_family.maxattr;
@@ -273,8 +276,7 @@ int tipc_netlink_start(void)
 {
 	int res;
 
-	res = genl_register_family_with_ops(&tipc_genl_family,
-					    tipc_genl_v2_ops);
+	res = genl_register_family(&tipc_genl_family);
 	if (res) {
 		pr_err("Failed to register netlink interface\n");
 		return res;

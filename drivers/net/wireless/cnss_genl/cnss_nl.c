@@ -86,7 +86,6 @@ static int cld80211_pre_doit(const struct genl_ops *ops, struct sk_buff *skb,
 
 /* The netlink family */
 static struct genl_family cld80211_fam = {
-	.id = GENL_ID_GENERATE,
 	.name = CLD80211_GENL_NAME,
 	.hdrsize = 0,			/* no private header */
 	.version = 1,			/* no particular meaning now */
@@ -94,6 +93,11 @@ static struct genl_family cld80211_fam = {
 	.netnsok = true,
 	.pre_doit = cld80211_pre_doit,
 	.post_doit = NULL,
+	.module = THIS_MODULE,
+	.ops = nl_ops,
+	.n_ops = ARRAY_SIZE(nl_ops),
+	.mcgrps = nl_mcgrps,
+	.n_mcgrps = ARRAY_SIZE(nl_mcgrps),
 };
 
 int register_cld_cmd_cb(u8 cmd_id, cld80211_cb func, void *cb_ctx)
@@ -174,8 +178,7 @@ static int __cld80211_init(void)
 		nl_ops[i].policy = cld80211_policy;
 	}
 
-	err = genl_register_family_with_ops_groups(&cld80211_fam, nl_ops,
-						   nl_mcgrps);
+	err = genl_register_family(&cld80211_fam);
 	if (err) {
 		pr_err("CLD80211: Failed to register cld80211 family: %d\n",
 		       err);
