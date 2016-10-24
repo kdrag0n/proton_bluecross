@@ -1219,7 +1219,6 @@ send:
 }
 
 static struct genl_family tipc_genl_compat_family = {
-	.id		= GENL_ID_GENERATE,
 	.name		= TIPC_GENL_NAME,
 	.version	= TIPC_GENL_VERSION,
 	.hdrsize	= TIPC_GENL_HDRLEN,
