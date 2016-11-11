@@ -1204,8 +1204,10 @@ no_thread_group:
 	/* we have changed execution domain */
 	tsk->exit_signal = SIGCHLD;
 
+#ifdef CONFIG_POSIX_TIMERS
 	exit_itimers(sig);
 	flush_itimer_signals();
+#endif
 
 	if (atomic_read(&oldsighand->count) != 1) {
 		struct sighand_struct *newsighand;
