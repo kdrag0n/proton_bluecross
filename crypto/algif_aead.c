@@ -460,12 +460,12 @@ static int aead_recvmsg_async(struct socket *sock, struct msghdr *msg,
 
 	/* take over all tx sgls from ctx */
 	areq->tsgl = sock_kmalloc(sk,
-				  array_size(sizeof(*areq->tsgl), sgl->cur),
+				  sizeof(*areq->tsgl) * max_t(u32, sgl->cur, 1),
 				  GFP_KERNEL);
 	if (unlikely(!areq->tsgl))
 		goto free;
 
-	sg_init_table(areq->tsgl, sgl->cur);
+	sg_init_table(areq->tsgl, max_t(u32, sgl->cur, 1));
 	for (i = 0; i < sgl->cur; i++)
 		sg_set_page(&areq->tsgl[i], sg_page(&sgl->sg[i]),
 			    sgl->sg[i].length, sgl->sg[i].offset);
