@@ -2573,16 +2573,6 @@ static inline void *kvzalloc(size_t size, gfp_t flags)
 	return ret;
 }
 
-static inline int wbc_to_write_flags(struct writeback_control *wbc)
-{
-	if (wbc->sync_mode == WB_SYNC_ALL)
-		return REQ_SYNC;
-	else if (wbc->for_kupdate || wbc->for_background)
-		return 0;
-
-	return 0;
-}
-
 static inline void *f2fs_kzalloc(struct f2fs_sb_info *sbi,
 					size_t size, gfp_t flags)
 {
