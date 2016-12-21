@@ -73,7 +73,7 @@ enum debug_event {
 };
 
 struct lpm_debug {
-	cycle_t time;
+	u64 time;
 	enum debug_event evt;
 	int cpu;
 	uint32_t arg1;

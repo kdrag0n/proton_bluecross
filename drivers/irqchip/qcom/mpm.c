@@ -422,10 +422,10 @@ static void system_pm_exit_sleep(void)
 	msm_rpm_exit_sleep();
 }
 
-static cycle_t us_to_ticks(uint64_t sleep_val)
+static u64 us_to_ticks(uint64_t sleep_val)
 {
 	uint64_t sec, nsec;
-	cycle_t wakeup;
+	u64 wakeup;
 
 	sec = sleep_val;
 	do_div(sec, USEC_PER_SEC);
@@ -452,7 +452,7 @@ static int system_pm_update_wakeup(bool from_idle)
 {
 	uint64_t wake_time;
 	uint32_t lo = ~0U, hi = ~0U;
-	cycle_t wakeup;
+	u64 wakeup;
 
 	if (unlikely(!from_idle && msm_pm_sleep_time_override)) {
 		wake_time = msm_pm_sleep_time_override * USEC_PER_SEC;
