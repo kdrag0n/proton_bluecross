@@ -17,7 +17,7 @@
 #define HIMAX_COMMON_H
 
 #include <asm/segment.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <asm/atomic.h>
 
 #include <linux/delay.h>
