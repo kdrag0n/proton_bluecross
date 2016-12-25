@@ -1270,7 +1270,7 @@ static int cs40l2x_pbq_pair_launch(struct cs40l2x_private *cs40l2x)
 				return ret;
 
 			hrtimer_start(&cs40l2x->pbq_timer,
-					ktime_set(0, CS40L2X_PBQ_POLL_NS),
+					CS40L2X_PBQ_POLL_NS,
 					HRTIMER_MODE_REL);
 
 			cs40l2x->pbq_state = CS40L2X_PBQ_STATE_PLAYING;
@@ -1308,7 +1308,7 @@ static void cs40l2x_vibe_pbq_worker(struct work_struct *work)
 
 		if (val != CS40L2X_STATUS_IDLE) {
 			hrtimer_start(&cs40l2x->pbq_timer,
-					ktime_set(0, CS40L2X_PBQ_POLL_NS),
+					CS40L2X_PBQ_POLL_NS,
 					HRTIMER_MODE_REL);
 			goto err_mutex;
 		}

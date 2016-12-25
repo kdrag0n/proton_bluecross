@@ -540,7 +540,7 @@ static enum hrtimer_restart cam_ois_shift_timer(struct hrtimer *timer)
 	if (ois_timer.ois_timer_state != CAM_OIS_TIME_ERROR) {
 		queue_work(ois_timer_in->ois_wq, &ois_timer_in->g_work);
 		currtime = ktime_get();
-		interval = ktime_set(0, READ_OUT_TIME);
+		interval = READ_OUT_TIME;
 		hrtimer_forward(timer, currtime, interval);
 
 		return HRTIMER_RESTART;
@@ -602,7 +602,7 @@ static int cam_ois_start_shift_reader(struct cam_ois_ctrl_t *o_ctrl)
 		}
 
 		// set timer
-		ktime = ktime_set(0, READ_OUT_TIME);
+		ktime = READ_OUT_TIME;
 		hrtimer_init(&ois_timer.hr_timer, CLOCK_MONOTONIC,
 			HRTIMER_MODE_REL);
 		ois_timer.hr_timer.function = &cam_ois_shift_timer;

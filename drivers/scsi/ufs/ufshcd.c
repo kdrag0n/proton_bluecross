@@ -2554,7 +2554,7 @@ static void ufshcd_clk_scaling_update_busy(struct ufs_hba *hba)
 	if (!hba->outstanding_reqs && scaling->is_busy_started) {
 		scaling->tot_busy_t += ktime_to_us(ktime_sub(ktime_get(),
 					scaling->busy_start_t));
-		scaling->busy_start_t = ktime_set(0, 0);
+		scaling->busy_start_t = 0;
 		scaling->is_busy_started = false;
 	}
 }
@@ -2570,7 +2570,7 @@ int ufshcd_send_command(struct ufs_hba *hba, unsigned int task_tag)
 	int ret = 0;
 
 	hba->lrb[task_tag].issue_time_stamp = ktime_get();
-	hba->lrb[task_tag].complete_time_stamp = ktime_set(0, 0);
+	hba->lrb[task_tag].complete_time_stamp = 0;
 	ufshcd_clk_scaling_start_busy(hba);
 	__set_bit(task_tag, &hba->outstanding_reqs);
 	ufshcd_writel(hba, 1 << task_tag, REG_UTP_TRANSFER_REQ_DOOR_BELL);
@@ -3473,7 +3473,7 @@ ufshcd_dev_cmd_completion(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 	int resp;
 	int err = 0;
 
-	hba->ufs_stats.last_hibern8_exit_tstamp = ktime_set(0, 0);
+	hba->ufs_stats.last_hibern8_exit_tstamp = 0;
 	resp = ufshcd_get_req_rsp(lrbp->ucd_rsp_ptr);
 
 	switch (resp) {
@@ -5757,7 +5757,7 @@ ufshcd_transfer_rsp_status(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 	switch (ocs) {
 	case OCS_SUCCESS:
 		result = ufshcd_get_req_rsp(lrbp->ucd_rsp_ptr);
-		hba->ufs_stats.last_hibern8_exit_tstamp = ktime_set(0, 0);
+		hba->ufs_stats.last_hibern8_exit_tstamp = 0;
 		switch (result) {
 		case UPIU_TRANSACTION_RESPONSE:
 			/*
@@ -11139,7 +11139,7 @@ start_window:
 		scaling->busy_start_t = ktime_get();
 		scaling->is_busy_started = true;
 	} else {
-		scaling->busy_start_t = ktime_set(0, 0);
+		scaling->busy_start_t = 0;
 		scaling->is_busy_started = false;
 	}
 	spin_unlock_irqrestore(hba->host->host_lock, flags);

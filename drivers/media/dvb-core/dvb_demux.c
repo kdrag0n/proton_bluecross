@@ -630,7 +630,7 @@ static inline int dvb_dmx_swfilter_section_feed(struct dvb_demux_feed *feed)
 		return 0;
 
 	if (sec->check_crc) {
-		ktime_t pre_crc_time = ktime_set(0, 0);
+		ktime_t pre_crc_time = 0;
 
 		if (dvb_demux_performancecheck)
 			pre_crc_time = ktime_get();
@@ -1617,7 +1617,7 @@ EXPORT_SYMBOL(dvb_dmx_swfilter_packet);
 void dvb_dmx_swfilter_packets(struct dvb_demux *demux, const u8 *buf,
 			      size_t count)
 {
-	ktime_t pre_time = ktime_set(0, 0);
+	ktime_t pre_time = 0;
 	u8 timestamp[TIMESTAMP_LEN] = {0};
 
 	if (dvb_demux_performancecheck)

@@ -1321,7 +1321,7 @@ enum hrtimer_restart himax_ts_timer_func(struct hrtimer *timer)
 
 	ts = container_of(timer, struct himax_ts_data, timer);
 	queue_work(ts->himax_wq, &ts->work);
-	hrtimer_start(&ts->timer, ktime_set(0, 12500000), HRTIMER_MODE_REL);
+	hrtimer_start(&ts->timer, 12500000, HRTIMER_MODE_REL);
 	return HRTIMER_NORESTART;
 }
 

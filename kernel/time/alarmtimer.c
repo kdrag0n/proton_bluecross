@@ -260,7 +260,7 @@ static int alarmtimer_suspend(struct device *dev)
 	min = freezer_delta;
 	expires = freezer_expires;
 	type = freezer_alarmtype;
-	freezer_delta = ktime_set(0, 0);
+	freezer_delta = 0;
 	spin_unlock_irqrestore(&freezer_delta_lock, flags);
 
 	rtc = alarmtimer_get_rtcdev();
@@ -303,7 +303,7 @@ static int alarmtimer_suspend(struct device *dev)
 	now = ktime_add(now, min);
 
 	/* Set alarm, if in the past reject suspend briefly to handle */
-	ret = rtc_timer_start(rtc, &rtctimer, now, ktime_set(0, 0));
+	ret = rtc_timer_start(rtc, &rtctimer, now, 0);
 	if (ret < 0)
 		__pm_wakeup_event(ws, MSEC_PER_SEC);
 	return ret;
@@ -695,7 +695,7 @@ static int alarm_timer_set(struct k_itimer *timr, int flags,
 	 */
 	if (timr->it.alarm.interval &&
 			ktime_to_ns(timr->it.alarm.interval) < TICK_NSEC)
-		timr->it.alarm.interval = ktime_set(0, TICK_NSEC);
+		timr->it.alarm.interval = TICK_NSEC;
 
 	exp = timespec_to_ktime(new_setting->it_value);
 	/* Convert (if necessary) to absolute time */

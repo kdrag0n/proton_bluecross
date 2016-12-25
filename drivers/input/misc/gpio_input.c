@@ -278,14 +278,14 @@ int gpio_event_input_func(struct gpio_event_input_devs *input_devs,
 		if (ds->use_irq)
 			for (i = 0; i < di->keymap_size; i++)
 				enable_irq(gpio_to_irq(di->keymap[i].gpio));
-		hrtimer_start(&ds->timer, ktime_set(0, 0), HRTIMER_MODE_REL);
+		hrtimer_start(&ds->timer, 0, HRTIMER_MODE_REL);
 		spin_unlock_irqrestore(&ds->irq_lock, irqflags);
 		return 0;
 	}
 
 	if (func == GPIO_EVENT_FUNC_INIT) {
 		if (ktime_to_ns(di->poll_time) <= 0)
-			di->poll_time = ktime_set(0, 20 * NSEC_PER_MSEC);
+			di->poll_time = 20 * NSEC_PER_MSEC;
 
 		*data = ds = kzalloc(struct_size(ds, key_state, di->keymap_size),
 				     GFP_KERNEL);
@@ -357,7 +357,7 @@ int gpio_event_input_func(struct gpio_event_input_devs *input_devs,
 
 		hrtimer_init(&ds->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 		ds->timer.function = gpio_event_input_timer_func;
-		hrtimer_start(&ds->timer, ktime_set(0, 0), HRTIMER_MODE_REL);
+		hrtimer_start(&ds->timer, 0, HRTIMER_MODE_REL);
 		spin_unlock_irqrestore(&ds->irq_lock, irqflags);
 		return 0;
 	}

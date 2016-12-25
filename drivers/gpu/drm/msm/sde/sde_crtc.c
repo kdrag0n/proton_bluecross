@@ -2269,7 +2269,7 @@ static void sde_crtc_vblank_cb(void *data)
 	struct sde_crtc *sde_crtc = to_sde_crtc(crtc);
 
 	/* keep statistics on vblank callback - with auto reset via debugfs */
-	if (ktime_equal(sde_crtc->vblank_cb_time, ktime_set(0, 0)))
+	if (ktime_equal(sde_crtc->vblank_cb_time, 0))
 		sde_crtc->vblank_cb_time = ktime_get();
 	else
 		sde_crtc->vblank_cb_count++;
@@ -2863,7 +2863,7 @@ static void _sde_crtc_wait_for_fences(struct drm_crtc *crtc)
 	drm_atomic_crtc_for_each_plane(plane, crtc) {
 		do {
 			kt_wait = ktime_sub(kt_end, ktime_get());
-			if (ktime_compare(kt_wait, ktime_set(0, 0)) >= 0)
+			if (ktime_compare(kt_wait, 0) >= 0)
 				wait_ms = ktime_to_ms(kt_wait);
 			else
 				wait_ms = 0;
@@ -5479,7 +5479,7 @@ static int _sde_debugfs_status_show(struct seq_file *s, void *data)
 
 		/* reset time & count for next measurement */
 		sde_crtc->vblank_cb_count = 0;
-		sde_crtc->vblank_cb_time = ktime_set(0, 0);
+		sde_crtc->vblank_cb_time = 0;
 	}
 	seq_printf(s, "vblank_enable:%d\n", sde_crtc->vblank_requested);
 	seq_printf(s, "total_framecount:%llu\n", sde_crtc->play_count);
