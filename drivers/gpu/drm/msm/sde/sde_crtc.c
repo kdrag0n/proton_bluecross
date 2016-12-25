@@ -2269,7 +2269,7 @@ static void sde_crtc_vblank_cb(void *data)
 	struct sde_crtc *sde_crtc = to_sde_crtc(crtc);
 
 	/* keep statistics on vblank callback - with auto reset via debugfs */
-	if (ktime_equal(sde_crtc->vblank_cb_time, 0))
+	if (!sde_crtc->vblank_cb_time)
 		sde_crtc->vblank_cb_time = ktime_get();
 	else
 		sde_crtc->vblank_cb_count++;
