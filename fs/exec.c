@@ -329,7 +329,7 @@ static int __bprm_mm_init(struct linux_binprm *bprm)
 	up_write(&mm->mmap_sem);
 	bprm->p = vma->vm_end - sizeof(void *);
 	if (randomize_va_space)
-		bprm->p ^= get_random_long() & ~PAGE_MASK;
+		bprm->p ^= get_random_int() & ~PAGE_MASK;
 	return 0;
 err:
 	up_write(&mm->mmap_sem);
