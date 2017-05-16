@@ -2787,7 +2787,7 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 {
 	const struct tcp_sock *tp = tcp_sk(sk); /* iff sk_type == SOCK_STREAM */
 	const struct inet_connection_sock *icsk = inet_csk(sk);
-	u32 now = tcp_time_stamp, intv;
+	u32 now = tcp_jiffies32, intv;
 	unsigned int start;
 	int notsent_bytes;
 	u64 rate64;
