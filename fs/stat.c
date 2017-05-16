@@ -4,6 +4,7 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
+#include <linux/capability.h>
 #include <linux/export.h>
 #include <linux/mm.h>
 #include <linux/errno.h>
@@ -28,8 +29,13 @@ void generic_fillattr(struct inode *inode, struct kstat *stat)
 	stat->gid = inode->i_gid;
 	stat->rdev = inode->i_rdev;
 	stat->size = i_size_read(inode);
-	stat->atime = inode->i_atime;
-	stat->mtime = inode->i_mtime;
+	if (is_sidechannel_device(inode) && !capable_noaudit(CAP_MKNOD)) {
+		stat->atime = inode->i_ctime;
+		stat->mtime = inode->i_ctime;
+	} else {
+		stat->atime = inode->i_atime;
+		stat->mtime = inode->i_mtime;
+	}
 	stat->ctime = inode->i_ctime;
 	stat->blksize = i_blocksize(inode);
 	stat->blocks = inode->i_blocks;
@@ -53,8 +59,14 @@ int vfs_getattr_nosec(struct path *path, struct kstat *stat)
 {
 	struct inode *inode = d_backing_inode(path->dentry);
 
-	if (inode->i_op->getattr)
-		return inode->i_op->getattr(path->mnt, path->dentry, stat);
+	if (inode->i_op->getattr) {
+		int retval = inode->i_op->getattr(path->mnt, path->dentry, stat);
+		if (!retval && is_sidechannel_device(inode) && !capable_noaudit(CAP_MKNOD)) {
+			stat->atime = stat->ctime;
+			stat->mtime = stat->ctime;
+		}
+		return retval;
+	}
 
 	generic_fillattr(inode, stat);
 	return 0;
