@@ -1960,6 +1960,8 @@ int msm_pcie_debug_info(struct pci_dev *dev, u32 option, u32 base,
 		return -ENODEV;
 	}
 
+	pdev = PCIE_BUS_PRIV_DATA(dev->bus);
+
 	if (option == MSM_PCIE_READ_PCIE_REGISTER ||
 		option == MSM_PCIE_WRITE_PCIE_REGISTER ||
 		option == MSM_PCIE_DUMP_PCIE_REGISTER_SPACE) {
@@ -1988,7 +1990,6 @@ int msm_pcie_debug_info(struct pci_dev *dev, u32 option, u32 base,
 		}
 	}
 
-	pdev = PCIE_BUS_PRIV_DATA(dev->bus);
 	rc_sel = BIT(pdev->rc_idx);
 
 	msm_pcie_sel_debug_testcase(pdev, option);
