@@ -2525,14 +2525,41 @@ static int tavil_codec_spk_boost_event(struct snd_soc_dapm_widget *w,
 
 static int __tavil_codec_enable_swr(struct snd_soc_dapm_widget *w, int event)
 {
-	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
-	struct tavil_priv *tavil;
+	struct snd_soc_codec *codec = 0;
+	struct snd_soc_dapm_context *dapm = 0;
+	struct tavil_priv *tavil = 0;
+	struct snd_soc_component *comp = 0;
+	struct platform_device *pdev = 0;
+	struct tavil_swr_ctrl_data *ctrl_data = 0;
+
 	int ch_cnt = 0;
 
-	tavil = snd_soc_codec_get_drvdata(codec);
+	if (w)
+		dapm = w->dapm;
+	if (dapm)
+		comp = snd_soc_dapm_to_component(w->dapm);
+	if (comp)
+		codec = snd_soc_component_to_codec(comp);
+	if (codec)
+		tavil = snd_soc_codec_get_drvdata(codec);
+	if (tavil)
+		ctrl_data = tavil->swr.ctrl_data;
+	if (ctrl_data)
+		pdev = ctrl_data->swr_pdev;
+
+	if (!pdev) {
+		pr_err("%s: w=%p; dapm=%p; comp=%p; codec=%p; tavil=%p; ctrl_data=%p; pdev=%p\n",
+			__func__, w, dapm, comp, codec, tavil, ctrl_data, pdev);
+		WARN_ON_ONCE(1);
+		return -EFAULT;
+	}
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
+		if (!pdev) {
+			pr_err("%s: No pdev (1)\n", __func__);
+			return -EFAULT;
+		}
 		if (((strnstr(w->name, "INT7_", sizeof("RX INT7_"))) ||
 			(strnstr(w->name, "INT7 MIX2",
 						sizeof("RX INT7 MIX2")))))
@@ -2542,12 +2569,16 @@ static int __tavil_codec_enable_swr(struct snd_soc_dapm_widget *w, int event)
 			tavil->swr.rx_8_count++;
 		ch_cnt = !!(tavil->swr.rx_7_count) + tavil->swr.rx_8_count;
 
-		swrm_wcd_notify(tavil->swr.ctrl_data[0].swr_pdev,
+		swrm_wcd_notify(pdev,
 				SWR_DEVICE_UP, NULL);
-		swrm_wcd_notify(tavil->swr.ctrl_data[0].swr_pdev,
+		swrm_wcd_notify(pdev,
 				SWR_SET_NUM_RX_CH, &ch_cnt);
 		break;
 	case SND_SOC_DAPM_POST_PMD:
+		if (!pdev) {
+			pr_err("%s: No pdev (2)\n", __func__);
+			return -EFAULT;
+		}
 		if ((strnstr(w->name, "INT7_", sizeof("RX INT7_")))  ||
 			(strnstr(w->name, "INT7 MIX2",
 			sizeof("RX INT7 MIX2"))))
@@ -2557,12 +2588,12 @@ static int __tavil_codec_enable_swr(struct snd_soc_dapm_widget *w, int event)
 			tavil->swr.rx_8_count--;
 		ch_cnt = !!(tavil->swr.rx_7_count) + tavil->swr.rx_8_count;
 
-		swrm_wcd_notify(tavil->swr.ctrl_data[0].swr_pdev,
+		swrm_wcd_notify(pdev,
 				SWR_SET_NUM_RX_CH, &ch_cnt);
 
 		break;
 	}
-	dev_dbg(tavil->dev, "%s: %s: current swr ch cnt: %d\n",
+	dev_info(tavil->dev, "%s: %s: current swr ch cnt: %d\n",
 		__func__, w->name, ch_cnt);
 
 	return 0;
@@ -4488,7 +4519,7 @@ static int __tavil_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
 	int micb_num;
 
-	dev_dbg(codec->dev, "%s: wname: %s, event: %d\n",
+	dev_info(codec->dev, "%s: wname: %s, event: %d\n",
 		__func__, w->name, event);
 
 	if (strnstr(w->name, "MIC BIAS1", sizeof("MIC BIAS1")))
@@ -4510,6 +4541,7 @@ static int __tavil_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 		 * and enable requests
 		 */
 		tavil_micbias_control(codec, micb_num, MICB_ENABLE, true);
+		dev_info(codec->dev, "%s: wname: %s: enable\n", __func__, w->name);
 		break;
 	case SND_SOC_DAPM_POST_PMU:
 		/* wait for cnp time */
@@ -4517,6 +4549,7 @@ static int __tavil_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		tavil_micbias_control(codec, micb_num, MICB_DISABLE, true);
+		dev_info(codec->dev, "%s: wname: %s: disable\n", __func__, w->name);
 		break;
 	};
 
