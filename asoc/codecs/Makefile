@@ -28,6 +28,10 @@ obj-$(CONFIG_SND_SOC_WCD_SPI)  += snd-soc-wcd-spi.o
 snd-soc-max98927-objs := max98927.o
 obj-$(CONFIG_SND_SOC_MAX98927) += snd-soc-max98927.o
 
+snd-soc-cs35l36-objs := cs35l36.o
+obj-$(CONFIG_SND_SOC_CS35L36)  += snd-soc-cs35l36.o
+
+
 snd-soc-msm-stub-objs := msm_stub.o
 obj-$(CONFIG_SND_SOC_MSM_STUB)  += snd-soc-msm-stub.o
 
