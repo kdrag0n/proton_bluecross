@@ -96,4 +96,4 @@ cxx_flags = -Wp,-MD,$(depfile),-MT,$@ $(CXXFLAGS) -D"BUILD_STR(s)=\#s" $(CXXFLAG
 ###
 ## HOSTCC C flags
 
-host_c_flags = -Wp,-MD,$(depfile),-MT,$@ $(CHOSTFLAGS) -D"BUILD_STR(s)=\#s" $(CHOSTFLAGS_$(basetarget).o) $(CHOSTFLAGS_$(obj))
+host_c_flags = -MD -MF $(depfile) -MT $@ $(CHOSTFLAGS) -D"BUILD_STR(s)=\#s" $(CHOSTFLAGS_$(basetarget).o) $(CHOSTFLAGS_$(obj))
