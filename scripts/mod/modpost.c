@@ -1965,7 +1965,9 @@ static void read_symbols(char *modname)
 		symname = remove_dot(info.strtab + sym->st_name);
 
 		handle_modversions(mod, &info, sym, symname);
+#ifndef CONFIG_MODULE_STRIPPED
 		handle_moddevtable(mod, &info, sym, symname);
+#endif
 	}
 	if (!is_vmlinux(modname) ||
 	     (is_vmlinux(modname) && vmlinux_section_warnings))
@@ -2109,7 +2111,9 @@ static void add_header(struct buffer *b, struct module *mod)
 	buf_printf(b, "#include <linux/vermagic.h>\n");
 	buf_printf(b, "#include <linux/compiler.h>\n");
 	buf_printf(b, "\n");
+#ifndef CONFIG_MODULE_STRIPPED
 	buf_printf(b, "MODULE_INFO(vermagic, VERMAGIC_STRING);\n");
+#endif
 	buf_printf(b, "\n");
 	buf_printf(b, "__visible struct module __this_module\n");
 	buf_printf(b, "__attribute__((section(\".gnu.linkonce.this_module\"))) = {\n");
@@ -2126,24 +2130,30 @@ static void add_header(struct buffer *b, struct module *mod)
 
 static void add_intree_flag(struct buffer *b, int is_intree)
 {
+#ifndef CONFIG_MODULE_STRIPPED
 	if (is_intree)
 		buf_printf(b, "\nMODULE_INFO(intree, \"Y\");\n");
+#endif
 }
 
 /* Cannot check for assembler */
 static void add_retpoline(struct buffer *b)
 {
+#ifndef CONFIG_MODULE_STRIPPED
 	buf_printf(b, "\n#ifdef RETPOLINE\n");
 	buf_printf(b, "MODULE_INFO(retpoline, \"Y\");\n");
 	buf_printf(b, "#endif\n");
+#endif
 }
 
 static void add_staging_flag(struct buffer *b, const char *name)
 {
+#ifndef CONFIG_MODULE_STRIPPED
 	static const char *staging_dir = "drivers/staging";
 
 	if (strncmp(staging_dir, name, strlen(staging_dir)) == 0)
 		buf_printf(b, "\nMODULE_INFO(staging, \"Y\");\n");
+#endif
 }
 
 /* In kernel, this size is defined in linux/module.h;
@@ -2247,11 +2257,13 @@ static void add_depends(struct buffer *b, struct module *mod,
 
 static void add_srcversion(struct buffer *b, struct module *mod)
 {
+#ifndef CONFIG_MODULE_STRIPPED
 	if (mod->srcversion[0]) {
 		buf_printf(b, "\n");
 		buf_printf(b, "MODULE_INFO(srcversion, \"%s\");\n",
 			   mod->srcversion);
 	}
+#endif
 }
 
 static void write_if_changed(struct buffer *b, const char *fname)
@@ -2486,7 +2498,9 @@ int main(int argc, char **argv)
 		add_staging_flag(&buf, mod->name);
 		err |= add_versions(&buf, mod);
 		add_depends(&buf, mod, modules);
+#ifndef CONFIG_MODULE_STRIPPED
 		add_moddevtable(&buf, mod);
+#endif
 		add_srcversion(&buf, mod);
 
 		sprintf(fname, "%s.mod.c", mod->name);
