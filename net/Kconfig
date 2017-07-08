@@ -90,6 +90,9 @@ source "net/netlabel/Kconfig"
 
 endif # if INET
 
+config SOCK_DIAG
+	bool
+
 config ANDROID_PARANOID_NETWORK
 	bool "Only allow certain groups to create sockets"
 	default y
