@@ -86,7 +86,8 @@ void state_suspend(void)
 
 void state_resume(void)
 {
-	cancel_delayed_work_sync(&suspend_work);
+	if (delayed_work_pending(&suspend_work))
+		cancel_delayed_work_sync(&suspend_work);
 	suspend_in_progress = false;
 
 	if (state_suspended)
