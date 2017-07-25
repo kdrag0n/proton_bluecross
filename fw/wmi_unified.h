@@ -7426,12 +7426,23 @@ typedef enum {
     WMI_VDEV_PARAM_11AX_TXBF,
 
     /** This parameter indicates whether VDEV is SMPS intolerant.
-      * I.e. - SMPS action frame cannot be transmitted by the VDEV to
-      * dynamically change the RX NSS.
-      *
-      * valid values: 1 - VDEV is SMPS intolerant, 0 - VDEV is SMPS tolerant
-      */
+     * I.e. - SMPS action frame cannot be transmitted by the VDEV to
+     * dynamically change the RX NSS.
+     *
+     * valid values: 1 - VDEV is SMPS intolerant, 0 - VDEV is SMPS tolerant
+     */
     WMI_VDEV_PARAM_SMPS_INTOLERANT,
+
+    /** specify probe request Tx delay for scans triggered on this VDEV */
+    WMI_VDEV_PARAM_PROBE_DELAY, /* units = milliseconds */
+
+    /** specify the time gap between each set of probe request transmissions.
+     * The number of probe requests in each set depends on the ssid_list and
+     * bssid_list in the scan request.
+     * This parameter will be applied only for scans triggered on this VDEV.
+     */
+    WMI_VDEV_PARAM_REPEAT_PROBE_TIME, /* units = milliseconds */
+
 
     /*=== ADD NEW VDEV PARAM TYPES ABOVE THIS LINE ===
      * The below vdev param types are used for prototyping, and are
@@ -9816,6 +9827,7 @@ enum {
     ROAM_FILTER_OP_BITMAP_WHITE_LIST =   0x2,
     ROAM_FILTER_OP_BITMAP_PREFER_BSSID = 0x4,
     ROAM_FILTER_OP_BITMAP_LCA_DISALLOW = 0x8,
+    ROAM_FILTER_OP_BITMAP_RSSI_REJECTION_OCE = 0x10,
 };
 
 /** lca_enable_source_bitmap */
@@ -9830,6 +9842,17 @@ enum {
 #define WMI_ROAM_LCA_DISALLOW_SOURCE_FORCED     0x100
 
 typedef struct {
+    /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_roam_rssi_rejection_oce_config_param */
+    A_UINT32 tlv_header;
+     /** BSSID of AP, who reject (re-)assoc due to low RSSI */
+    wmi_mac_addr bssid;
+    /** Disallowed AP for certain duration, in units of milliseconds */
+    A_UINT32 remaining_disallow_duration;
+   /** AP will be allowed for candidate, when AP RSSI better than expected RSSI units in dBm */
+    A_INT32 requested_rssi;
+} wmi_roam_rssi_rejection_oce_config_param;
+
+typedef struct {
     A_UINT32 tlv_header;     /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_roam_filter_list_fixed_param */
     A_UINT32 vdev_id; /** Unique id identifying the VDEV on which roaming filter is adopted */
     A_UINT32 flags; /** flags for filter */
@@ -9837,6 +9860,7 @@ typedef struct {
     A_UINT32 num_bssid_black_list; /* number of blacklist in the TLV variable bssid_black_list */
     A_UINT32 num_ssid_white_list; /* number of whitelist in the TLV variable ssid_white_list */
     A_UINT32 num_bssid_preferred_list; /* only for lfr 3.0. number of preferred list & factor in the TLV */
+    A_UINT32 num_rssi_rejection_ap; /** number of list of AP who rejected STA due to low RSSI */
     /**
      * TLV (tag length value) parameters follows roam_filter_list_cmd
      * The TLV's are:
@@ -9845,6 +9869,7 @@ typedef struct {
      *     wmi_mac_addr bssid_preferred_list[];
      *     A_UINT32 bssid_preferred_factor[];
      *     wmi_roam_lca_disallow_config_tlv_param lca_disallow_param[0/1] (opt)
+     *     wmi_roam_rssi_rejection_oce_config_param rssi_rejection_list[]
      */
 } wmi_roam_filter_fixed_param;
 
