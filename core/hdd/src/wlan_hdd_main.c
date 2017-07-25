@@ -278,6 +278,10 @@ void wlan_hdd_txrx_pause_cb(uint8_t vdev_id,
  * post processing
  */
 uint8_t g_wlan_driver_version[] = QWLAN_VERSIONSTR;
+
+#ifndef BUILD_TIMESTAMP
+#define BUILD_TIMESTAMP ""
+#endif
 uint8_t g_wlan_driver_timestamp[] = BUILD_TIMESTAMP;
 
 /**
@@ -596,6 +600,36 @@ static void hdd_qdf_trace_enable(QDF_MODULE_ID moduleId, uint32_t bitmask)
 }
 
 /**
+ * wlan_hdd_validate_context_in_loading() - check the HDD context in loading
+ * @hdd_ctx:	HDD context pointer
+ *
+ * Return: 0 if the context is valid. Error code otherwise
+ */
+int wlan_hdd_validate_context_in_loading(hdd_context_t *hdd_ctx)
+{
+	if (NULL == hdd_ctx || NULL == hdd_ctx->config) {
+		hdd_info("%pS HDD context is Null", (void *)_RET_IP_);
+		return -ENODEV;
+	}
+
+	if (cds_is_driver_recovering()) {
+		hdd_info("%pS Recovery in Progress. State: 0x%x Ignore!!!",
+			(void *)_RET_IP_, cds_get_driver_state());
+		return -EAGAIN;
+	}
+
+	if (hdd_ctx->start_modules_in_progress ||
+	    hdd_ctx->stop_modules_in_progress) {
+		hdd_info("%pS Start/Stop Modules in progress. Ignore!!!",
+			(void *)_RET_IP_);
+		return -EAGAIN;
+	}
+
+	return 0;
+}
+
+
+/**
  * wlan_hdd_validate_context() - check the HDD context
  * @hdd_ctx:	HDD context pointer
  *
@@ -867,6 +901,36 @@ static void hdd_update_vdev_nss(hdd_context_t *hdd_ctx)
 
 	sme_update_vdev_type_nss(hdd_ctx->hHal, max_supp_nss,
 			cfg_ini->vdev_type_nss_5g, eCSR_BAND_5G);
+}
+
+/**
+ * hdd_update_wiphy_vhtcap() - Updates wiphy vhtcap fields
+ * @hdd_ctx: HDD context
+ *
+ * Updates wiphy vhtcap fields
+ *
+ * Return: None
+ */
+static void hdd_update_wiphy_vhtcap(hdd_context_t *hdd_ctx)
+{
+	struct ieee80211_supported_band *band_5g =
+		hdd_ctx->wiphy->bands[NL80211_BAND_5GHZ];
+	uint32_t val;
+
+	if (!band_5g) {
+		hdd_debug("5GHz band disabled, skipping capability population");
+		return;
+	}
+
+	val = hdd_ctx->config->txBFCsnValue;
+	band_5g->vht_cap.cap |= (val << IEEE80211_VHT_CAP_BEAMFORMEE_STS_SHIFT);
+
+	val = NUM_OF_SOUNDING_DIMENSIONS;
+	band_5g->vht_cap.cap |=
+		(val << IEEE80211_VHT_CAP_SOUNDING_DIMENSIONS_SHIFT);
+
+	hdd_info("Updated wiphy vhtcap:0x%x, CSNAntSupp:%d, NumSoundDim:%d",
+		band_5g->vht_cap.cap, hdd_ctx->config->txBFCsnValue, val);
 }
 
 /**
@@ -1528,6 +1592,11 @@ void hdd_update_tgt_cfg(void *context, void *param)
 	hdd_debug("Target BPF %d Host BPF %d 8ss fw support %d txBFCsnValue %d",
 		cfg->bpf_enabled, hdd_ctx->config->bpf_packet_filter_enable,
 		cfg->tx_bfee_8ss_enabled, hdd_ctx->config->txBFCsnValue);
+
+	/*
+	 * Update txBFCsnValue and NumSoundingDim values to vhtcap in wiphy
+	 */
+	hdd_update_wiphy_vhtcap(hdd_ctx);
 	/*
 	 * If BPF is enabled, maxWowFilters set to WMA_STA_WOW_DEFAULT_PTRN_MAX
 	 * because we need atleast WMA_STA_WOW_DEFAULT_PTRN_MAX free slots to
@@ -4086,13 +4155,17 @@ QDF_STATUS hdd_reset_all_adapters(hdd_context_t *hdd_ctx)
 			clear_bit(WMM_INIT_DONE, &adapter->event_flags);
 		}
 
-		/*
-		 * If adapter is SAP, set session ID to invalid since SAP
-		 * session will be cleanup during SSR.
-		 */
-		if (adapter->device_mode == QDF_SAP_MODE)
+		if (adapter->device_mode == QDF_SAP_MODE) {
+			/*
+			 * If adapter is SAP, set session ID to invalid
+			 * since SAP session will be cleanup during SSR.
+			 */
 			wlansap_set_invalid_session(
 				WLAN_HDD_GET_SAP_CTX_PTR(adapter));
+
+			wlansap_cleanup_cac_timer(
+				WLAN_HDD_GET_SAP_CTX_PTR(adapter));
+		}
 
 		status = hdd_get_next_adapter(hdd_ctx, adapterNode, &pNext);
 		adapterNode = pNext;
@@ -4642,6 +4715,8 @@ QDF_STATUS hdd_start_all_adapters(hdd_context_t *hdd_ctx)
 
 		hdd_wmm_init(adapter);
 
+		adapter->scan_info.mScanPending = false;
+
 		switch (adapter->device_mode) {
 		case QDF_STA_MODE:
 		case QDF_P2P_CLIENT_MODE:
@@ -4653,7 +4728,6 @@ QDF_STATUS hdd_start_all_adapters(hdd_context_t *hdd_ctx)
 			hdd_init_station_mode(adapter);
 			/* Open the gates for HDD to receive Wext commands */
 			adapter->isLinkUpSvcNeeded = false;
-			adapter->scan_info.mScanPending = false;
 
 			/* Indicate disconnect event to supplicant
 			 * if associated previously
@@ -5180,57 +5254,6 @@ static int hdd_wlan_register_ip6_notifier(hdd_context_t *hdd_ctx)
 }
 #endif
 
-#ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
-/**
- * hdd_logging_sock_activate_svc() - Activate logging
- * @hdd_ctx: HDD context
- *
- * Activates the logging service
- *
- * Return: Zero in case of success, negative value otherwise
- */
-static int hdd_logging_sock_activate_svc(hdd_context_t *hdd_ctx)
-{
-	int ret;
-	struct hdd_config *config = hdd_ctx->config;
-
-	if (!config->wlanLoggingEnable)
-		return 0;
-
-	ret = wlan_logging_sock_activate_svc(config->wlanLoggingToConsole,
-					     config->wlanLoggingNumBuf);
-	if (ret)
-		hdd_err("wlan_logging_sock_activate_svc failed: %d", ret);
-	return ret;
-}
-
-/**
- * wlan_hdd_logging_sock_deactivate_svc() - Deactivate logging
- * @hdd_ctx: HDD context
- *
- * Deactivates the logging service
- *
- * Return: 0 on deactivating the logging service
- */
-static int hdd_logging_sock_deactivate_svc(hdd_context_t *hdd_ctx)
-{
-	if (hdd_ctx && hdd_ctx->config->wlanLoggingEnable)
-		return wlan_logging_sock_deactivate_svc();
-
-	return 0;
-}
-#else
-static inline int hdd_logging_sock_activate_svc(hdd_context_t *hdd_ctx)
-{
-	return 0;
-}
-
-static inline int hdd_logging_sock_deactivate_svc(hdd_context_t *hdd_ctx)
-{
-	return 0;
-}
-#endif
-
 /**
  * hdd_register_notifiers - Register netdev notifiers.
  * @hdd_ctx: HDD context
@@ -5498,8 +5521,6 @@ static int hdd_context_deinit(hdd_context_t *hdd_ctx)
  */
 static void hdd_context_destroy(hdd_context_t *hdd_ctx)
 {
-
-	hdd_logging_sock_deactivate_svc(hdd_ctx);
 
 	wlan_hdd_deinit_tx_rx_histogram(hdd_ctx);
 
@@ -6765,10 +6786,13 @@ static uint8_t hdd_get_safe_channel_from_pcl_and_acs_range(
 		return INVALID_CHANNEL_ID;
 	}
 
-	if (!pcl.pcl_len) {
-		hdd_err("pcl length is zero. this is not expected");
-		return INVALID_CHANNEL_ID;
-	}
+	/*
+	 * In some scenarios, like hw dbs disabled, sap+sap case, if operating
+	 * channel is unsafe channel, the pcl may be empty, instead of return,
+	 * try to choose a safe channel from acs range.
+	 */
+	if (!pcl.pcl_len)
+		hdd_debug("pcl length is zero!");
 
 	hdd_debug("start:%d end:%d",
 		adapter->sessionCtx.ap.sapConfig.acs_cfg.start_ch,
@@ -6936,7 +6960,12 @@ void hdd_unsafe_channel_restart_sap(hdd_context_t *hdd_ctxt)
 			hdd_debug("sending coex indication");
 			wlan_hdd_send_svc_nlink_msg(hdd_ctxt->radio_index,
 					WLAN_SVC_LTE_COEX_IND, NULL, 0);
-			hdd_restart_sap(adapter_temp, restart_chan);
+			hdd_debug("driver to start sap: %d",
+				hdd_ctxt->config->sap_internal_restart);
+			if (hdd_ctxt->config->sap_internal_restart)
+				hdd_restart_sap(adapter_temp, restart_chan);
+			else
+				return;
 		}
 
 next_adapater:
@@ -7530,10 +7559,8 @@ static hdd_context_t *hdd_context_create(struct device *dev)
 	if (ret)
 		goto err_deinit_hdd_context;
 
-	ret = hdd_logging_sock_activate_svc(hdd_ctx);
-	if (ret)
-		goto err_free_histogram;
-
+	wlan_logging_set_log_to_console(hdd_ctx->config->wlanLoggingToConsole);
+	wlan_logging_set_active(hdd_ctx->config->wlanLoggingEnable);
 
 	/*
 	 * Update QDF trace levels based upon the code. The multicast
@@ -7547,9 +7574,6 @@ skip_multicast_logging:
 	hdd_set_trace_level_for_each(hdd_ctx);
 
 	return hdd_ctx;
-
-err_free_histogram:
-	wlan_hdd_deinit_tx_rx_histogram(hdd_ctx);
 
 err_deinit_hdd_context:
 	hdd_context_deinit(hdd_ctx);
@@ -9040,6 +9064,9 @@ int hdd_configure_cds(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 	cds_get_dfs_region(&dfs_reg);
 	cds_set_wma_dfs_region(dfs_reg);
 
+	if (hdd_enable_egap(hdd_ctx))
+		hdd_debug("enhance green ap is not enabled");
+
 	return 0;
 
 hdd_features_deinit:
@@ -9367,10 +9394,13 @@ void hdd_dp_trace_init(struct hdd_config *config)
 				&num_entries, sizeof(config_params));
 
 	/* calculating, num bw timer intervals in a second (1000ms) */
-	if (config->busBandwidthComputeInterval)
+	if (config->busBandwidthComputeInterval <= 1000 && config->busBandwidthComputeInterval > 0)
 		thresh_time_limit =
 			(1000 / config->busBandwidthComputeInterval);
-	else
+	else if (config->busBandwidthComputeInterval > 1000) {
+		hdd_err("busBandwidthComputeInterval > 1000, using 1000");
+		thresh_time_limit = 1;
+	} else
 		hdd_err("busBandwidthComputeInterval is 0, using defaults");
 
 	switch (num_entries) {
@@ -9533,9 +9563,6 @@ int hdd_wlan_startup(struct device *dev)
 	hdd_runtime_suspend_context_init(hdd_ctx);
 	memdump_init();
 	hdd_driver_memdump_init();
-
-	if (hdd_enable_egap(hdd_ctx))
-		hdd_debug("enhance green ap is not enabled");
 
 	if (hdd_ctx->config->fIsImpsEnabled)
 		hdd_set_idle_ps_config(hdd_ctx, true);
@@ -10840,7 +10867,7 @@ static int __hdd_module_init(void)
 	pr_err("%s: Loading driver v%s (%s)%s\n",
 	       WLAN_MODULE_NAME,
 	       QWLAN_VERSIONSTR,
-	       BUILD_TIMESTAMP,
+	       g_wlan_driver_timestamp,
 	       TIMER_MANAGER_STR MEMORY_DEBUG_STR);
 
 	ret = wlan_hdd_state_ctrl_param_create();
@@ -11624,29 +11651,6 @@ int hdd_get_rssi_snr_by_bssid(hdd_adapter_t *adapter, const uint8_t *bssid,
 }
 
 /**
- * hdd_send_limit_off_chan_cmd() - send limit off-channel command parameters
- * @param - pointer to sir_limit_off_chan
- *
- * Return: 0 on success and non zero value on failure
- */
-static int hdd_send_limit_off_chan_cmd(struct sir_limit_off_chan *param)
-{
-	cds_msg_t msg = {0};
-	QDF_STATUS status;
-
-	msg.type = SIR_HAL_SET_LIMIT_OFF_CHAN;
-	msg.reserved = 0;
-	msg.bodyptr = param;
-
-	status = cds_mq_post_message(QDF_MODULE_ID_WMA, &msg);
-	if (status != QDF_STATUS_SUCCESS) {
-		hdd_err("Not able to post limit off chan param message to WMA");
-		return -EIO;
-	}
-	return 0;
-}
-
-/**
  * hdd_set_limit_off_chan_for_tos() - set limit off-channel command parameters
  * @adapter - HDD adapter
  * @tos - type of service
@@ -11662,6 +11666,7 @@ int hdd_set_limit_off_chan_for_tos(hdd_adapter_t *adapter, enum tos tos,
 	struct sir_limit_off_chan *cmd;
 	hdd_context_t *hdd_ctx;
 	int ret;
+	tHalHandle hal;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -11670,6 +11675,8 @@ int hdd_set_limit_off_chan_for_tos(hdd_adapter_t *adapter, enum tos tos,
 		hdd_err("failed to set limit off chan params");
 		return ret;
 	}
+
+	hal = hdd_ctx->hHal;
 
 	cmd = qdf_mem_malloc(sizeof(struct sir_limit_off_chan));
 	if (!cmd) {
@@ -11704,24 +11711,18 @@ int hdd_set_limit_off_chan_for_tos(hdd_adapter_t *adapter, enum tos tos,
 		cds_set_cur_conc_system_pref(hdd_ctx->config->conc_system_pref);
 	}
 
-	cmd = qdf_mem_malloc(sizeof(struct sir_limit_off_chan));
-	if (!cmd) {
-		hdd_err("qdf_mem_malloc failed for limit off channel");
-		return -ENOMEM;
-	}
-
-	qdf_mem_zero(cmd, sizeof(struct sir_limit_off_chan));
-
 	cmd->vdev_id = adapter->sessionId;
 	cmd->is_tos_active = is_tos_active;
 	cmd->rest_time = hdd_ctx->config->nRestTimeConc;
 	cmd->skip_dfs_chans = true;
 
-	ret = hdd_send_limit_off_chan_cmd(cmd);
-	if (ret)
+	ret = sme_send_limit_off_chan_cmd(hal, cmd);
+	if (ret) {
 		qdf_mem_free(cmd);
+		return -ENOMEM;
+	}
 
-	return ret;
+	return 0;
 }
 
 /* Register the module init/exit functions */

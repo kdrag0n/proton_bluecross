@@ -192,15 +192,18 @@ typedef enum {
 	SME_AC_VO = 3
 } sme_ac_enum_type;
 
-/* TSPEC Direction Enum Type */
+/*---------------------------------------------------------------------------
+  Enumeration of the various TSPEC directions
+
+  From 802.11e/WMM specifications
+  ---------------------------------------------------------------------------*/
+
 typedef enum {
-	/* uplink */
-	SME_TX_DIR = 0,
-	/* downlink */
-	SME_RX_DIR = 1,
-	/* bidirectional */
-	SME_BI_DIR = 2,
-} sme_tspec_dir_type;
+	SME_QOS_WMM_TS_DIR_UPLINK = 0,
+	SME_QOS_WMM_TS_DIR_DOWNLINK = 1,
+	SME_QOS_WMM_TS_DIR_RESV = 2,    /* Reserved */
+	SME_QOS_WMM_TS_DIR_BOTH = 3,
+} sme_qos_wmm_dir_type;
 
 /**
  * struct sme_oem_capability - OEM capability to be exchanged between host
@@ -265,7 +268,7 @@ QDF_STATUS sme_close_session(tHalHandle hHal, uint8_t sessionId,
 		csr_roamSessionCloseCallback callback,
 		void *pContext);
 QDF_STATUS sme_update_roam_params(tHalHandle hHal, uint8_t session_id,
-		struct roam_ext_params roam_params_src, int update_param);
+		struct roam_ext_params *roam_params_src, int update_param);
 #ifdef FEATURE_WLAN_SCAN_PNO
 void sme_update_roam_pno_channel_prediction_config(
 		tHalHandle hal, tCsrConfigParam *csr_config,
@@ -1052,7 +1055,7 @@ QDF_STATUS sme_enable_uapsd_for_ac(void *cds_ctx, uint8_t sta_id,
 				      sme_ac_enum_type ac, uint8_t tid,
 				      uint8_t pri, uint32_t srvc_int,
 				      uint32_t sus_int,
-				      sme_tspec_dir_type dir,
+				      sme_qos_wmm_dir_type dir,
 				      uint8_t psb, uint32_t sessionId,
 				      uint32_t delay_interval);
 
@@ -1779,4 +1782,15 @@ int sme_cli_set_command(int vdev_id, int param_id, int sval, int vpdev);
  */
 void sme_set_chan_info_callback(tHalHandle hal_handle,
 			void (*callback)(struct scan_chan_info *chan_info));
+
+/**
+ * sme_send_limit_off_chan_cmd() - send limit off-channel command parameters
+ * @hal: hal handle for getting global mac struct
+ * @param:  pointer to sir_limit_off_chan
+ *
+ * Return: 0 on success and non zero value on failure
+ */
+
+QDF_STATUS sme_send_limit_off_chan_cmd(tHalHandle hal,
+		struct sir_limit_off_chan *param);
 #endif /* #if !defined( __SME_API_H ) */

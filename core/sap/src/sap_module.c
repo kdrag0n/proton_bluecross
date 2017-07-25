@@ -702,6 +702,19 @@ wlansap_set_scan_acs_channel_params(tsap_Config_t *pconfig,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+eCsrPhyMode wlan_sap_get_phymode(void *ctx)
+{
+	ptSapContext sap_ctx = CDS_GET_SAP_CB(ctx);
+
+	if (!sap_ctx) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+			FL("Invalid SAP pointer from ctx"));
+		return 0;
+	}
+	return sap_ctx->csr_roamProfile.phyMode;
+}
+
 /**
  * wlan_sap_get_vht_ch_width() - Returns SAP VHT channel width.
  * @ctx:	Pointer to cds Context or Sap Context based on MBSSID
@@ -3742,4 +3755,27 @@ wlansap_set_invalid_session(void *cds_ctx)
 	psapctx->isSapSessionOpen = false;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void wlansap_cleanup_cac_timer(void *sap_ctx)
+{
+	tHalHandle hal;
+	ptSapContext psap_ctx;
+	tpAniSirGlobal pmac;
+
+	if (!sap_ctx)
+		return;
+
+	psap_ctx = CDS_GET_SAP_CB(sap_ctx);
+	hal = CDS_GET_HAL_CB(psap_ctx->p_cds_gctx);
+	pmac = PMAC_STRUCT(hal);
+	if (pmac->sap.SapDfsInfo.is_dfs_cac_timer_running) {
+		qdf_mc_timer_stop(&pmac->sap.SapDfsInfo.
+				  sap_dfs_cac_timer);
+		pmac->sap.SapDfsInfo.is_dfs_cac_timer_running = 0;
+		qdf_mc_timer_destroy(
+			&pmac->sap.SapDfsInfo.sap_dfs_cac_timer);
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+			FL("sapdfs, force cleanup running dfs cac timer"));
+	}
 }

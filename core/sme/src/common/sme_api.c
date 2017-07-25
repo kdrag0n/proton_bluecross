@@ -608,7 +608,7 @@ tSmeCmd *sme_get_command_buffer(tpAniSirGlobal pMac)
 				false,
 				pMac->sme.enableSelfRecovery ? true : false);
 		else if (pMac->sme.enableSelfRecovery)
-			cds_trigger_recovery(false);
+			cds_trigger_recovery();
 		else
 			QDF_BUG(0);
 	}
@@ -1447,7 +1447,7 @@ QDF_STATUS sme_update_config(tHalHandle hHal, tpSmeConfigParams
  * Return: Return the status of the updation.
  */
 QDF_STATUS sme_update_roam_params(tHalHandle hal,
-	uint8_t session_id, struct roam_ext_params roam_params_src,
+	uint8_t session_id, struct roam_ext_params *roam_params_src,
 	int update_param)
 {
 	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
@@ -1458,31 +1458,31 @@ QDF_STATUS sme_update_roam_params(tHalHandle hal,
 	switch (update_param) {
 	case REASON_ROAM_EXT_SCAN_PARAMS_CHANGED:
 		roam_params_dst->raise_rssi_thresh_5g =
-			roam_params_src.raise_rssi_thresh_5g;
+			roam_params_src->raise_rssi_thresh_5g;
 		roam_params_dst->drop_rssi_thresh_5g =
-			roam_params_src.drop_rssi_thresh_5g;
+			roam_params_src->drop_rssi_thresh_5g;
 		roam_params_dst->raise_factor_5g =
-			roam_params_src.raise_factor_5g;
+			roam_params_src->raise_factor_5g;
 		roam_params_dst->drop_factor_5g =
-			roam_params_src.drop_factor_5g;
+			roam_params_src->drop_factor_5g;
 		roam_params_dst->max_raise_rssi_5g =
-			roam_params_src.max_raise_rssi_5g;
+			roam_params_src->max_raise_rssi_5g;
 		roam_params_dst->max_drop_rssi_5g =
-			roam_params_src.max_drop_rssi_5g;
+			roam_params_src->max_drop_rssi_5g;
 		roam_params_dst->alert_rssi_threshold =
-			roam_params_src.alert_rssi_threshold;
+			roam_params_src->alert_rssi_threshold;
 		roam_params_dst->is_5g_pref_enabled = true;
 		break;
 	case REASON_ROAM_SET_SSID_ALLOWED:
 		qdf_mem_set(&roam_params_dst->ssid_allowed_list, 0,
 				sizeof(tSirMacSSid) * MAX_SSID_ALLOWED_LIST);
 		roam_params_dst->num_ssid_allowed_list =
-			roam_params_src.num_ssid_allowed_list;
+			roam_params_src->num_ssid_allowed_list;
 		for (i = 0; i < roam_params_dst->num_ssid_allowed_list; i++) {
 			roam_params_dst->ssid_allowed_list[i].length =
-				roam_params_src.ssid_allowed_list[i].length;
+				roam_params_src->ssid_allowed_list[i].length;
 			qdf_mem_copy(roam_params_dst->ssid_allowed_list[i].ssId,
-				roam_params_src.ssid_allowed_list[i].ssId,
+				roam_params_src->ssid_allowed_list[i].ssId,
 				roam_params_dst->ssid_allowed_list[i].length);
 		}
 		break;
@@ -1490,28 +1490,28 @@ QDF_STATUS sme_update_roam_params(tHalHandle hal,
 		qdf_mem_set(&roam_params_dst->bssid_favored, 0,
 			sizeof(tSirMacAddr) * MAX_BSSID_FAVORED);
 		roam_params_dst->num_bssid_favored =
-			roam_params_src.num_bssid_favored;
+			roam_params_src->num_bssid_favored;
 		for (i = 0; i < roam_params_dst->num_bssid_favored; i++) {
 			qdf_mem_copy(&roam_params_dst->bssid_favored[i],
-				&roam_params_src.bssid_favored[i],
+				&roam_params_src->bssid_favored[i],
 				sizeof(tSirMacAddr));
 			roam_params_dst->bssid_favored_factor[i] =
-				roam_params_src.bssid_favored_factor[i];
+				roam_params_src->bssid_favored_factor[i];
 		}
 		break;
 	case REASON_ROAM_SET_BLACKLIST_BSSID:
 		qdf_mem_set(&roam_params_dst->bssid_avoid_list, 0,
 			QDF_MAC_ADDR_SIZE * MAX_BSSID_AVOID_LIST);
 		roam_params_dst->num_bssid_avoid_list =
-			roam_params_src.num_bssid_avoid_list;
+			roam_params_src->num_bssid_avoid_list;
 		for (i = 0; i < roam_params_dst->num_bssid_avoid_list; i++) {
 			qdf_copy_macaddr(&roam_params_dst->bssid_avoid_list[i],
-					&roam_params_src.bssid_avoid_list[i]);
+					&roam_params_src->bssid_avoid_list[i]);
 		}
 		break;
 	case REASON_ROAM_GOOD_RSSI_CHANGED:
 		roam_params_dst->good_rssi_roam =
-			roam_params_src.good_rssi_roam;
+			roam_params_src->good_rssi_roam;
 		break;
 	default:
 		break;
@@ -8905,19 +8905,19 @@ QDF_STATUS sme_update_is_mawc_ini_feature_enabled(tHalHandle hHal,
  * Return QDF_STATUS_SUCCESS on success
  *	   Other status on failure
  */
-QDF_STATUS sme_stop_roaming(tHalHandle hHal, uint8_t sessionId, uint8_t reason)
+QDF_STATUS sme_stop_roaming(tHalHandle hal, uint8_t session_id, uint8_t reason)
 {
 	tSirMsgQ wma_msg;
 	tSirRetStatus status;
 	tSirRoamOffloadScanReq *req;
-	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hHal);
-	void *wma = cds_get_context(QDF_MODULE_ID_WMA);
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+	tpCsrNeighborRoamControlInfo roam_info;
 
-	if (!wma) {
-		sme_err("wma is null");
-		return QDF_STATUS_E_NULL_VALUE;
+	if (!CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
+		sme_err("incorrect session/vdev ID");
+		return QDF_STATUS_E_INVAL;
 	}
-
+	roam_info = &mac_ctx->roam.neighborRoamInfo[session_id];
 	req = qdf_mem_malloc(sizeof(*req));
 	if (!req) {
 		sme_err("failed to allocated memory");
@@ -8929,8 +8929,8 @@ QDF_STATUS sme_stop_roaming(tHalHandle hHal, uint8_t sessionId, uint8_t reason)
 		req->reason = REASON_ROAM_STOP_ALL;
 	else
 		req->reason = REASON_ROAM_SYNCH_FAILED;
-	req->sessionId = sessionId;
-	if (csr_neighbor_middle_of_roaming(mac_ctx, sessionId))
+	req->sessionId = session_id;
+	if (csr_neighbor_middle_of_roaming(mac_ctx, session_id))
 		req->middle_of_roaming = 1;
 	else
 		csr_roam_reset_roam_params(mac_ctx);
@@ -8944,6 +8944,8 @@ QDF_STATUS sme_stop_roaming(tHalHandle hHal, uint8_t sessionId, uint8_t reason)
 		qdf_mem_free(req);
 		return QDF_STATUS_E_FAULT;
 	}
+	roam_info->b_roam_scan_offload_started = false;
+	roam_info->last_sent_cmd = ROAM_SCAN_OFFLOAD_STOP;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -11955,7 +11957,7 @@ void active_list_cmd_timeout_handle(void *userData)
 
 	if (mac_ctx->sme.enableSelfRecovery) {
 		sme_save_active_cmd_stats(hal);
-		cds_trigger_recovery(false);
+		cds_trigger_recovery();
 	} else {
 		if (!mac_ctx->roam.configParam.enable_fatal_event &&
 		   !(cds_is_load_or_unload_in_progress() ||
@@ -12766,8 +12768,6 @@ static QDF_STATUS sme_process_channel_change_resp(tpAniSirGlobal pMac,
 		proam_info.channelChangeRespEvent->sessionId = SessionId;
 		proam_info.channelChangeRespEvent->newChannelNumber =
 			pChnlParams->channelNumber;
-		proam_info.channelChangeRespEvent->secondaryChannelOffset =
-			pChnlParams->ch_width;
 
 		if (pChnlParams->status == QDF_STATUS_SUCCESS) {
 			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
@@ -15124,7 +15124,7 @@ QDF_STATUS sme_enable_uapsd_for_ac(void *cds_ctx, uint8_t sta_id,
 				   sme_ac_enum_type ac, uint8_t tid,
 				   uint8_t pri, uint32_t srvc_int,
 				   uint32_t sus_int,
-				   sme_tspec_dir_type dir,
+				   sme_qos_wmm_dir_type dir,
 				   uint8_t psb, uint32_t sessionId,
 				   uint32_t delay_interval)
 {
@@ -18172,4 +18172,37 @@ void sme_set_chan_info_callback(tHalHandle hal_handle,
 	tpAniSirGlobal mac = PMAC_STRUCT(hal_handle);
 
 	mac->chan_info_cb = callback;
+}
+
+/**
+ * sme_send_limit_off_chan_cmd() - send limit off-channel command parameters
+ * @hal: hal handle for getting global mac struct
+ * @param - pointer to sir_limit_off_chan
+ * Return: 0 on success and non zero value on failure
+ */
+QDF_STATUS sme_send_limit_off_chan_cmd(tHalHandle hal,
+		struct sir_limit_off_chan *param)
+{
+	cds_msg_t msg = {0};
+	QDF_STATUS status;
+	tpAniSirGlobal  mac;
+
+	mac = PMAC_STRUCT(hal);
+
+	mac->limit_off_chan_params.is_active = param->is_tos_active;
+	mac->limit_off_chan_params.vdev_id = param->vdev_id;
+	mac->limit_off_chan_params.max_offchan_time = param->max_off_chan_time;
+	mac->limit_off_chan_params.rest_time = param->rest_time;
+	mac->limit_off_chan_params.skip_dfs_chan = param->skip_dfs_chans;
+
+	msg.type = SIR_HAL_SET_LIMIT_OFF_CHAN;
+	msg.reserved = 0;
+	msg.bodyptr = param;
+
+	status = cds_mq_post_message(QDF_MODULE_ID_WMA, &msg);
+	if (status != QDF_STATUS_SUCCESS) {
+		sme_err("Not able to post limit off chan param message to WMA");
+		return QDF_STATUS_E_NOMEM;
+	}
+	return QDF_STATUS_SUCCESS;
 }

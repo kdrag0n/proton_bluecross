@@ -90,6 +90,8 @@
 
 #define HDD_IPA_MAX_PENDING_EVENT_COUNT    20
 
+#define IPA_WLAN_RX_SOFTIRQ_THRESH 16
+
 enum hdd_ipa_uc_op_code {
 	HDD_IPA_UC_OPCODE_TX_SUSPEND = 0,
 	HDD_IPA_UC_OPCODE_TX_RESUME = 1,
@@ -738,6 +740,9 @@ static void hdd_ipa_uc_loaded_uc_cb(void *priv_ctxt)
 	uc_op_work->msg = msg;
 	schedule_work(&uc_op_work->work);
 
+	/* work handler will free the msg buffer */
+	return;
+
 done:
 	qdf_mem_free(msg);
 }
@@ -1008,6 +1013,12 @@ static void __hdd_ipa_uc_rt_debug_host_dump(hdd_context_t *hdd_ctx)
 		return;
 	}
 
+	if (!hdd_ipa_is_rt_debugging_enabled(hdd_ctx)) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG,
+			"%s: IPA RT debug is not enabled", __func__);
+		return;
+	}
+
 	HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
 		"========= WLAN-IPA DEBUG BUF DUMP ==========\n");
 	HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
@@ -1162,7 +1173,7 @@ static void hdd_ipa_uc_rt_debug_init(hdd_context_t *hdd_ctx)
 {
 	struct hdd_ipa_priv *hdd_ipa;
 
-	if (wlan_hdd_validate_context(hdd_ctx))
+	if (wlan_hdd_validate_context_in_loading(hdd_ctx))
 		return;
 
 	hdd_ipa = (struct hdd_ipa_priv *)hdd_ctx->hdd_ipa;
@@ -2083,6 +2094,7 @@ static void hdd_ipa_uc_op_cb(struct op_msg_type *op_msg, void *usr_ctxt)
 	if (HDD_IPA_UC_OPCODE_MAX <= msg->op_code) {
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
 			    "%s, INVALID OPCODE %d", __func__, msg->op_code);
+		qdf_mem_free(op_msg);
 		return;
 	}
 
@@ -3825,6 +3837,40 @@ static void hdd_ipa_destroy_rm_resource(struct hdd_ipa_priv *hdd_ipa)
 			    "RM CONS resource delete failed %d", ret);
 }
 
+#ifdef QCA_CONFIG_SMP
+static int hdd_ipa_aggregated_rx_ind(qdf_nbuf_t skb)
+{
+	return netif_rx_ni(skb);
+}
+#else
+static int hdd_ipa_aggregated_rx_ind(qdf_nbuf_t skb)
+{
+	struct iphdr *ip_h;
+	static atomic_t softirq_mitigation_cntr =
+		ATOMIC_INIT(IPA_WLAN_RX_SOFTIRQ_THRESH);
+	int result;
+
+	ip_h = (struct iphdr *)(skb->data);
+	if ((skb->protocol == htons(ETH_P_IP)) &&
+		(ip_h->protocol == IPPROTO_ICMP)) {
+		result = netif_rx_ni(skb);
+	} else {
+		/* Call netif_rx_ni for every IPA_WLAN_RX_SOFTIRQ_THRESH packets
+		 * to avoid excessive softirq's.
+		 */
+		if (atomic_dec_and_test(&softirq_mitigation_cntr)) {
+			result = netif_rx_ni(skb);
+			atomic_set(&softirq_mitigation_cntr,
+					IPA_WLAN_RX_SOFTIRQ_THRESH);
+		} else {
+			result = netif_rx(skb);
+		}
+	}
+
+	return result;
+}
+#endif
+
 /**
  * hdd_ipa_send_skb_to_network() - Send skb to kernel
  * @skb: network buffer
@@ -3838,6 +3884,7 @@ static void hdd_ipa_destroy_rm_resource(struct hdd_ipa_priv *hdd_ipa)
 static void hdd_ipa_send_skb_to_network(qdf_nbuf_t skb,
 	hdd_adapter_t *adapter)
 {
+	int result;
 	struct hdd_ipa_priv *hdd_ipa = ghdd_ipa;
 	unsigned int cpu_index;
 
@@ -3863,7 +3910,8 @@ static void hdd_ipa_send_skb_to_network(qdf_nbuf_t skb,
 	cpu_index = wlan_hdd_get_cpu();
 
 	++adapter->hdd_stats.hddTxRxStats.rxPackets[cpu_index];
-	if (netif_rx_ni(skb) == NET_RX_SUCCESS)
+	result = hdd_ipa_aggregated_rx_ind(skb);
+	if (result == NET_RX_SUCCESS)
 		++adapter->hdd_stats.hddTxRxStats.rxDelivered[cpu_index];
 	else
 		++adapter->hdd_stats.hddTxRxStats.rxRefused[cpu_index];
@@ -6119,4 +6167,22 @@ QDF_STATUS hdd_ipa_cleanup(hdd_context_t *hdd_ctx)
 
 	return ret;
 }
+
+int hdd_ipa_uc_smmu_map(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr)
+{
+	HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG, "Map: %d Num_buf: %d", map, num_buf);
+
+	if (!num_buf) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG, "No buffers to map/unmap");
+		return 0;
+	}
+
+	if (map)
+		return ipa_create_wdi_mapping(num_buf,
+			   (struct ipa_wdi_buffer_info *)buf_arr);
+	else
+		return ipa_release_wdi_mapping(num_buf,
+			   (struct ipa_wdi_buffer_info *)buf_arr);
+}
+
 #endif /* IPA_OFFLOAD */

@@ -97,8 +97,6 @@
 #define ROAMING_OFFLOAD_TIMER_STOP	2
 #define CSR_ROAMING_OFFLOAD_TIMEOUT_PERIOD    (5 * QDF_MC_TIMER_TO_SEC_UNIT)
 
-static bool b_roam_scan_offload_started;
-
 /* Static Type declarations */
 static tCsrRoamSession csr_roam_roam_session[CSR_ROAM_SESSION_MAX];
 
@@ -405,6 +403,9 @@ QDF_STATUS csr_open(tpAniSirGlobal pMac)
 			    (csr_ll_open(pMac->hHdd,
 					 &pMac->roam.roamCmdPendingList)))
 			break;
+
+		qdf_list_create(&pMac->roam.rssi_disallow_bssid,
+			MAX_RSSI_AVOID_BSSID_LIST);
 	} while (0);
 
 	return status;
@@ -502,12 +503,41 @@ QDF_STATUS csr_set_channels(tHalHandle hHal, tCsrConfigParam *pParam)
 	return status;
 }
 
+/**
+ * csr_assoc_rej_free_rssi_disallow_list() - Free the rssi diallowed
+ * BSSID entries and destroy the list
+ * @list: rssi based disallowed list entry
+ *
+ * Return: void
+ */
+static void csr_assoc_rej_free_rssi_disallow_list(qdf_list_t *list)
+{
+	QDF_STATUS status;
+	struct sir_rssi_disallow_lst *cur_node;
+	qdf_list_node_t *cur_lst = NULL, *next_lst = NULL;
+
+	qdf_list_peek_front(list, &cur_lst);
+	while (cur_lst) {
+		qdf_list_peek_next(list, cur_lst, &next_lst);
+		cur_node = qdf_container_of(cur_lst,
+			struct sir_rssi_disallow_lst, node);
+		status = qdf_list_remove_node(list, cur_lst);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			qdf_mem_free(cur_node);
+		cur_lst = next_lst;
+		next_lst = NULL;
+	}
+	qdf_list_destroy(list);
+}
+
 QDF_STATUS csr_close(tpAniSirGlobal pMac)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tSmeCmd *saved_scan_cmd;
 
 	csr_roam_close(pMac);
+	csr_assoc_rej_free_rssi_disallow_list(
+		&pMac->roam.rssi_disallow_bssid);
 	csr_scan_close(pMac);
 	csr_ll_close(&pMac->roam.statsClientReqList);
 	csr_ll_close(&pMac->roam.peStatsReqList);
@@ -1006,14 +1036,6 @@ QDF_STATUS csr_stop(tpAniSirGlobal pMac, tHalStopType stopType)
 		csr_roam_state_change(pMac, eCSR_ROAMING_STATE_STOP, sessionId);
 		pMac->roam.curSubState[sessionId] = eCSR_ROAM_SUBSTATE_NONE;
 	}
-
-	/* When HAL resets all the context information
-	 * in HAL is lost, so we might need to send the
-	 * scan offload request again when it comes
-	 * out of reset for scan offload to be functional
-	 */
-	if (HAL_STOP_TYPE_SYS_RESET == stopType)
-		b_roam_scan_offload_started = false;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2363,6 +2385,10 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 			cfg_set_int(pMac, WNI_CFG_PASSIVE_MINIMUM_CHANNEL_TIME,
 				    pParam->nPassiveMinChnTime);
 		}
+		pMac->roam.configParam.scan_probe_repeat_time =
+			pParam->scan_probe_repeat_time;
+		pMac->roam.configParam.scan_num_probes =
+			pParam->scan_num_probes;
 #ifdef WLAN_AP_STA_CONCURRENCY
 		if (pParam->nActiveMaxChnTimeConc) {
 			pMac->roam.configParam.nActiveMaxChnTimeConc =
@@ -2712,6 +2738,8 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 			pParam->sta_roam_policy_params.dfs_mode;
 		pMac->roam.configParam.sta_roam_policy.skip_unsafe_channels =
 			pParam->sta_roam_policy_params.skip_unsafe_channels;
+		pMac->roam.configParam.sta_roam_policy.sap_operating_band =
+			pParam->sta_roam_policy_params.sap_operating_band;
 
 		pMac->roam.configParam.tx_aggregation_size =
 			pParam->tx_aggregation_size;
@@ -2772,6 +2800,8 @@ QDF_STATUS csr_get_config_param(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
 	pParam->nActiveMinChnTime = cfg_params->nActiveMinChnTime;
 	pParam->nPassiveMaxChnTime = cfg_params->nPassiveMaxChnTime;
 	pParam->nPassiveMinChnTime = cfg_params->nPassiveMinChnTime;
+	pParam->scan_probe_repeat_time = cfg_params->scan_probe_repeat_time;
+	pParam->scan_num_probes = cfg_params->scan_num_probes;
 #ifdef WLAN_AP_STA_CONCURRENCY
 	pParam->nActiveMaxChnTimeConc = cfg_params->nActiveMaxChnTimeConc;
 	pParam->nActiveMinChnTimeConc = cfg_params->nActiveMinChnTimeConc;
@@ -5801,6 +5831,10 @@ static QDF_STATUS csr_roam_trigger_reassociate(tpAniSirGlobal mac_ctx,
 			if (!QDF_IS_STATUS_SUCCESS(status)) {
 				sme_err("failed status %d", status);
 				csr_release_command_roam(mac_ctx, cmd);
+			} else {
+				csr_neighbor_roam_state_transition(mac_ctx,
+					eCSR_NEIGHBOR_ROAM_STATE_REASSOCIATING,
+					session_id);
 			}
 
 			qdf_mem_free(pIes);
@@ -8044,6 +8078,10 @@ static void csr_roam_print_candidate_aps(tpAniSirGlobal pMac,
 	struct scan_result_list *bss_list = NULL;
 
 	bss_list = (struct scan_result_list *)hScanList;
+	if (!bss_list ||
+	   !csr_ll_count(&bss_list->List))
+		return;
+
 	pEntry = csr_ll_peek_head(&bss_list->List, LL_ACCESS_NOLOCK);
 	while (pEntry) {
 		pBssDesc = GET_BASE_ADDR(pEntry,
@@ -11205,6 +11243,14 @@ csr_roam_chk_lnk_swt_ch_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 				pSwitchChnInd->chan_params.center_freq_seg0;
 		roamInfo.chan_info.band_center_freq2 =
 				pSwitchChnInd->chan_params.center_freq_seg1;
+
+		if (CSR_IS_PHY_MODE_11ac(mac_ctx->roam.configParam.phyMode))
+			roamInfo.mode = SIR_SME_PHY_MODE_VHT;
+		else if (CSR_IS_PHY_MODE_11n(mac_ctx->roam.configParam.phyMode))
+			roamInfo.mode = SIR_SME_PHY_MODE_HT;
+		else
+			roamInfo.mode = SIR_SME_PHY_MODE_LEGACY;
+
 		status = csr_roam_call_callback(mac_ctx, sessionId,
 				&roamInfo, 0, eCSR_ROAM_STA_CHANNEL_SWITCH,
 				eCSR_ROAM_RESULT_NONE);
@@ -13986,9 +14032,10 @@ QDF_STATUS csr_roam_del_pmkid_from_cache(tpAniSirGlobal pMac,
 				&pmksa->BSSID))
 			fMatchFound = 1;
 
-		else if ((!qdf_mem_cmp(cached_pmksa->ssid,
-			pmksa->ssid, pmksa->ssid_len)) &&
-			(!qdf_mem_cmp(cached_pmksa->cache_id,
+		else if (cached_pmksa->ssid_len &&
+				(!qdf_mem_cmp(cached_pmksa->ssid,
+				pmksa->ssid, pmksa->ssid_len)) &&
+				(!qdf_mem_cmp(cached_pmksa->cache_id,
 				pmksa->cache_id, CACHE_ID_LEN)))
 			fMatchFound = 1;
 
@@ -17387,6 +17434,7 @@ QDF_STATUS csr_get_snr(tpAniSirGlobal pMac,
 
 	status = csr_roam_get_session_id_from_bssid(pMac, &bssId, &sessionId);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		qdf_mem_free(pMsg);
 		sme_err("Couldn't find session_id for given BSSID");
 		return status;
 	}
@@ -18349,24 +18397,24 @@ static void check_allowed_ssid_list(tSirRoamOffloadScanReq *req_buffer,
 /*
  * Below Table describe whether RSO command can be send down to fimrware or not.
  * Host check it on the basis of previous RSO command sent down to firmware.
- *||==========================================================================||
- *|| New cmd        |            LAST SENT COMMAND --->                       ||
- *||====|=====================================================================||
- *||    V           | START | STOP | RESTART | UPDATE_CFG| ABORT_SCAN         ||
- *|| -------------------------------------------------------------------------||
- *|| RSO_START      | NO    | YES  |  NO     | NO        | NO                 ||
- *|| RSO_STOP       | YES   | YES  |  YES    | YES       | YES                ||
- *|| RSO_RESTART    | YES   | YES  |  NO     | YES       | YES                ||
- *|| RSO_UPDATE_CFG | YES   | NO   |  YES    | YES       | YES                ||
- *|| RSO_ABORT_SCAN | YES   | NO   |  YES    | YES       | YES                ||
- *||==========================================================================||
+ * ||=========================================================================||
+ * || New cmd        |            LAST SENT COMMAND --->                      ||
+ * ||====|====================================================================||
+ * ||    V           | START | STOP | RESTART | UPDATE_CFG| ABORT_SCAN        ||
+ * || ------------------------------------------------------------------------||
+ * || RSO_START      | NO    | YES  |  NO     | YES       | NO                ||
+ * || RSO_STOP       | YES   | YES  |  YES    | YES       | YES               ||
+ * || RSO_RESTART    | YES   | YES  |  NO     | YES       | YES               ||
+ * || RSO_UPDATE_CFG | YES   | NO   |  YES    | YES       | YES               ||
+ * || RSO_ABORT_SCAN | YES   | NO   |  YES    | YES       | YES               ||
+ * ||=========================================================================||
  **/
 #define RSO_START_BIT       (1<<ROAM_SCAN_OFFLOAD_START)
 #define RSO_STOP_BIT        (1<<ROAM_SCAN_OFFLOAD_STOP)
 #define RSO_RESTART_BIT     (1<<ROAM_SCAN_OFFLOAD_RESTART)
 #define RSO_UPDATE_CFG_BIT  (1<<ROAM_SCAN_OFFLOAD_UPDATE_CFG)
 #define RSO_ABORT_SCAN_BIT  (1<<ROAM_SCAN_OFFLOAD_ABORT_SCAN)
-#define RSO_START_ALLOW_MASK   (RSO_STOP_BIT)
+#define RSO_START_ALLOW_MASK   (RSO_STOP_BIT | RSO_UPDATE_CFG_BIT)
 #define RSO_STOP_ALLOW_MASK    (RSO_UPDATE_CFG_BIT | RSO_RESTART_BIT | \
 		RSO_STOP_BIT | RSO_START_BIT | RSO_ABORT_SCAN_BIT)
 #define RSO_RESTART_ALLOW_MASK (RSO_UPDATE_CFG_BIT | RSO_START_BIT | \
@@ -18760,7 +18808,7 @@ csr_roam_offload_scan(tpAniSirGlobal mac_ctx, uint8_t session_id,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if ((true == b_roam_scan_offload_started)
+	if ((true == roam_info->b_roam_scan_offload_started)
 	    && (ROAM_SCAN_OFFLOAD_START == command)) {
 		sme_err("Roam Scan Offload is already started");
 		return QDF_STATUS_E_FAILURE;
@@ -18922,9 +18970,9 @@ csr_roam_offload_scan(tpAniSirGlobal mac_ctx, uint8_t session_id,
 		return QDF_STATUS_E_FAILURE;
 	}
 	if (ROAM_SCAN_OFFLOAD_START == command)
-		b_roam_scan_offload_started = true;
+		roam_info->b_roam_scan_offload_started = true;
 	else if (ROAM_SCAN_OFFLOAD_STOP == command)
-		b_roam_scan_offload_started = false;
+		roam_info->b_roam_scan_offload_started = false;
 
 	/* update the last sent cmd */
 	roam_info->last_sent_cmd = command;
@@ -20881,7 +20929,6 @@ static QDF_STATUS csr_process_roam_sync_callback(tpAniSirGlobal mac_ctx,
 		eCSR_ASSOC_STATE_TYPE_INFRA_ASSOCIATED;
 	sme_qos_csr_event_ind(mac_ctx, session_id,
 		SME_QOS_CSR_REASSOC_COMPLETE, &assoc_info);
-	sme_qos_remove_addts_delts_cmd(mac_ctx, session_id);
 	roam_info->pBssDesc = bss_desc;
 	conn_profile->acm_mask = sme_qos_get_acm_mask(mac_ctx,
 			bss_desc, NULL);

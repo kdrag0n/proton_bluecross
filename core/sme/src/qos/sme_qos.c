@@ -325,7 +325,7 @@ struct sme_qos_searchinfo {
 	uint8_t sessionId;
 	uint8_t index;
 	union sme_qos_searchkey key;
-	sme_QosWmmDirType direction;
+	sme_qos_wmm_dir_type direction;
 	uint8_t tspec_mask;
 };
 /*
@@ -915,28 +915,6 @@ QDF_STATUS sme_qos_validate_params(tpAniSirGlobal pMac,
 		qdf_mem_free(pIes);
 
 	return status;
-}
-
-void sme_qos_remove_addts_delts_cmd(tpAniSirGlobal mac_ctx, uint8_t session_id)
-{
-	tListElem *entry;
-	tSmeCmd *command;
-
-	entry = csr_ll_peek_head(&mac_ctx->sme.smeCmdActiveList,
-				 LL_ACCESS_LOCK);
-	if (NULL == entry)
-		return;
-	command = GET_BASE_ADDR(entry, tSmeCmd, Link);
-	if ((eSmeCommandAddTs   == command->command ||
-	    eSmeCommandDelTs == command->command) &&
-	    command->sessionId == session_id) {
-		if (csr_ll_remove_entry(&mac_ctx->sme.smeCmdActiveList, entry,
-		    LL_ACCESS_LOCK)) {
-			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
-			      "%s: removed addts/delts command", __func__);
-			qos_release_command(mac_ctx, command);
-		}
-	}
 }
 
 /*
@@ -3525,7 +3503,7 @@ static QDF_STATUS sme_qos_process_ft_reassoc_req_ev(
  * Return: None
  */
 static void sme_qos_fill_aggr_info(int ac_id, int ts_id,
-				   sme_QosWmmDirType direction,
+				   sme_qos_wmm_dir_type direction,
 				   tSirAggrQosReq *msg,
 				   struct sme_qos_sessioninfo *session)
 {
@@ -3857,7 +3835,7 @@ static QDF_STATUS sme_qos_find_matching_tspec_lfr3(tpAniSirGlobal mac_ctx,
 	struct sme_qos_acinfo *ac_info;
 	uint8_t tspec_flow_idx;
 	bool found = false;
-	sme_QosWmmDirType direction, qos_dir;
+	sme_qos_wmm_dir_type direction, qos_dir;
 	uint8_t ac1;
 	tDot11fIERICDataDesc *ric_data = NULL;
 	uint32_t ric_len;

@@ -175,6 +175,7 @@ enum log_event_indicator {
  * @WLAN_LOG_REASON_SCAN_NOT_ALLOWED: scan not allowed due to connection states
  * @WLAN_LOG_REASON_HB_FAILURE: station triggered heart beat failure with AP
  * @WLAN_LOG_REASON_ROAM_HO_FAILURE: Handover failed during LFR3 roaming
+ * @WLAN_LOG_REASON_DISCONNECT: Disconnect because of some failure
  */
 enum log_event_host_reason_code {
 	WLAN_LOG_REASON_CODE_UNUSED,
@@ -190,7 +191,8 @@ enum log_event_host_reason_code {
 	WLAN_LOG_REASON_NO_SCAN_RESULTS,
 	WLAN_LOG_REASON_SCAN_NOT_ALLOWED,
 	WLAN_LOG_REASON_HB_FAILURE,
-	WLAN_LOG_REASON_ROAM_HO_FAILURE
+	WLAN_LOG_REASON_ROAM_HO_FAILURE,
+	WLAN_LOG_REASON_DISCONNECT
 };
 
 
@@ -894,6 +896,23 @@ struct vdev_type_nss {
 	uint8_t ocb;
 };
 
+/**
+ * struct limit_off_chan_params - limit off channel parameters
+ * @is_active: status of parameters.
+ * @vdev_id: vdev_id
+ * @max_offchan_time: max allowed off channel time
+ * @rest_time: home channel time
+ * @skip_dfs_chan: skip DFS channels during scan
+ * Holds the limit off channel parameters.
+ */
+struct limit_off_chan_params {
+	bool is_active;
+	uint32_t vdev_id;
+	uint32_t max_offchan_time;
+	uint32_t rest_time;
+	bool skip_dfs_chan;
+};
+
 /* ------------------------------------------------------------------- */
 /* / MAC Sirius parameter structure */
 typedef struct sAniSirGlobal {
@@ -970,6 +989,7 @@ typedef struct sAniSirGlobal {
 	bool snr_monitor_enabled;
 	/* channel information callback */
 	void (*chan_info_cb)(struct scan_chan_info *chan_info);
+	struct limit_off_chan_params limit_off_chan_params;
 } tAniSirGlobal;
 
 typedef enum {

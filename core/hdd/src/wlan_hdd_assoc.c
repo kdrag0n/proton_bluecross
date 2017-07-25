@@ -1995,8 +1995,11 @@ static void hdd_send_re_assoc_event(struct net_device *dev,
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
 			   buf_ssid_ie, ssid_ie_len);
 	final_req_ie = qdf_mem_malloc(IW_GENERIC_IE_MAX);
-	if (final_req_ie == NULL)
+	if (final_req_ie == NULL) {
+		if (bss)
+			cfg80211_put_bss(pAdapter->wdev.wiphy, bss);
 		goto done;
+	}
 	buf_ptr = final_req_ie;
 	qdf_mem_copy(buf_ptr, buf_ssid_ie, ssid_ie_len);
 	buf_ptr += ssid_ie_len;
@@ -3719,12 +3722,11 @@ hdd_roam_tdls_status_update_handler(hdd_adapter_t *pAdapter,
 	{
 		if (eSIR_SME_SUCCESS != pRoamInfo->statusCode) {
 			hdd_err("Add Sta failed. status code: %d",
-				pRoamInfo->statusCode);
+					pRoamInfo->statusCode);
+			pAdapter->tdlsAddStaStatus = QDF_STATUS_E_FAILURE;
+		} else {
+			pAdapter->tdlsAddStaStatus = QDF_STATUS_SUCCESS;
 		}
-		/* store the ucast signature which will be used later when
-		 * registering to TL
-		 */
-		pAdapter->tdlsAddStaStatus = pRoamInfo->statusCode;
 		complete(&pAdapter->tdls_add_station_comp);
 		break;
 	}
@@ -4643,7 +4645,8 @@ static void hdd_roam_channel_switch_handler(hdd_adapter_t *adapter,
 	else
 		cfg80211_put_bss(wiphy, bss);
 
-	status = hdd_chan_change_notify(adapter, adapter->dev, chan_change);
+	status = hdd_chan_change_notify(adapter, adapter->dev, chan_change,
+			roam_info->mode == SIR_SME_PHY_MODE_LEGACY);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("channel change notification failed");
 

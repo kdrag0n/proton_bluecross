@@ -671,9 +671,10 @@ static void hdd_issue_stored_joinreq(hdd_adapter_t *sta_adapter,
 
 /**
  * hdd_chan_change_notify() - Function to notify hostapd about channel change
- * @hostapd_adapter	hostapd adapter
+ * @hostapd_adapter:	hostapd adapter
  * @dev:		Net device structure
  * @chan_change:	New channel change parameters
+ * @legacy_phymode:	is the phymode legacy
  *
  * This function is used to notify hostapd about the channel change
  *
@@ -682,7 +683,8 @@ static void hdd_issue_stored_joinreq(hdd_adapter_t *sta_adapter,
  */
 QDF_STATUS hdd_chan_change_notify(hdd_adapter_t *adapter,
 		struct net_device *dev,
-		struct hdd_chan_change_params chan_change)
+		struct hdd_chan_change_params chan_change,
+		bool legacy_phymode)
 {
 	struct ieee80211_channel *chan;
 	struct cfg80211_chan_def chandef;
@@ -709,20 +711,23 @@ QDF_STATUS hdd_chan_change_notify(hdd_adapter_t *adapter,
 		hdd_err("Invalid input frequency for channel conversion");
 		return QDF_STATUS_E_FAILURE;
 	}
-
-	switch (chan_change.chan_params.sec_ch_offset) {
-	case PHY_SINGLE_CHANNEL_CENTERED:
-		channel_type = NL80211_CHAN_HT20;
-		break;
-	case PHY_DOUBLE_CHANNEL_HIGH_PRIMARY:
-		channel_type = NL80211_CHAN_HT40MINUS;
-		break;
-	case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
-		channel_type = NL80211_CHAN_HT40PLUS;
-		break;
-	default:
+	if (legacy_phymode) {
 		channel_type = NL80211_CHAN_NO_HT;
-		break;
+	} else {
+		switch (chan_change.chan_params.sec_ch_offset) {
+		case PHY_SINGLE_CHANNEL_CENTERED:
+			channel_type = NL80211_CHAN_HT20;
+			break;
+		case PHY_DOUBLE_CHANNEL_HIGH_PRIMARY:
+			channel_type = NL80211_CHAN_HT40MINUS;
+			break;
+		case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
+			channel_type = NL80211_CHAN_HT40PLUS;
+			break;
+		default:
+			channel_type = NL80211_CHAN_NO_HT;
+			break;
+		}
 	}
 
 	cfg80211_chandef_create(&chandef, chan, channel_type);
@@ -1147,6 +1152,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct hdd_chan_change_params chan_change;
 	int ret = 0;
+	struct ch_params_s sap_ch_param = {0};
+	eCsrPhyMode phy_mode;
+	bool legacy_phymode;
 
 	dev = (struct net_device *)usrDataForCallback;
 	if (!dev) {
@@ -2039,19 +2047,41 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 					pHddCtx->config->force_sap_acs) {
 			return QDF_STATUS_SUCCESS;
 		}
+		sap_ch_param.ch_width =
+			pSapEvent->sapevt.sap_ch_selected.ch_width;
+		sap_ch_param.center_freq_seg0 =
+			pSapEvent->sapevt.sap_ch_selected.vht_seg0_center_ch;
+		sap_ch_param.center_freq_seg1 =
+			pSapEvent->sapevt.sap_ch_selected.vht_seg1_center_ch;
+		cds_set_channel_params(pSapEvent->sapevt.sap_ch_selected.pri_ch,
+			pSapEvent->sapevt.sap_ch_selected.ht_sec_ch,
+			&sap_ch_param);
+		phy_mode = wlan_sap_get_phymode(
+				WLAN_HDD_GET_SAP_CTX_PTR(pHostapdAdapter));
+		switch (phy_mode) {
+		case eCSR_DOT11_MODE_11n:
+		case eCSR_DOT11_MODE_11n_ONLY:
+		case eCSR_DOT11_MODE_11ac:
+		case eCSR_DOT11_MODE_11ac_ONLY:
+			legacy_phymode = false;
+			break;
+		default:
+			legacy_phymode = true;
+			break;
+		}
 		chan_change.chan =
 			  pSapEvent->sapevt.sap_ch_selected.pri_ch;
 		chan_change.chan_params.ch_width =
 			  pSapEvent->sapevt.sap_ch_selected.ch_width;
 		chan_change.chan_params.sec_ch_offset =
-			  pSapEvent->sapevt.sap_ch_selected.ht_sec_ch;
+			  sap_ch_param.sec_ch_offset;
 		chan_change.chan_params.center_freq_seg0 =
 			  pSapEvent->sapevt.sap_ch_selected.vht_seg0_center_ch;
 		chan_change.chan_params.center_freq_seg1 =
 			  pSapEvent->sapevt.sap_ch_selected.vht_seg1_center_ch;
 
 		return hdd_chan_change_notify(pHostapdAdapter, dev,
-						chan_change);
+						chan_change, legacy_phymode);
 
 	case eSAP_ACS_SCAN_SUCCESS_EVENT:
 		return hdd_handle_acs_scan_event(pSapEvent, pHostapdAdapter);
@@ -8098,11 +8128,6 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	pConfig->acs_cfg.acs_mode = false;
 	wlan_hdd_undo_acs(pAdapter);
 	qdf_mem_zero(&pConfig->acs_cfg, sizeof(struct sap_acs_cfg));
-
-	/* Remove the channel no from sap mandatory list if it is a
-	 * 5GHz channel */
-	if (CDS_IS_CHANNEL_5GHZ(pConfig->channel))
-		cds_remove_sap_mandatory_chan(pConfig->channel);
 
 	/* Stop all tx queues */
 	hdd_debug("Disabling queues");

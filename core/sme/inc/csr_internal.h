@@ -655,6 +655,8 @@ typedef struct tagCsrConfig {
 	uint32_t disallow_duration;
 	uint32_t rssi_channel_penalization;
 	uint32_t num_disallowed_aps;
+	uint32_t scan_probe_repeat_time;
+	uint32_t scan_num_probes;
 } tCsrConfig;
 
 typedef struct tagCsrChannelPowerInfo {
@@ -1033,6 +1035,7 @@ typedef struct tagCsrRoamStruct {
 	uint8_t *pReassocResp;          /* reassociation response from new AP */
 	uint16_t reassocRespLen;        /* length of reassociation response */
 	qdf_mc_timer_t packetdump_timer;
+	qdf_list_t rssi_disallow_bssid;
 } tCsrRoamStruct;
 
 #define GET_NEXT_ROAM_ID(pRoamStruct)  (((pRoamStruct)->nextRoamId + 1 == 0) ? \

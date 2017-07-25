@@ -755,7 +755,14 @@ void wma_set_bss_rate_flags(struct wma_txrx_node *iface,
 
 int32_t wmi_unified_send_txbf(tp_wma_handle wma, tpAddStaParams params);
 
-void wma_update_txrx_chainmask(int num_rf_chains, int *cmd_value);
+/**
+ * wma_check_txrx_chainmask() - check txrx chainmask
+ * @num_rf_chains: number of rf chains
+ * @cmd_value: command value
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS wma_check_txrx_chainmask(int num_rf_chains, int cmd_value);
 
 int wma_peer_state_change_event_handler(void *handle,
 					       uint8_t *event_buff,
@@ -993,7 +1000,8 @@ wma_unified_dfs_phyerr_filter_offload_enable(tp_wma_handle wma_handle);
 QDF_STATUS wma_pktlog_wmi_send_cmd(WMA_HANDLE handle,
 				   struct ath_pktlog_wmi_params *params);
 #endif
-
+int wma_d0_wow_disable_ack_event(void *handle, u_int8_t *event,
+				u_int32_t len);
 int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 				     uint32_t len);
 int wma_pdev_resume_event_handler(void *handle, uint8_t *event, uint32_t len);

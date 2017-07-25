@@ -129,6 +129,8 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 
 #define MAX_LEN_UDP_RESP_OFFLOAD 128
 
+#define MAX_RSSI_AVOID_BSSID_LIST    10
+
 /* Maximum number of realms present in fils indication element */
 #define SIR_MAX_REALM_COUNT 7
 /* Realm length */
@@ -903,6 +905,8 @@ typedef struct sSirSmeScanReq {
 	 * WNI_CFG_PASSIVE_MAXIMUM_CHANNEL_TIME) is used.
 	 */
 	uint32_t maxChannelTime;
+	uint32_t scan_probe_repeat_time;
+	uint32_t scan_num_probes;
 	enum wmi_dwelltime_adaptive_mode scan_adaptive_dwell_mode;
 	/**
 	 * returnAfterFirstMatch can take following values:
@@ -4015,6 +4019,8 @@ typedef struct sSirScanOffloadReq {
 	tSirScanType scanType;
 	uint32_t minChannelTime;
 	uint32_t maxChannelTime;
+	uint32_t scan_probe_repeat_time;
+	uint32_t scan_num_probes;
 	uint32_t scan_id;
 	uint32_t scan_requestor_id;
 	/* in units of milliseconds, ignored when not connected */
@@ -4474,7 +4480,6 @@ typedef struct sSirChanChangeResponse {
 	uint8_t sessionId;
 	uint8_t newChannelNumber;
 	uint8_t channelChangeStatus;
-	ePhyChanBondState secondaryChannelOffset;
 } tSirChanChangeResponse, *tpSirChanChangeResponse;
 
 typedef struct sSirStartBeaconIndication {
@@ -8070,6 +8075,23 @@ struct sir_peer_set_rx_blocksize {
 	uint32_t vdev_id;
 	struct qdf_mac_addr peer_macaddr;
 	uint32_t rx_block_ack_win_limit;
+};
+
+/**
+ * struct sir_rssi_disallow_lst - Structure holding Rssi based avoid candidate
+ * list
+ * @node: Node pointer
+ * @bssid: BSSID of the AP
+ * @retry_delay: Retry delay received during last rejection in ms
+ * @ expected_rssi: RSSI at which STA can initate
+ * @time_during_rejection: Timestamp during last rejection in millisec
+ */
+struct sir_rssi_disallow_lst {
+	qdf_list_node_t node;
+	struct qdf_mac_addr bssid;
+	uint32_t retry_delay;
+	int8_t expected_rssi;
+	qdf_time_t time_during_rejection;
 };
 
 /*

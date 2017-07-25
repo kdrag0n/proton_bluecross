@@ -838,6 +838,52 @@ enum hdd_dot11_mode {
 #define CFG_ACTIVE_MIN_CHANNEL_TIME_MAX        (10000)
 #define CFG_ACTIVE_MIN_CHANNEL_TIME_DEFAULT    (20)
 
+/*
+ * <ini>
+ * gScanNumProbes - Set the number of probes on each channel for active scan
+ * @Min: 0
+ * @Max: 20
+ * @Default: 0
+ *
+ * This ini is used to set number of probes on each channel for
+ * active scan
+ *
+ * Related: None
+ *
+ * Supported Feature: Scan
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SCAN_NUM_PROBES_NAME       "gScanNumProbes"
+#define CFG_SCAN_NUM_PROBES_MIN        (0)
+#define CFG_SCAN_NUM_PROBES_MAX        (20)
+#define CFG_SCAN_NUM_PROBES_DEFAULT    (0)
+
+/*
+ * <ini>
+ * gScanProbeRepeatTime - Set probe repeat time on each channel for active scan
+ * @Min: 0
+ * @Max: 30
+ * @Default: 0
+ *
+ * This ini is used to set probe repeat time on each channel for
+ * active scan
+ *
+ * Related: None
+ *
+ * Supported Feature: Scan
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SCAN_PROBE_REPEAT_TIME_NAME       "gScanProbeRepeatTime"
+#define CFG_SCAN_PROBE_REPEAT_TIME_MIN        (0)
+#define CFG_SCAN_PROBE_REPEAT_TIME_MAX        (30)
+#define CFG_SCAN_PROBE_REPEAT_TIME_DEFAULT    (0)
+
 #ifdef FEATURE_WLAN_EXTSCAN
 /*
  * <ini>
@@ -7673,12 +7719,6 @@ enum hdd_link_speed_rpt_type {
 #define CFG_WLAN_LOGGING_CONSOLE_SUPPORT_ENABLE  (1)
 #define CFG_WLAN_LOGGING_CONSOLE_SUPPORT_DISABLE (0)
 #define CFG_WLAN_LOGGING_CONSOLE_SUPPORT_DEFAULT (1)
-
-/* Number of buffers to be used for WLAN logging */
-#define CFG_WLAN_LOGGING_NUM_BUF_NAME               "wlanLoggingNumBuf"
-#define CFG_WLAN_LOGGING_NUM_BUF_MIN                (4)
-#define CFG_WLAN_LOGGING_NUM_BUF_MAX                (512)
-#define CFG_WLAN_LOGGING_NUM_BUF_DEFAULT            (256)
 #endif /* WLAN_LOGGING_SOCK_SVC_ENABLE */
 
 /*
@@ -8881,7 +8921,8 @@ enum dot11p_mode {
 			QDF_NBUF_PKT_TRAC_TYPE_DHCP |\
 			QDF_NBUF_PKT_TRAC_TYPE_MGMT_ACTION |\
 			QDF_NBUF_PKT_TRAC_TYPE_ARP |\
-			QDF_NBUF_PKT_TRAC_TYPE_ICMP)\
+			QDF_NBUF_PKT_TRAC_TYPE_ICMP |\
+			QDF_NBUF_PKT_TRAC_TYPE_ICMPv6)\
 
 /* Default verbosity, in case its missing in gDptraceConfig string*/
 #define DP_TRACE_CONFIG_DEFAULT_VERBOSTY QDF_DP_TRACE_VERBOSITY_LOW
@@ -8903,7 +8944,7 @@ enum dot11p_mode {
  * gDptraceConfig = 1, 4
  */
 #define CFG_ENABLE_DP_TRACE_CONFIG		"gDptraceConfig"
-#define CFG_ENABLE_DP_TRACE_CONFIG_DEFAULT	"1, 8, 1, 62"
+#define CFG_ENABLE_DP_TRACE_CONFIG_DEFAULT	"1, 8, 1, 126"
 
 /*
  * This parameter will set the weight to calculate the average low pass
@@ -9087,6 +9128,28 @@ enum dot11p_mode {
 #define CFG_CE_SERVICE_MAX_YIELD_TIME_MIN      (1)
 #define CFG_CE_SERVICE_MAX_YIELD_TIME_MAX      (10)
 #define CFG_CE_SERVICE_MAX_YIELD_TIME_DEFAULT  (10)
+
+/*
+ * <ini>
+ * ce_service_max_rx_ind_flush - Control to set ce service max rx ind flush
+ *
+ * @Min: 1
+ * @Max: 32
+ * @Default: 1
+ *
+ * This ini is used to set ce service max rx ind flush
+ *
+ * Supported Feature: NAPI
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_CE_SERVICE_MAX_RX_IND_FLUSH_NAME     "ce_service_max_rx_ind_flush"
+#define CFG_CE_SERVICE_MAX_RX_IND_FLUSH_MIN      (1)
+#define CFG_CE_SERVICE_MAX_RX_IND_FLUSH_MAX      (32)
+#define CFG_CE_SERVICE_MAX_RX_IND_FLUSH_DEFAULT  (32)
+
 
 /* List of RPS CPU maps for different rx queues registered by WLAN driver
  * Ref - Kernel/Documentation/networking/scaling.txt
@@ -11205,6 +11268,30 @@ enum hw_filter_mode {
 #define CFG_TX_ORPHAN_ENABLE_MIN     (0)
 #define CFG_TX_ORPHAN_ENABLE_MAX     (1)
 
+
+/*
+ * <ini>
+ * gEnableNDIMacRandomization - When enabled this will randomize NDI Mac
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * When enabled this will randomize NDI Mac
+ *
+ *
+ * Related: None
+ *
+ * Supported Feature: NAN
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_RANDOMIZE_NDI_MAC_NAME      "gEnableNDIMacRandomization"
+#define CFG_RANDOMIZE_NDI_MAC_MIN       (0)
+#define CFG_RANDOMIZE_NDI_MAC_MAX       (1)
+#define CFG_RANDOMIZE_NDI_MAC_DEFAULT   (1)
+
 /*
  * <ini>
  * gItoRepeatCount - sets ito repeated count
@@ -11319,6 +11406,8 @@ struct hdd_config {
 	uint32_t nPassiveMaxChnTime;    /* in units of milliseconds */
 	uint32_t nActiveMinChnTime;     /* in units of milliseconds */
 	uint32_t nActiveMaxChnTime;     /* in units of milliseconds */
+	uint32_t scan_probe_repeat_time;
+	uint32_t scan_num_probes;
 
 	uint32_t nInitialDwellTime;     /* in units of milliseconds */
 	bool initial_scan_no_dfs_chnl;
@@ -11375,28 +11464,28 @@ struct hdd_config {
 	bool bImplicitQosEnabled;
 
 	/* default TSPEC parameters for AC_VO */
-	sme_QosWmmDirType InfraDirAcVo;
+	sme_qos_wmm_dir_type InfraDirAcVo;
 	uint16_t InfraNomMsduSizeAcVo;
 	uint32_t InfraMeanDataRateAcVo;
 	uint32_t InfraMinPhyRateAcVo;
 	uint16_t InfraSbaAcVo;
 
 	/* default TSPEC parameters for AC_VI */
-	sme_QosWmmDirType InfraDirAcVi;
+	sme_qos_wmm_dir_type InfraDirAcVi;
 	uint16_t InfraNomMsduSizeAcVi;
 	uint32_t InfraMeanDataRateAcVi;
 	uint32_t InfraMinPhyRateAcVi;
 	uint16_t InfraSbaAcVi;
 
 	/* default TSPEC parameters for AC_BE */
-	sme_QosWmmDirType InfraDirAcBe;
+	sme_qos_wmm_dir_type InfraDirAcBe;
 	uint16_t InfraNomMsduSizeAcBe;
 	uint32_t InfraMeanDataRateAcBe;
 	uint32_t InfraMinPhyRateAcBe;
 	uint16_t InfraSbaAcBe;
 
 	/* default TSPEC parameters for AC_BK */
-	sme_QosWmmDirType InfraDirAcBk;
+	sme_qos_wmm_dir_type InfraDirAcBk;
 	uint16_t InfraNomMsduSizeAcBk;
 	uint32_t InfraMeanDataRateAcBk;
 	uint32_t InfraMinPhyRateAcBk;
@@ -11749,9 +11838,8 @@ struct hdd_config {
 	uint32_t IpaUcTxPartitionBase;
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
 	/* WLAN Logging */
-	uint32_t wlanLoggingEnable;
-	uint32_t wlanLoggingToConsole;
-	uint32_t wlanLoggingNumBuf;
+	bool wlanLoggingEnable;
+	bool wlanLoggingToConsole;
 #endif /* WLAN_LOGGING_SOCK_SVC_ENABLE */
 
 	uint8_t enableSifsBurst;
@@ -11820,6 +11908,7 @@ struct hdd_config {
 	uint8_t dot11p_mode;
 	uint8_t rx_mode;
 	uint8_t ce_service_max_yield_time;
+	uint8_t ce_service_max_rx_ind_flush;
 	uint8_t cpu_map_list[CFG_RPS_RX_QUEUE_CPU_MAP_LIST_LEN];
 #ifdef FEATURE_WLAN_EXTSCAN
 	bool     extscan_enabled;
@@ -12007,7 +12096,7 @@ struct hdd_config {
 	uint32_t disallow_duration;
 	uint32_t rssi_channel_penalization;
 	uint32_t num_disallowed_aps;
-
+	bool is_ndi_mac_randomized;
 	uint8_t ito_repeat_count;
 };
 
