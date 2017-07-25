@@ -529,6 +529,12 @@ struct hif_pipe_addl_info {
 	struct hif_dl_pipe_info dl_pipe;
 };
 
+#ifdef CONFIG_SLUB_DEBUG_ON
+#define MSG_FLUSH_NUM 16
+#else /* PERF build */
+#define MSG_FLUSH_NUM 32
+#endif /* SLUB_DEBUG_ON */
+
 struct hif_bus_id;
 
 void hif_claim_device(struct hif_opaque_softc *hif_ctx);
@@ -653,6 +659,22 @@ static inline
 enum ipa_hw_type hif_get_ipa_hw_type(void)
 {
 	return ipa_get_hw_type();
+}
+
+/**
+ * hif_get_ipa_present() - get IPA hw status
+ *
+ * This API return the IPA hw status.
+ *
+ * Return: true if IPA is present or false otherwise
+ */
+static inline
+bool hif_get_ipa_present(void)
+{
+	if (ipa_uc_reg_rdyCB(NULL) != -EPERM)
+		return true;
+	else
+		return false;
 }
 #endif
 int hif_bus_resume(struct hif_opaque_softc *hif_ctx);
@@ -780,4 +802,16 @@ void hif_set_ce_service_max_yield_time(struct hif_opaque_softc *hif,
 unsigned long long
 hif_get_ce_service_max_yield_time(struct hif_opaque_softc *hif);
 
+/**
+ * hif_set_ce_service_max_rx_ind_flush() - sets CE service max rx ind flush
+ * @hif: hif context
+ * @ce_service_max_rx_ind_flush: CE service max rx ind flush to set
+ *
+ * This API stores CE service max rx ind flush in hif context based
+ * on ini value.
+ *
+ * Return: void
+ */
+void hif_set_ce_service_max_rx_ind_flush(struct hif_opaque_softc *hif,
+				       uint8_t ce_service_max_rx_ind_flush);
 #endif /* _HIF_H_ */

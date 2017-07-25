@@ -83,6 +83,30 @@ static inline qdf_time_t qdf_get_system_uptime(void)
 }
 
 /**
+ * qdf_get_bootbased_boottime_ns() - Get the bootbased time in nanoseconds
+ *
+ * qdf_get_bootbased_boottime_ns() function returns the number of nanoseconds
+ * that have elapsed since the system was booted. It also includes the time when
+ * system was suspended.
+ *
+ * Return:
+ * The time since system booted in nanoseconds
+ */
+
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0))
+static inline s64 qdf_get_bootbased_boottime_ns(void)
+{
+	return ktime_get_boot_ns();
+}
+
+#else
+static inline s64 qdf_get_bootbased_boottime_ns(void)
+{
+	return ktime_to_ns(ktime_get_boottime());
+}
+#endif
+
+/**
  * qdf_get_system_timestamp - Return current timestamp
  *
  * Return: unsigned long timestamp in ms.
