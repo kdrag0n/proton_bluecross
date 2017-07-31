@@ -80,6 +80,8 @@ google-easel-objs               += google-easel-comm.o google-easel-comm-dma.o g
 
 obj-y                           += st33/
 obj-$(CONFIG_ACCESS_RAMOOPS)    += access_ramoops.o
+obj-$(CONFIG_FORCE_FAST_CHARGE) += fastchg.o
+
 CFLAGS_lkdtm_rodata.o		+= $(DISABLE_LTO)
 KCOV_INSTRUMENT_lkdtm_rodata.o	:= n
 
