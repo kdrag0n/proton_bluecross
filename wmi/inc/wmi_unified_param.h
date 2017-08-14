@@ -1819,6 +1819,8 @@ struct roam_offload_scan_params {
  * @dense_min_aps_cnt: dense roam minimum APs
  * @initial_dense_status: dense status detected by host
  * @traffic_threshold: dense roam RSSI threshold
+ * @bg_scan_bad_rssi_thresh: Bad RSSI threshold to perform bg scan
+ * @bg_scan_client_bitmap: Bitmap used to identify the client scans to snoop
  */
 struct roam_offload_scan_rssi_params {
 	int8_t rssi_thresh;
@@ -1841,6 +1843,8 @@ struct roam_offload_scan_rssi_params {
 	int dense_min_aps_cnt;
 	int initial_dense_status;
 	int traffic_threshold;
+	int8_t bg_scan_bad_rssi_thresh;
+	uint32_t bg_scan_client_bitmap;
 };
 
 /**
@@ -2162,6 +2166,24 @@ struct pno_scan_req_params {
 	uint8_t *voui;
 };
 
+/**
+ * struct nlo_mawc_params - Motion Aided Wireless Connectivity based
+ *                          Network List Offload configuration
+ * @vdev_id: VDEV ID on which the configuration needs to be applied
+ * @enable: flag to enable or disable
+ * @exp_backoff_ratio: ratio of exponential backoff
+ * @init_scan_interval: initial scan interval(msec)
+ * @max_scan_interval:  max scan interval(msec)
+ */
+struct nlo_mawc_params {
+	uint8_t vdev_id;
+	bool enable;
+	uint32_t exp_backoff_ratio;
+	uint32_t init_scan_interval;
+	uint32_t max_scan_interval;
+};
+
+
 #define WMI_WLAN_EXTSCAN_MAX_CHANNELS                 36
 #define WMI_WLAN_EXTSCAN_MAX_BUCKETS                  16
 #define WMI_WLAN_EXTSCAN_MAX_HOTLIST_APS              128
@@ -2339,7 +2361,7 @@ struct plm_req_params {
 #define MAX_SSID_ALLOWED_LIST    4
 #define MAX_BSSID_AVOID_LIST     16
 #define MAX_BSSID_FAVORED      16
-
+#define MAX_RSSI_AVOID_BSSID_LIST 10
 
 /**
  * struct mac_ts_info_tfc - mac ts info parameters
@@ -3277,6 +3299,19 @@ struct ssid_hotlist_param {
 };
 
 /**
+ * struct rssi_disallow_bssid - Structure holding Rssi based avoid candidate
+ * @bssid: BSSID of the AP
+ * @remaining_duration: remaining disallow duration in ms
+ * @expected_rssi: RSSI at which STA can initate in dBm
+ */
+struct rssi_disallow_bssid {
+	struct qdf_mac_addr bssid;
+	uint32_t remaining_duration;
+	int8_t expected_rssi;
+};
+
+
+/**
  * struct roam_scan_filter_params - Structure holding roaming scan
  *                                  parameters
  * @op_bitmap:                bitmap to determine reason of roaming
@@ -3321,6 +3356,8 @@ struct roam_scan_filter_params {
 	uint32_t disallow_duration;
 	uint32_t rssi_channel_penalization;
 	uint32_t num_disallowed_aps;
+	uint32_t num_rssi_rejection_ap;
+	struct rssi_disallow_bssid rssi_rejection_ap[MAX_RSSI_AVOID_BSSID_LIST];
 };
 
 /**
@@ -6941,5 +6978,24 @@ struct wmi_limit_off_chan_param {
 	uint32_t rest_time;
 	bool skip_dfs_chans;
 };
+
+/**
+ * struct wmi_mawc_roam_params - Motion Aided wireless connectivity params
+ * @vdev_id: VDEV on which the parameters should be applied
+ * @enable: MAWC roaming feature enable/disable
+ * @traffic_load_threshold: Traffic threshold in kBps for MAWC roaming
+ * @best_ap_rssi_threshold: AP RSSI Threshold for MAWC roaming
+ * @rssi_stationary_high_adjust: High RSSI adjustment value to supress scan
+ * @rssi_stationary_low_adjust: Low RSSI adjustment value to supress scan
+ */
+struct wmi_mawc_roam_params {
+	uint8_t vdev_id;
+	bool enable;
+	uint32_t traffic_load_threshold;
+	uint32_t best_ap_rssi_threshold;
+	uint8_t rssi_stationary_high_adjust;
+	uint8_t rssi_stationary_low_adjust;
+};
+
 #endif /* _WMI_UNIFIED_PARAM_H_ */
 
