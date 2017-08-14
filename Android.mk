@@ -55,7 +55,7 @@ ifeq ($(PRODUCT_VENDOR_MOVE_ENABLED),true)
     ifeq ($(WIFI_DRIVER_INSTALL_TO_KERNEL_OUT),true)
         LOCAL_MODULE_PATH := $(KERNEL_MODULES_OUT)
     else
-        LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/$(WLAN_CHIPSET)
+        LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib/modules/$(WLAN_CHIPSET)
     endif
 else
     LOCAL_MODULE_PATH := $(TARGET_OUT)/lib/modules/$(WLAN_CHIPSET)
@@ -69,7 +69,7 @@ ifneq ($(findstring $(WLAN_CHIPSET),$(WIFI_DRIVER_DEFAULT)),)
 ifeq ($(PRODUCT_VENDOR_MOVE_ENABLED),true)
 ifneq ($(WIFI_DRIVER_INSTALL_TO_KERNEL_OUT),)
 $(shell mkdir -p $(TARGET_OUT_VENDOR)/lib/modules; \
-	ln -sf /system/lib/modules/$(WLAN_CHIPSET)/$(LOCAL_MODULE) $(TARGET_OUT_VENDOR)/lib/modules/wlan.ko)
+	ln -sf /$(TARGET_COPY_OUT_VENDOR)/lib/modules/$(WLAN_CHIPSET)/$(LOCAL_MODULE) $(TARGET_OUT_VENDOR)/lib/modules/wlan.ko)
 endif
 else
 $(shell mkdir -p $(TARGET_OUT)/lib/modules; \

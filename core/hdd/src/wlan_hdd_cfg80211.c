@@ -2318,6 +2318,14 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 		wlan_hdd_cfg80211_set_feature(feature_flags,
 			QCA_WLAN_VENDOR_FEATURE_P2P_LISTEN_OFFLOAD);
 
+	if (hdd_ctx_ptr->config->oce_sta_enabled)
+		wlan_hdd_cfg80211_set_feature(feature_flags,
+					      QCA_WLAN_VENDOR_FEATURE_OCE_STA);
+
+	if (hdd_ctx_ptr->config->oce_sap_enabled)
+		wlan_hdd_cfg80211_set_feature(feature_flags,
+					  QCA_WLAN_VENDOR_FEATURE_OCE_STA_CFON);
+
 	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(feature_flags) +
 			NLMSG_HDRLEN);
 
@@ -3275,13 +3283,68 @@ static int wlan_hdd_cfg80211_handle_wisa_cmd(struct wiphy *wiphy,
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO
 #define STATION_ASSOC_FAIL_REASON \
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_ASSOC_FAIL_REASON
+#define STATION_REMOTE \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_REMOTE
 #define STATION_MAX \
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_MAX
+
+/* define short names for get station info attributes */
+#define LINK_INFO_STANDARD_NL80211_ATTR \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_LINK_STANDARD_NL80211_ATTR
+#define AP_INFO_STANDARD_NL80211_ATTR \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AP_STANDARD_NL80211_ATTR
+#define INFO_ROAM_COUNT \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ROAM_COUNT
+#define INFO_AKM \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AKM
+#define WLAN802_11_MODE \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_802_11_MODE
+#define AP_INFO_HS20_INDICATION \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AP_HS20_INDICATION
+#define HT_OPERATION \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_HT_OPERATION
+#define VHT_OPERATION \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_VHT_OPERATION
+#define INFO_ASSOC_FAIL_REASON \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ASSOC_FAIL_REASON
+#define REMOTE_MAX_PHY_RATE \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_MAX_PHY_RATE
+#define REMOTE_TX_PACKETS \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_PACKETS
+#define REMOTE_TX_BYTES \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_BYTES
+#define REMOTE_RX_PACKETS \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_RX_PACKETS
+#define REMOTE_RX_BYTES \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_RX_BYTES
+#define REMOTE_LAST_TX_RATE \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_LAST_TX_RATE
+#define REMOTE_LAST_RX_RATE \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_LAST_RX_RATE
+#define REMOTE_WMM \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_WMM
+#define REMOTE_SUPPORTED_MODE \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_SUPPORTED_MODE
+#define REMOTE_AMPDU \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_AMPDU
+#define REMOTE_TX_STBC \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_STBC
+#define REMOTE_RX_STBC \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_RX_STBC
+#define REMOTE_CH_WIDTH\
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_CH_WIDTH
+#define REMOTE_SGI_ENABLE\
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_SGI_ENABLE
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0))
+#define REMOTE_PAD\
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_PAD
+#endif
 
 static const struct nla_policy
 hdd_get_station_policy[STATION_MAX + 1] = {
 	[STATION_INFO] = {.type = NLA_FLAG},
 	[STATION_ASSOC_FAIL_REASON] = {.type = NLA_FLAG},
+	[STATION_REMOTE] = {.type = NLA_BINARY, .len = QDF_MAC_ADDR_SIZE},
 };
 
 /**
@@ -3710,6 +3773,302 @@ fail:
 }
 
 /**
+ * hdd_get_peer_txrx_rate_cb() - get station's txrx rate callback
+ * @peer_info: pointer of peer information
+ * @context: get peer info callback context
+ *
+ * This function fill txrx rate information to aStaInfo[staid] of hostapd
+ * adapter
+ */
+static void hdd_get_peer_txrx_rate_cb(struct sir_peer_info_ext_resp *peer_info,
+		void *context)
+{
+	struct statsContext *get_txrx_rate_context;
+	struct sir_peer_info_ext *txrx_rate;
+	hdd_adapter_t *adapter;
+	uint8_t staid;
+
+	if ((peer_info == NULL) || (context == NULL)) {
+		hdd_err("Bad param, peer_info [%p] context [%p]",
+			peer_info, context);
+		return;
+	}
+
+	spin_lock(&hdd_context_lock);
+	/*
+	 * there is a race condition that exists between this callback
+	 * function and the caller since the caller could time out either
+	 * before or while this code is executing.  we use a spinlock to
+	 * serialize these actions
+	 */
+	get_txrx_rate_context = context;
+	if (get_txrx_rate_context->magic != PEER_INFO_CONTEXT_MAGIC) {
+		/*
+		 * the caller presumably timed out so there is nothing
+		 * we can do
+		 */
+		spin_unlock(&hdd_context_lock);
+		hdd_warn("Invalid context, magic [%08x]",
+			get_txrx_rate_context->magic);
+		return;
+	}
+
+	if (!peer_info->count || !peer_info->info) {
+		spin_unlock(&hdd_context_lock);
+		hdd_err("Fail to get remote peer info");
+		return;
+	}
+
+	adapter = get_txrx_rate_context->pAdapter;
+	txrx_rate = peer_info->info;
+	if (hdd_softap_get_sta_id(adapter,
+				&txrx_rate->peer_macaddr,
+				&staid) != QDF_STATUS_SUCCESS) {
+		spin_unlock(&hdd_context_lock);
+		hdd_err("Station MAC address does not matching");
+		return;
+	}
+
+	adapter->aStaInfo[staid].tx_rate = txrx_rate->tx_rate;
+	adapter->aStaInfo[staid].rx_rate = txrx_rate->rx_rate;
+	hdd_debug("%pM txrate %u rxrate %u",
+			txrx_rate->peer_macaddr.bytes,
+			adapter->aStaInfo[staid].tx_rate,
+			adapter->aStaInfo[staid].rx_rate);
+
+	get_txrx_rate_context->magic = 0;
+
+	/* notify the caller */
+	complete(&get_txrx_rate_context->completion);
+
+	/* serialization is complete */
+	spin_unlock(&hdd_context_lock);
+}
+
+/**
+ * wlan_hdd_get_txrx_rate() - get station's txrx rate
+ * @adapter: hostapd interface
+ * @macaddress: mac address of requested peer
+ *
+ * This function call sme_get_peer_info_ext to get txrx rate
+ *
+ * Return: 0 on success, otherwise error value
+ */
+static int wlan_hdd_get_txrx_rate(hdd_adapter_t *adapter,
+		struct qdf_mac_addr macaddress)
+{
+	QDF_STATUS status;
+	int ret;
+	static struct statsContext context;
+	struct sir_peer_info_ext_req txrx_rate_req;
+
+	if (adapter == NULL) {
+		hdd_err("pAdapter is NULL");
+		return -EFAULT;
+	}
+
+	init_completion(&context.completion);
+	context.magic = PEER_INFO_CONTEXT_MAGIC;
+	context.pAdapter = adapter;
+
+	qdf_mem_copy(&(txrx_rate_req.peer_macaddr), &macaddress,
+				QDF_MAC_ADDR_SIZE);
+	txrx_rate_req.sessionid = adapter->sessionId;
+	txrx_rate_req.reset_after_request = 0;
+	status = sme_get_peer_info_ext(WLAN_HDD_GET_HAL_CTX(adapter),
+				&txrx_rate_req,
+				&context,
+				hdd_get_peer_txrx_rate_cb);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Unable to retrieve statistics for txrx_rate");
+		ret = -EFAULT;
+	} else {
+		if (!wait_for_completion_timeout(&context.completion,
+				msecs_to_jiffies(WLAN_WAIT_TIME_STATS))) {
+			hdd_err("SME timed out while retrieving txrx_rate");
+			ret = -EFAULT;
+		} else {
+			ret = 0;
+		}
+	}
+	/*
+	 * either we never sent a request, we sent a request and received a
+	 * response or we sent a request and timed out.  if we never sent a
+	 * request or if we sent a request and got a response, we want to
+	 * clear the magic out of paranoia.  if we timed out there is a
+	 * race condition such that the callback function could be
+	 * executing at the same time we are. of primary concern is if the
+	 * callback function had already verified the "magic" but had not
+	 * yet set the completion variable when a timeout occurred. we
+	 * serialize these activities by invalidating the magic while
+	 * holding a shared spinlock which will cause us to block if the
+	 * callback is currently executing
+	 */
+	spin_lock(&hdd_context_lock);
+	context.magic = 0;
+	spin_unlock(&hdd_context_lock);
+	return ret;
+}
+
+/**
+ * hdd_get_stainfo() - get stainfo for the specified peer
+ * @adapter: hostapd interface
+ * @mac_addr: mac address of requested peer
+ *
+ * This function find the stainfo for the peer with mac_addr
+ *
+ * Return: stainfo if found, NULL if not found
+ */
+static hdd_station_info_t *hdd_get_stainfo(hdd_adapter_t *adapter,
+		struct qdf_mac_addr mac_addr)
+{
+	hdd_station_info_t *stainfo = NULL;
+	int i;
+
+	for (i = 0; i < WLAN_MAX_STA_COUNT; i++) {
+		if (!qdf_mem_cmp(&adapter->aStaInfo[i].macAddrSTA,
+					&mac_addr,
+					QDF_MAC_ADDR_SIZE))
+			stainfo = &adapter->aStaInfo[i];
+	}
+
+	return stainfo;
+}
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0))
+static inline int32_t remote_station_put_u64(struct sk_buff *skb,
+		int32_t attrtype, uint64_t value)
+{
+	return nla_put_u64_64bit(skb, attrtype, value, REMOTE_PAD);
+}
+#else
+static inline int32_t remote_station_put_u64(struct sk_buff *skb,
+		int32_t attrtype, uint64_t value)
+{
+	return nla_put_u64(skb, attrtype, value);
+}
+#endif
+
+/**
+ * hdd_get_station_remote() - get remote peer's info
+ * @hdd_ctx: hdd context
+ * @adapter: hostapd interface
+ * @mac_addr: mac address of requested peer
+ *
+ * This function collect and indicate the remote peer's info
+ *
+ * Return: 0 on success, otherwise error value
+ */
+static int hdd_get_station_remote(hdd_context_t *hdd_ctx,
+		hdd_adapter_t *adapter,
+		struct qdf_mac_addr mac_addr)
+{
+	hdd_station_info_t *stainfo = hdd_get_stainfo(adapter, mac_addr);
+	struct sk_buff *skb = NULL;
+	uint32_t nl_buf_len;
+	bool txrx_rate = true;
+
+	if (!stainfo) {
+		hdd_err("peer " MAC_ADDRESS_STR " not found",
+				MAC_ADDR_ARRAY(mac_addr.bytes));
+		goto fail;
+	}
+
+	nl_buf_len = NLMSG_HDRLEN;
+	nl_buf_len += (sizeof(stainfo->max_phy_rate) + NLA_HDRLEN) +
+		(sizeof(stainfo->tx_packets) + NLA_HDRLEN) +
+		(sizeof(stainfo->tx_bytes) + NLA_HDRLEN) +
+		(sizeof(stainfo->rx_packets) + NLA_HDRLEN) +
+		(sizeof(stainfo->rx_bytes) + NLA_HDRLEN) +
+		(sizeof(stainfo->isQosEnabled) + NLA_HDRLEN) +
+		(sizeof(stainfo->mode) + NLA_HDRLEN);
+
+	if (!hdd_ctx->config->sap_get_peer_info ||
+			wlan_hdd_get_txrx_rate(adapter, mac_addr)) {
+		hdd_err("fail to get tx/rx rate");
+		txrx_rate = false;
+	} else {
+		nl_buf_len += (sizeof(stainfo->tx_rate) + NLA_HDRLEN) +
+			(sizeof(stainfo->rx_rate) + NLA_HDRLEN);
+	}
+
+	/* below info is only valid for HT/VHT mode */
+	if (stainfo->mode > SIR_SME_PHY_MODE_LEGACY)
+		nl_buf_len += (sizeof(stainfo->ampdu) + NLA_HDRLEN) +
+			(sizeof(stainfo->tx_stbc) + NLA_HDRLEN) +
+			(sizeof(stainfo->rx_stbc) + NLA_HDRLEN) +
+			(sizeof(stainfo->ch_width) + NLA_HDRLEN) +
+			(sizeof(stainfo->sgi_enable) + NLA_HDRLEN);
+
+	hdd_info("buflen %d hdrlen %d", nl_buf_len, NLMSG_HDRLEN);
+
+	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
+			nl_buf_len);
+	if (!skb) {
+		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		goto fail;
+	}
+
+	hdd_info("stainfo");
+	hdd_info("maxrate %x tx_pkts %x tx_bytes %llx",
+			stainfo->max_phy_rate, stainfo->tx_packets,
+			stainfo->tx_bytes);
+	hdd_info("rx_pkts %x rx_bytes %llx mode %x",
+			stainfo->rx_packets, stainfo->rx_bytes,
+			stainfo->mode);
+	if (stainfo->mode > SIR_SME_PHY_MODE_LEGACY) {
+		hdd_info("ampdu %d tx_stbc %d rx_stbc %d",
+				stainfo->ampdu, stainfo->tx_stbc,
+				stainfo->rx_stbc);
+		hdd_info("wmm %d chwidth %d sgi %d",
+				stainfo->isQosEnabled,
+				stainfo->ch_width,
+				stainfo->sgi_enable);
+	}
+
+	if (nla_put_u32(skb, REMOTE_MAX_PHY_RATE, stainfo->max_phy_rate) ||
+	    nla_put_u32(skb, REMOTE_TX_PACKETS, stainfo->tx_packets) ||
+	    remote_station_put_u64(skb, REMOTE_TX_BYTES, stainfo->tx_bytes) ||
+	    nla_put_u32(skb, REMOTE_RX_PACKETS, stainfo->rx_packets) ||
+	    remote_station_put_u64(skb, REMOTE_RX_BYTES, stainfo->rx_bytes) ||
+	    nla_put_u8(skb, REMOTE_WMM, stainfo->isQosEnabled) ||
+	    nla_put_u8(skb, REMOTE_SUPPORTED_MODE, stainfo->mode)) {
+		hdd_err("put fail");
+		goto fail;
+	}
+
+	if (txrx_rate) {
+		if (nla_put_u32(skb, REMOTE_LAST_TX_RATE, stainfo->tx_rate) ||
+		    nla_put_u32(skb, REMOTE_LAST_RX_RATE, stainfo->rx_rate)) {
+			hdd_err("put fail");
+			goto fail;
+		} else {
+			hdd_info("tx_rate %x rx_rate %x",
+					stainfo->tx_rate, stainfo->rx_rate);
+		}
+	}
+
+	if (stainfo->mode > SIR_SME_PHY_MODE_LEGACY) {
+		if (nla_put_u8(skb, REMOTE_AMPDU, stainfo->ampdu) ||
+		    nla_put_u8(skb, REMOTE_TX_STBC, stainfo->tx_stbc) ||
+		    nla_put_u8(skb, REMOTE_RX_STBC, stainfo->rx_stbc) ||
+		    nla_put_u8(skb, REMOTE_CH_WIDTH, stainfo->ch_width) ||
+		    nla_put_u8(skb, REMOTE_SGI_ENABLE, stainfo->sgi_enable)) {
+			hdd_err("put fail");
+			goto fail;
+		}
+	}
+
+	return cfg80211_vendor_cmd_reply(skb);
+
+fail:
+	if (skb)
+		kfree_skb(skb);
+
+	return -EINVAL;
+}
+
+/**
  * __hdd_cfg80211_get_station_cmd() - Handle get station vendor cmd
  * @wiphy: corestack handler
  * @wdev: wireless device
@@ -3757,6 +4116,23 @@ __hdd_cfg80211_get_station_cmd(struct wiphy *wiphy,
 		status = hdd_get_station_info(hdd_ctx, adapter);
 	} else if (tb[STATION_ASSOC_FAIL_REASON]) {
 		status = hdd_get_station_assoc_fail(hdd_ctx, adapter);
+	} else if (tb[STATION_REMOTE]) {
+		struct qdf_mac_addr mac_addr;
+
+		if (adapter->device_mode != QDF_SAP_MODE &&
+		    adapter->device_mode != QDF_P2P_GO_MODE) {
+			hdd_err("invalid device_mode:%d", adapter->device_mode);
+			status = -EINVAL;
+			goto out;
+		}
+
+		nla_memcpy(mac_addr.bytes, tb[STATION_REMOTE],
+			QDF_MAC_ADDR_SIZE);
+
+		hdd_debug("STATION_REMOTE "MAC_ADDRESS_STR"",
+				MAC_ADDR_ARRAY(mac_addr.bytes));
+
+		status = hdd_get_station_remote(hdd_ctx, adapter, mac_addr);
 	} else {
 		hdd_err("get station info cmd type failed");
 		status = -EINVAL;
@@ -3801,7 +4177,34 @@ hdd_cfg80211_get_station_cmd(struct wiphy *wiphy,
 #undef STATION_INVALID
 #undef STATION_INFO
 #undef STATION_ASSOC_FAIL_REASON
+#undef STATION_REMOTE
 #undef STATION_MAX
+#undef LINK_INFO_STANDARD_NL80211_ATTR
+#undef AP_INFO_STANDARD_NL80211_ATTR
+#undef INFO_ROAM_COUNT
+#undef INFO_AKM
+#undef WLAN802_11_MODE
+#undef AP_INFO_HS20_INDICATION
+#undef HT_OPERATION
+#undef VHT_OPERATION
+#undef INFO_ASSOC_FAIL_REASON
+#undef REMOTE_MAX_PHY_RATE
+#undef REMOTE_TX_PACKETS
+#undef REMOTE_TX_BYTES
+#undef REMOTE_RX_PACKETS
+#undef REMOTE_RX_BYTES
+#undef REMOTE_LAST_TX_RATE
+#undef REMOTE_LAST_RX_RATE
+#undef REMOTE_WMM
+#undef REMOTE_SUPPORTED_MODE
+#undef REMOTE_AMPDU
+#undef REMOTE_TX_STBC
+#undef REMOTE_RX_STBC
+#undef REMOTE_CH_WIDTH
+#undef REMOTE_SGI_ENABLE
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0))
+#undef REMOTE_PAD
+#endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
@@ -4064,7 +4467,7 @@ __wlan_hdd_cfg80211_get_logger_supp_feature(struct wiphy *wiphy,
 
 	features = 0;
 
-	if (hdd_is_memdump_supported())
+	if (hdd_is_memdump_supported(hdd_ctx))
 		features |= WIFI_LOGGER_MEMORY_DUMP_SUPPORTED;
 	features |= WIFI_LOGGER_PER_PACKET_TX_RX_STATUS_SUPPORTED;
 	features |= WIFI_LOGGER_CONNECT_EVENT_SUPPORTED;
@@ -4383,6 +4786,8 @@ wlan_hdd_wifi_config_policy[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1] = {
 	[ANT_DIV_ACK_SNR_WEIGHT] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_LISTEN_INTERVAL] = {.type = NLA_U32 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_LRO] = {.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_TOTAL_BEACON_MISS_COUNT] = {
+			.type = NLA_U8},
 };
 
 /**
@@ -4523,6 +4928,7 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 	int param_id;
 	uint32_t tx_fail_count;
 	uint32_t ant_div_usrcfg;
+	uint8_t bmiss_bcnt;
 
 	ENTER_DEV(dev);
 
@@ -5049,6 +5455,39 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 			hdd_err("Failed to set ant div weight");
 			return ret_val;
 		}
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_TOTAL_BEACON_MISS_COUNT]) {
+		bmiss_bcnt = nla_get_u8(
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_TOTAL_BEACON_MISS_COUNT]);
+		if (hdd_ctx->config->nRoamBmissFirstBcnt < bmiss_bcnt) {
+			hdd_ctx->config->nRoamBmissFinalBcnt = bmiss_bcnt
+				- hdd_ctx->config->nRoamBmissFirstBcnt;
+			hdd_debug("Bmiss first cnt(%d), Bmiss final cnt(%d)",
+				hdd_ctx->config->nRoamBmissFirstBcnt,
+				hdd_ctx->config->nRoamBmissFinalBcnt);
+			ret_val = sme_set_roam_bmiss_final_bcnt(hdd_ctx->hHal,
+				0, hdd_ctx->config->nRoamBmissFinalBcnt);
+
+			if (ret_val) {
+				hdd_err("Failed to set bmiss final Bcnt");
+				return ret_val;
+			}
+
+			ret_val = sme_set_bmiss_bcnt(adapter->sessionId,
+				hdd_ctx->config->nRoamBmissFirstBcnt,
+				hdd_ctx->config->nRoamBmissFinalBcnt);
+			if (ret_val) {
+				hdd_err("Failed to set bmiss Bcnt");
+				return ret_val;
+			}
+		} else {
+			hdd_err("Bcnt(%d) needs to exceed BmissFirstBcnt(%d)",
+				bmiss_bcnt,
+				hdd_ctx->config->nRoamBmissFirstBcnt);
+			return -EINVAL;
+		}
+
 	}
 
 	return ret_val;
@@ -8304,6 +8743,8 @@ __wlan_hdd_cfg80211_avoid_freq(struct wiphy *wiphy,
 	uint16_t unsafe_channel_count;
 	int unsafe_channel_index;
 	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+	uint16_t *local_unsafe_list;
+	uint16_t local_unsafe_list_count;
 
 	ENTER_DEV(wdev->netdev);
 
@@ -8320,6 +8761,13 @@ __wlan_hdd_cfg80211_avoid_freq(struct wiphy *wiphy,
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != ret)
 		return ret;
+
+	ret = hdd_clone_local_unsafe_chan(hdd_ctx,
+					  &local_unsafe_list,
+					  &local_unsafe_list_count);
+	if (0 != ret)
+		return ret;
+
 	pld_get_wlan_unsafe_channel(qdf_ctx->dev, hdd_ctx->unsafe_channel_list,
 			&(hdd_ctx->unsafe_channel_count),
 			sizeof(hdd_ctx->unsafe_channel_list));
@@ -8332,7 +8780,12 @@ __wlan_hdd_cfg80211_avoid_freq(struct wiphy *wiphy,
 		hdd_debug("Channel %d is not safe",
 			hdd_ctx->unsafe_channel_list[unsafe_channel_index]);
 	}
-	hdd_unsafe_channel_restart_sap(hdd_ctx);
+
+	if (hdd_local_unsafe_channel_updated(hdd_ctx, local_unsafe_list,
+					     local_unsafe_list_count))
+		hdd_unsafe_channel_restart_sap(hdd_ctx);
+	qdf_mem_free(local_unsafe_list);
+
 	return 0;
 }
 
@@ -9906,7 +10359,7 @@ void hdd_bt_activity_cb(void *context, uint32_t bt_activity)
 	else
 		return;
 
-	hdd_info("a2dp_active:%d vo_active:%d", hdd_ctx->bt_a2dp_active,
+	hdd_debug("a2dp_active: %d vo_active: %d", hdd_ctx->bt_a2dp_active,
 		 hdd_ctx->bt_vo_active);
 }
 
@@ -11680,63 +12133,149 @@ void wlan_hdd_cfg80211_update_wiphy_caps(struct wiphy *wiphy)
 #endif
 }
 
+/**
+ * wlan_hdd_cfg80211_register_frames - Register for all callbacks and frames.
+ * @pAdapter: pointer to adapter
+ *
+ * This function registers for all frame which supplicant is interested in
+ * and callbacks for ack confirmation and mgmt indication.
+ *
+ * Return: 0 on success and non zero on failure
+ */
+
 /* This function registers for all frame which supplicant is interested in */
-void wlan_hdd_cfg80211_register_frames(hdd_adapter_t *pAdapter)
+int wlan_hdd_cfg80211_register_frames(hdd_adapter_t *pAdapter)
 {
 	tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
 	/* Register for all P2P action, public action etc frames */
 	uint16_t type = (SIR_MAC_MGMT_FRAME << 2) | (SIR_MAC_MGMT_ACTION << 4);
+	QDF_STATUS status;
 
 	ENTER();
 
 	/* Register frame indication call back */
-	sme_register_mgmt_frame_ind_callback(hHal, hdd_indicate_mgmt_frame);
+	status = sme_register_mgmt_frame_ind_callback(hHal,
+			hdd_indicate_mgmt_frame);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Failed to register hdd_indicate_mgmt_frame");
+		goto ret_status;
+	}
 
 	/* Register for p2p ack indication */
-	sme_register_p2p_ack_ind_callback(hHal, hdd_send_action_cnf_cb);
+	status = sme_register_p2p_ack_ind_callback(hHal,
+			hdd_send_action_cnf_cb);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Failed to register hdd_send_action_cnf_cb");
+		goto ret_status;
+	}
 
 	/* Right now we are registering these frame when driver is getting
 	   initialized. Once we will move to 2.6.37 kernel, in which we have
 	   frame register ops, we will move this code as a part of that */
 	/* GAS Initial Request */
-	sme_register_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
-				(uint8_t *) GAS_INITIAL_REQ,
-				GAS_INITIAL_REQ_SIZE);
+	status = sme_register_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
+			(uint8_t *) GAS_INITIAL_REQ,
+			GAS_INITIAL_REQ_SIZE);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Failed to register GAS_INITIAL_REQ");
+		goto ret_status;
+	}
 
 	/* GAS Initial Response */
-	sme_register_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
-				(uint8_t *) GAS_INITIAL_RSP,
-				GAS_INITIAL_RSP_SIZE);
+	status = sme_register_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
+			(uint8_t *) GAS_INITIAL_RSP,
+			GAS_INITIAL_RSP_SIZE);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Failed to register GAS_INITIAL_RSP");
+		goto dereg_gas_initial_req;
+	}
 
 	/* GAS Comeback Request */
-	sme_register_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
-				(uint8_t *) GAS_COMEBACK_REQ,
-				GAS_COMEBACK_REQ_SIZE);
+	status = sme_register_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
+			(uint8_t *) GAS_COMEBACK_REQ,
+			GAS_COMEBACK_REQ_SIZE);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Failed to register GAS_COMEBACK_REQ");
+		goto dereg_gas_initial_rsp;
+	}
 
 	/* GAS Comeback Response */
-	sme_register_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
-				(uint8_t *) GAS_COMEBACK_RSP,
-				GAS_COMEBACK_RSP_SIZE);
+	status = sme_register_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
+			(uint8_t *) GAS_COMEBACK_RSP,
+			GAS_COMEBACK_RSP_SIZE);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Failed to register GAS_COMEBACK_RSP");
+		goto dereg_gas_comeback_req;
+	}
 
 	/* P2P Public Action */
-	sme_register_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
-				(uint8_t *) P2P_PUBLIC_ACTION_FRAME,
-				P2P_PUBLIC_ACTION_FRAME_SIZE);
+	status = sme_register_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
+			(uint8_t *) P2P_PUBLIC_ACTION_FRAME,
+			P2P_PUBLIC_ACTION_FRAME_SIZE);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Failed to register P2P_PUBLIC_ACTION_FRAME");
+		goto dereg_gas_comeback_rsp;
+	}
 
 	/* P2P Action */
-	sme_register_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
-				(uint8_t *) P2P_ACTION_FRAME,
-				P2P_ACTION_FRAME_SIZE);
+	status = sme_register_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
+			(uint8_t *) P2P_ACTION_FRAME,
+			P2P_ACTION_FRAME_SIZE);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Failed to register P2P_ACTION_FRAME");
+		goto dereg_p2p_public_action_frm;
+	}
 
 	/* WNM BSS Transition Request frame */
-	sme_register_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
-				(uint8_t *) WNM_BSS_ACTION_FRAME,
-				WNM_BSS_ACTION_FRAME_SIZE);
+	status = sme_register_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
+			(uint8_t *) WNM_BSS_ACTION_FRAME,
+			WNM_BSS_ACTION_FRAME_SIZE);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Failed to register WNM_BSS_ACTION_FRAME");
+		goto dereg_p2p_action_frm;
+	}
 
 	/* WNM-Notification */
-	sme_register_mgmt_frame(hHal, pAdapter->sessionId, type,
-				(uint8_t *) WNM_NOTIFICATION_FRAME,
-				WNM_NOTIFICATION_FRAME_SIZE);
+	status = sme_register_mgmt_frame(hHal, pAdapter->sessionId, type,
+			(uint8_t *) WNM_NOTIFICATION_FRAME,
+			WNM_NOTIFICATION_FRAME_SIZE);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Failed to register hdd_send_action_cnf_cb");
+		goto dereg_wnm_bss_action_frm;
+	}
+	return qdf_status_to_os_return(status);
+
+dereg_wnm_bss_action_frm:
+	sme_deregister_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
+			(uint8_t *) WNM_BSS_ACTION_FRAME,
+			WNM_BSS_ACTION_FRAME_SIZE);
+dereg_p2p_action_frm:
+	sme_deregister_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
+			(uint8_t *) P2P_ACTION_FRAME,
+			P2P_ACTION_FRAME_SIZE);
+dereg_p2p_public_action_frm:
+	sme_deregister_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
+			(uint8_t *) P2P_PUBLIC_ACTION_FRAME,
+			P2P_PUBLIC_ACTION_FRAME_SIZE);
+dereg_gas_comeback_rsp:
+	sme_deregister_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
+			(uint8_t *) GAS_COMEBACK_RSP,
+			GAS_COMEBACK_RSP_SIZE);
+dereg_gas_comeback_req:
+	sme_deregister_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
+			(uint8_t *) GAS_COMEBACK_REQ,
+			GAS_COMEBACK_REQ_SIZE);
+dereg_gas_initial_rsp:
+	sme_deregister_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
+			(uint8_t *) GAS_INITIAL_RSP,
+			GAS_INITIAL_RSP_SIZE);
+dereg_gas_initial_req:
+	sme_deregister_mgmt_frame(hHal, SME_SESSION_ID_ANY, type,
+			(uint8_t *) GAS_INITIAL_REQ,
+			GAS_INITIAL_REQ_SIZE);
+ret_status:
+	return qdf_status_to_os_return(status);
+
 }
 
 void wlan_hdd_cfg80211_deregister_frames(hdd_adapter_t *pAdapter)
@@ -15669,7 +16208,7 @@ static int wlan_hdd_disconnect(hdd_adapter_t *pAdapter, u16 reason)
 			}
 			if (pAdapter->roam_ho_fail) {
 				INIT_COMPLETION(pAdapter->disconnect_comp_var);
-					hdd_debug("Disabling queues");
+					hdd_info("Disabling queues");
 				wlan_hdd_netif_queue_control(pAdapter,
 					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					WLAN_CONTROL_PATH);
@@ -15682,12 +16221,11 @@ static int wlan_hdd_disconnect(hdd_adapter_t *pAdapter, u16 reason)
 
 	prev_conn_state = pHddStaCtx->conn_info.connState;
 	/*stop tx queues */
-	hdd_debug("Disabling queues");
+	hdd_info("Disabling queues");
 	wlan_hdd_netif_queue_control(pAdapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
-	hdd_debug("Set HDD connState to eConnectionState_Disconnecting");
-	pHddStaCtx->conn_info.connState = eConnectionState_Disconnecting;
+	hdd_conn_set_connection_state(pAdapter, eConnectionState_Disconnecting);
 
 
 	INIT_COMPLETION(pAdapter->disconnect_comp_var);
@@ -15819,9 +16357,6 @@ static int __wlan_hdd_cfg80211_disconnect(struct wiphy *wiphy,
 	int status;
 	hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
 	hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
-#ifdef FEATURE_WLAN_TDLS
-	uint8_t staIdx;
-#endif
 
 	ENTER();
 
@@ -15895,25 +16430,10 @@ static int __wlan_hdd_cfg80211_disconnect(struct wiphy *wiphy,
 		}
 		wlan_hdd_cleanup_remain_on_channel_ctx(pAdapter);
 #ifdef FEATURE_WLAN_TDLS
-		/* First clean up the tdls peers if any */
-		for (staIdx = 0; staIdx < pHddCtx->max_num_tdls_sta; staIdx++) {
-			if ((pHddCtx->tdlsConnInfo[staIdx].sessionId ==
-			     pAdapter->sessionId)
-			    && (pHddCtx->tdlsConnInfo[staIdx].staId)) {
-				uint8_t *mac;
-				mac =
-					pHddCtx->tdlsConnInfo[staIdx].peerMac.bytes;
-				hdd_debug("call sme_delete_tdls_peer_sta staId %d sessionId %d "
-				       MAC_ADDRESS_STR,
-				       pHddCtx->tdlsConnInfo[staIdx].staId,
-				       pAdapter->sessionId,
-				       MAC_ADDR_ARRAY(mac));
-				sme_delete_tdls_peer_sta(WLAN_HDD_GET_HAL_CTX
-								 (pAdapter),
-							 pAdapter->sessionId, mac);
-			}
-		}
-		wlan_hdd_tdls_notify_disconnect(pAdapter, true);
+		/* First clean up the tdls peers
+		 * Send Msg to PE for deleting all the TDLS peers
+		 */
+		sme_delete_all_tdls_peers(pHddCtx->hHal, pAdapter->sessionId);
 #endif
 		hdd_info("Disconnect request from user space with reason: %d (%s) internal reason code: %d",
 			reason, hdd_ieee80211_reason_code_to_str(reason), reasonCode);

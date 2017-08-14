@@ -3350,24 +3350,8 @@ QDF_STATUS ol_txrx_clear_peer(uint8_t sta_id)
 
 }
 
-void peer_unmap_timer_work_function(void *param)
-{
-	WMA_LOGE("Enter: %s", __func__);
-	wma_peer_debug_dump();
-	if (cds_is_self_recovery_enabled()) {
-		if (!cds_is_driver_recovering())
-			cds_trigger_recovery();
-		else
-			WMA_LOGE("%s: Recovery is in progress, ignore!",
-					__func__);
-	}
-	else {
-		QDF_BUG(0);
-	}
-}
-
 /**
- * peer_unmap_timer_handler() - peer unmap timer function
+ * peer_unmap_timer() - peer unmap timer function
  * @data: peer object pointer
  *
  * Return: none
@@ -3375,7 +3359,6 @@ void peer_unmap_timer_work_function(void *param)
 void peer_unmap_timer_handler(void *data)
 {
 	ol_txrx_peer_handle peer = (ol_txrx_peer_handle)data;
-	ol_txrx_pdev_handle txrx_pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 
 	WMA_LOGE("%s: all unmap events not received for peer %p, ref_cnt %d",
 		 __func__, peer, qdf_atomic_read(&peer->ref_cnt));
@@ -3384,11 +3367,12 @@ void peer_unmap_timer_handler(void *data)
 		 peer->mac_addr.raw[0], peer->mac_addr.raw[1],
 		 peer->mac_addr.raw[2], peer->mac_addr.raw[3],
 		 peer->mac_addr.raw[4], peer->mac_addr.raw[5]);
-	if (!cds_is_driver_recovering()) {
-		qdf_create_work(0, &txrx_pdev->peer_unmap_timer_work,
-				peer_unmap_timer_work_function,
-				NULL);
-		qdf_sched_work(0, &txrx_pdev->peer_unmap_timer_work);
+	if (!cds_is_driver_recovering() && !cds_is_fw_down()) {
+		wma_peer_debug_dump();
+		if (cds_is_self_recovery_enabled())
+			cds_trigger_recovery();
+		else
+			QDF_BUG(0);
 	} else {
 		WMA_LOGE("%s: Recovery is in progress, ignore!", __func__);
 	}
@@ -4463,21 +4447,8 @@ inline void ol_txrx_flow_control_cb(ol_txrx_vdev_handle vdev,
 #ifdef IPA_OFFLOAD
 /**
  * ol_txrx_ipa_uc_get_resource() - Client request resource information
- * @pdev: handle to the HTT instance
- * @ce_sr_base_paddr: copy engine source ring base physical address
- * @ce_sr_ring_size: copy engine source ring size
- * @ce_reg_paddr: copy engine register physical address
- * @tx_comp_ring_base_paddr: tx comp ring base physical address
- * @tx_comp_ring_size: tx comp ring size
- * @tx_num_alloc_buffer: number of allocated tx buffer
- * @rx_rdy_ring_base_paddr: rx ready ring base physical address
- * @rx_rdy_ring_size: rx ready ring size
- * @rx_proc_done_idx_paddr: rx process done index physical address
- * @rx_proc_done_idx_vaddr: rx process done index virtual address
- * @rx2_rdy_ring_base_paddr: rx done ring base physical address
- * @rx2_rdy_ring_size: rx done ring size
- * @rx2_proc_done_idx_paddr: rx done index physical address
- * @rx2_proc_done_idx_vaddr: rx done index virtual address
+ * @pdev: txrx pdev
+ * @ipa_res: ipa resources
  *
  *  OL client will reuqest IPA UC related resource information
  *  Resource information will be distributted to IPA module
@@ -4490,20 +4461,15 @@ ol_txrx_ipa_uc_get_resource(ol_txrx_pdev_handle pdev,
 		 struct ol_txrx_ipa_resources *ipa_res)
 {
 	htt_ipa_uc_get_resource(pdev->htt_pdev,
-				&ipa_res->ce_sr_base_paddr,
+				&ipa_res->ce_sr,
+				&ipa_res->tx_comp_ring,
+				&ipa_res->rx_rdy_ring,
+				&ipa_res->rx2_rdy_ring,
+				&ipa_res->rx_proc_done_idx,
+				&ipa_res->rx2_proc_done_idx,
 				&ipa_res->ce_sr_ring_size,
 				&ipa_res->ce_reg_paddr,
-				&ipa_res->tx_comp_ring_base_paddr,
-				&ipa_res->tx_comp_ring_size,
-				&ipa_res->tx_num_alloc_buffer,
-				&ipa_res->rx_rdy_ring_base_paddr,
-				&ipa_res->rx_rdy_ring_size,
-				&ipa_res->rx_proc_done_idx_paddr,
-				&ipa_res->rx_proc_done_idx_vaddr,
-				&ipa_res->rx2_rdy_ring_base_paddr,
-				&ipa_res->rx2_rdy_ring_size,
-				&ipa_res->rx2_proc_done_idx_paddr,
-				&ipa_res->rx2_proc_done_idx_vaddr);
+				&ipa_res->tx_num_alloc_buffer);
 }
 
 /**

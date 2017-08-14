@@ -3472,7 +3472,7 @@ static void hdd_get_rssi_cb(int8_t rssi, uint32_t staId, void *pContext)
 	 */
 	spin_lock(&hdd_context_lock);
 
-	if (RSSI_CONTEXT_MAGIC != pStatsContext->magic) {
+	if (pStatsContext->magic != PEER_INFO_CONTEXT_MAGIC) {
 		/* the caller presumably timed out so there is nothing
 		 * we can do
 		 */
@@ -3592,7 +3592,7 @@ QDF_STATUS wlan_hdd_get_rssi(hdd_adapter_t *pAdapter, int8_t *rssi_value)
 
 	init_completion(&context.completion);
 	context.pAdapter = pAdapter;
-	context.magic = RSSI_CONTEXT_MAGIC;
+	context.magic = PEER_INFO_CONTEXT_MAGIC;
 
 	hstatus = sme_get_rssi(pHddCtx->hHal, hdd_get_rssi_cb,
 			       pHddStaCtx->conn_info.staId[0],
@@ -3893,6 +3893,128 @@ int wlan_hdd_get_link_speed(hdd_adapter_t *sta_adapter, uint32_t *link_speed)
 
 	return 0;
 }
+
+/**
+ * hdd_get_peer_rssi_cb() - get peer station's rssi callback
+ * @sta_rssi: pointer of peer information
+ * @context: get rssi callback context
+ *
+ * This function will fill rssi information to hostapd
+ * adapter
+ *
+ */
+static void hdd_get_peer_rssi_cb(struct sir_peer_info_resp *sta_rssi,
+							void *context)
+{
+	struct statsContext *get_rssi_context;
+	struct sir_peer_info *rssi_info;
+	uint8_t peer_num;
+	hdd_adapter_t *padapter;
+
+	if ((sta_rssi == NULL) || (context == NULL)) {
+		hdd_err("Bad param, sta_rssi [%p] context [%p]",
+			sta_rssi, context);
+		return;
+	}
+
+	spin_lock(&hdd_context_lock);
+	/*
+	 * there is a race condition that exists between this callback
+	 * function and the caller since the caller could time out either
+	 * before or while this code is executing.  we use a spinlock to
+	 * serialize these actions
+	 */
+	get_rssi_context = (struct statsContext *)context;
+	padapter = get_rssi_context->pAdapter;
+	if (get_rssi_context->magic != PEER_INFO_CONTEXT_MAGIC ||
+	    !padapter) {
+		/*
+		 * the caller presumably timed out so there is nothing
+		 * we can do
+		 */
+		spin_unlock(&hdd_context_lock);
+		hdd_warn("Invalid context, magic [%08x], adapter [%p]",
+			get_rssi_context->magic, padapter);
+		return;
+	}
+
+	peer_num = sta_rssi->count;
+	rssi_info = sta_rssi->info;
+	get_rssi_context->magic = 0;
+
+	hdd_debug("%d peers", peer_num);
+
+	if (peer_num > MAX_PEER_STA) {
+		hdd_warn("Exceed max peer sta to handle one time %d", peer_num);
+		peer_num = MAX_PEER_STA;
+	}
+
+	qdf_mem_copy(padapter->peer_sta_info.info, rssi_info,
+		peer_num * sizeof(*rssi_info));
+	padapter->peer_sta_info.sta_num = peer_num;
+
+	/* notify the caller */
+	complete(&get_rssi_context->completion);
+
+	/* serialization is complete */
+	spin_unlock(&hdd_context_lock);
+}
+
+int wlan_hdd_get_peer_rssi(hdd_adapter_t *adapter,
+					struct qdf_mac_addr *macaddress)
+{
+	QDF_STATUS status;
+	int ret;
+	static struct statsContext context;
+	struct sir_peer_info_req rssi_req;
+
+	if (!adapter || !macaddress) {
+		hdd_err("pAdapter [%p], macaddress [%p]", adapter, macaddress);
+		return -EFAULT;
+	}
+
+	init_completion(&context.completion);
+	context.magic = PEER_INFO_CONTEXT_MAGIC;
+
+	qdf_mem_copy(&(rssi_req.peer_macaddr), macaddress,
+				QDF_MAC_ADDR_SIZE);
+	rssi_req.sessionid = adapter->sessionId;
+	status = sme_get_peer_info(WLAN_HDD_GET_HAL_CTX(adapter),
+				rssi_req,
+				&context,
+				hdd_get_peer_rssi_cb);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Unable to retrieve statistics for rssi");
+		ret = -EFAULT;
+	} else {
+		if (!wait_for_completion_timeout(&context.completion,
+				msecs_to_jiffies(WLAN_WAIT_TIME_STATS))) {
+			hdd_err("SME timed out while retrieving rssi");
+			ret = -EFAULT;
+		} else {
+			ret = 0;
+		}
+	}
+
+	/*
+	 * either we never sent a request, we sent a request and received a
+	 * response or we sent a request and timed out.  if we never sent a
+	 * request or if we sent a request and got a response, we want to
+	 * clear the magic out of paranoia.  if we timed out there is a
+	 * race condition such that the callback function could be
+	 * executing at the same time we are. of primary concern is if the
+	 * callback function had already verified the "magic" but had not
+	 * yet set the completion variable when a timeout occurred. we
+	 * serialize these activities by invalidating the magic while
+	 * holding a shared spinlock which will cause us to block if the
+	 * callback is currently executing
+	 */
+	spin_lock(&hdd_context_lock);
+	context.magic = 0;
+	spin_unlock(&hdd_context_lock);
+	return ret;
+}
+
 
 /**
  * hdd_statistics_cb() - "Get statistics" callback function
@@ -7061,7 +7183,7 @@ static int __iw_set_mlme(struct net_device *dev,
 			(WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter))->authKeyMgmt =
 				0;
 
-			hdd_debug("Disabling queues");
+			hdd_info("Disabling queues");
 			wlan_hdd_netif_queue_control(pAdapter,
 					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					WLAN_CONTROL_PATH);
@@ -7375,7 +7497,6 @@ int wlan_hdd_update_phymode(struct net_device *net, tHalHandle hal,
 		sme_update_config(hal, &smeconfig);
 
 		phddctx->config->dot11Mode = hdd_dot11mode;
-		phddctx->config->nBandCapability = curr_band;
 		phddctx->config->nChannelBondingMode24GHz =
 			smeconfig.csrConfig.channelBondingMode24GHz;
 		phddctx->config->nChannelBondingMode5GHz =
@@ -7385,12 +7506,15 @@ int wlan_hdd_update_phymode(struct net_device *net, tHalHandle hal,
 			hdd_err("could not update config_dat");
 			return -EIO;
 		}
-		if (phddctx->config->nChannelBondingMode5GHz)
-			phddctx->wiphy->bands[HDD_NL80211_BAND_5GHZ]->ht_cap.cap
-				|= IEEE80211_HT_CAP_SUP_WIDTH_20_40;
-		else
-			phddctx->wiphy->bands[HDD_NL80211_BAND_5GHZ]->ht_cap.cap
-				&= ~IEEE80211_HT_CAP_SUP_WIDTH_20_40;
+
+		if (band_5g) {
+			if (phddctx->config->nChannelBondingMode5GHz)
+				phddctx->wiphy->bands[HDD_NL80211_BAND_5GHZ]->ht_cap.cap
+					|= IEEE80211_HT_CAP_SUP_WIDTH_20_40;
+			else
+				phddctx->wiphy->bands[HDD_NL80211_BAND_5GHZ]->ht_cap.cap
+					&= ~IEEE80211_HT_CAP_SUP_WIDTH_20_40;
+		}
 
 		hdd_debug("New_Phymode= %d ch_bonding=%d band=%d VHT_ch_width=%u",
 			phymode, chwidth, curr_band, vhtchanwidth);
@@ -12095,7 +12219,8 @@ int hdd_set_band(struct net_device *dev, u8 ui_band)
 	}
 
 	if ((band == eCSR_BAND_24 && pHddCtx->config->nBandCapability == 2) ||
-	    (band == eCSR_BAND_5G && pHddCtx->config->nBandCapability == 1)) {
+	    (band == eCSR_BAND_5G && pHddCtx->config->nBandCapability == 1) ||
+	    (band == eCSR_BAND_ALL && pHddCtx->config->nBandCapability != 0)) {
 		hdd_err("band value %u violate INI settings %u",
 			  band, pHddCtx->config->nBandCapability);
 		return -EIO;
@@ -12106,6 +12231,8 @@ int hdd_set_band(struct net_device *dev, u8 ui_band)
 			pHddCtx->config->nBandCapability);
 		band = pHddCtx->config->nBandCapability;
 	}
+
+	pHddCtx->curr_band = band;
 
 	if (QDF_STATUS_SUCCESS != sme_get_freq_band(hHal, &currBand)) {
 		hdd_debug("Failed to get current band config");

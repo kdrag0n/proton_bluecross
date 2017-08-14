@@ -1120,6 +1120,8 @@ QDF_STATUS wma_get_peer_info(WMA_HANDLE handle,
 
 	cmd->stats_id = WMI_REQUEST_PEER_STAT;
 	cmd->vdev_id = peer_info_req->sessionid;
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(peer_info_req->peer_macaddr.bytes,
+				&cmd->peer_macaddr);
 	wma_handle->get_sta_peer_info = true;
 
 	if (wmi_unified_cmd_send(wma_handle->wmi_handle, wmi_buf, len,
@@ -1208,7 +1210,9 @@ QDF_STATUS wma_add_beacon_filter(WMA_HANDLE handle,
 	u_int8_t *buf;
 	A_UINT32 *ie_map;
 	int ret;
+	struct wma_txrx_node *iface;
 	tp_wma_handle wma = (tp_wma_handle) handle;
+
 	wmi_add_bcn_filter_cmd_fixed_param *cmd;
 	int len = sizeof(wmi_add_bcn_filter_cmd_fixed_param);
 
@@ -1220,6 +1224,11 @@ QDF_STATUS wma_add_beacon_filter(WMA_HANDLE handle,
 			__func__);
 		return QDF_STATUS_E_INVAL;
 	}
+
+	iface = &wma->interfaces[filter_params->vdev_id];
+	qdf_mem_copy(&iface->beacon_filter, filter_params,
+			sizeof(struct beacon_filter_param));
+	iface->beacon_filter_enabled = true;
 
 	wmi_buf = wmi_buf_alloc(wma->wmi_handle, len);
 	if (!wmi_buf) {
@@ -4553,9 +4562,6 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 	case WOW_REASON_RA_MATCH:
 #endif /* FEATURE_WLAN_RA_FILTERING */
 	case WOW_REASON_RECV_MAGIC_PATTERN:
-		if (wma_vdev)
-			wma_wow_stats_display(&wma_vdev->wow_stats);
-
 		WMA_LOGD("Wake up for Rx packet, dump starting from ethernet hdr");
 		if (!param_buf->wow_packet_buffer) {
 			WMA_LOGE("No wow packet buffer present");
@@ -8040,12 +8046,17 @@ static int __wma_bus_suspend(enum qdf_suspend_type type, uint32_t wow_flags)
 	WMA_HANDLE handle = cds_get_context(QDF_MODULE_ID_WMA);
 	qdf_device_t qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 	tp_wma_handle wma = handle;
-	bool wow_mode = wma_is_wow_mode_selected(handle);
+	bool wow_mode;
 	bool can_suspend_link, is_unified_wow_supported;
 	QDF_STATUS status;
 
 	if (NULL == handle) {
 		WMA_LOGE("%s: wma context is NULL", __func__);
+		return -EFAULT;
+	}
+
+	if (NULL == qdf_dev) {
+		WMA_LOGE("%s: qdf_dev is NULL", __func__);
 		return -EFAULT;
 	}
 
@@ -8060,9 +8071,10 @@ static int __wma_bus_suspend(enum qdf_suspend_type type, uint32_t wow_flags)
 			return qdf_status_to_os_return(status);
 	}
 
+	wow_mode = wma_is_wow_mode_selected(handle);
 	if (type == QDF_SYSTEM_SUSPEND)
 		WMA_LOGD("%s: wow mode selected %d", __func__,
-				wma_is_wow_mode_selected(handle));
+				wow_mode);
 
 	if (!wow_mode)
 		return qdf_status_to_os_return(wma_suspend_target(handle, 0));
@@ -8130,11 +8142,22 @@ int wma_bus_suspend(uint32_t wow_flags)
 static int __wma_bus_resume(WMA_HANDLE handle)
 {
 	qdf_device_t qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
-	bool wow_mode = wma_is_wow_mode_selected(handle);
+	bool wow_mode;
 	tp_wma_handle wma = handle;
 	bool can_suspend_link, is_unified_wow_supported;
 	QDF_STATUS status;
 
+	if (NULL == handle) {
+		WMA_LOGE("%s: wma context is NULL", __func__);
+		return -EFAULT;
+	}
+
+	if (NULL == qdf_dev) {
+		WMA_LOGE("%s: qdf_dev is NULL", __func__);
+		return -EFAULT;
+	}
+
+	wow_mode = wma_is_wow_mode_selected(handle);
 	WMA_LOGD("%s: wow mode %d", __func__, wow_mode);
 
 	wma_peer_debug_log(DEBUG_INVALID_VDEV_ID, DEBUG_BUS_RESUME,

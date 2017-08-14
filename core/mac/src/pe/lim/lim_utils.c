@@ -3113,7 +3113,7 @@ lim_disable_11a_protection(tpAniSirGlobal mac_ctx,
 
 	/* for station role */
 	if (!LIM_IS_AP_ROLE(pe_session)) {
-		pe_warn("===> Protection from 11A Disabled");
+		pe_debug("===> Protection from 11A Disabled");
 		bcn_prms->llaCoexist = false;
 		pe_session->beaconParams.llaCoexist = false;
 		bcn_prms->paramChangeBitmap |= PARAM_llACOEXIST_CHANGED;
@@ -4380,6 +4380,11 @@ void lim_update_sta_run_time_ht_switch_chnl_params(tpAniSirGlobal pMac,
 	 */
 	if (pMac->lim.gpLimRemainOnChanReq) {
 		pe_debug("RoC is in progress");
+		return;
+	}
+
+	if (psessionEntry->ch_switch_in_progress == true) {
+		pe_debug("ch switch is in progress, ignore HT IE BW update");
 		return;
 	}
 
@@ -6721,7 +6726,7 @@ void lim_update_extcap_struct(tpAniSirGlobal mac_ctx,
 	}
 
 	if (DOT11F_EID_EXTCAP != buf[0] || buf[1] > DOT11F_IE_EXTCAP_MAX_LEN) {
-		pe_warn("Invalid IEs eid: %d elem_len: %d",
+		pe_debug_rate_limited(30, "Invalid IEs eid: %d elem_len: %d",
 				buf[0], buf[1]);
 		return;
 	}

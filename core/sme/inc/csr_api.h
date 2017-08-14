@@ -170,6 +170,7 @@ typedef enum {
 
 	eCSR_SCAN_SOFTAP_CHANNEL_RANGE,
 	eCSR_SCAN_P2P_FIND_PEER,
+	eCSR_SCAN_RRM,
 } eCsrRequestType;
 
 typedef enum {
@@ -1078,6 +1079,7 @@ typedef struct tagCsr11rConfigParams {
 typedef struct tagCsrNeighborRoamConfigParams {
 
 	uint32_t nNeighborScanTimerPeriod;
+	uint32_t neighbor_scan_min_timer_period;
 	uint8_t nNeighborLookupRssiThreshold;
 	uint16_t nNeighborScanMinChanTime;
 	uint16_t nNeighborScanMaxChanTime;
@@ -1140,6 +1142,7 @@ typedef struct tagCsrConfigParam {
 	bool Is11eSupportEnabled;
 	bool Is11dSupportEnabled;
 	bool Is11dSupportEnabledOriginal;
+	bool enable_11d_in_world_mode;
 	bool Is11hSupportEnabled;
 	bool shortSlotTime;
 	bool ProprietaryRatesEnabled;
@@ -1203,7 +1206,7 @@ typedef struct tagCsrConfigParam {
 	uint8_t isEseIniFeatureEnabled;
 #endif
 	uint8_t isFastRoamIniFeatureEnabled;
-	uint8_t MAWCEnabled;
+	struct mawc_params csr_mawc_config;
 	uint8_t isFastTransitionEnabled;
 	uint8_t RoamRssiDiff;
 	bool isWESModeEnabled;
@@ -1313,6 +1316,8 @@ typedef struct tagCsrConfigParam {
 	uint32_t roam_dense_traffic_thresh;
 	uint32_t roam_dense_rssi_thresh_offset;
 	uint32_t roam_dense_min_aps;
+	int8_t roam_bg_scan_bad_rssi_thresh;
+	uint32_t roam_bg_scan_client_bitmap;
 	uint32_t obss_width_interval;
 	uint32_t obss_active_dwelltime;
 	uint32_t obss_passive_dwelltime;

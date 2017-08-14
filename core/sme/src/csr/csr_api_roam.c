@@ -97,6 +97,17 @@
 #define ROAMING_OFFLOAD_TIMER_STOP	2
 #define CSR_ROAMING_OFFLOAD_TIMEOUT_PERIOD    (5 * QDF_MC_TIMER_TO_SEC_UNIT)
 
+/*
+ * MAWC_ROAM_TRAFFIC_THRESHOLD_DEFAULT - Indicates the traffic thresold in kBps
+ * MAWC_ROAM_AP_RSSI_THRESHOLD_DEFAULT - indicates the AP RSSI threshold
+ * MAWC_ROAM_RSSI_HIGH_ADJUST_DEFAULT - Adjustable high value to suppress scan
+ * MAWC_ROAM_RSSI_LOW_ADJUST_DEFAULT - Adjustable low value to suppress scan
+ */
+#define MAWC_ROAM_TRAFFIC_THRESHOLD_DEFAULT  300
+#define MAWC_ROAM_AP_RSSI_THRESHOLD_DEFAULT  (-66)
+#define MAWC_ROAM_RSSI_HIGH_ADJUST_DEFAULT   5
+#define MAWC_ROAM_RSSI_LOW_ADJUST_DEFAULT    5
+
 /* Static Type declarations */
 static tCsrRoamSession csr_roam_roam_session[CSR_ROAM_SESSION_MAX];
 
@@ -449,6 +460,7 @@ QDF_STATUS csr_set_reg_info(tHalHandle hHal, uint8_t *apCntryCode)
 	cntryCodeLength = WNI_CFG_COUNTRY_CODE_LEN;
 	status = csr_get_regulatory_domain_for_country(pMac, apCntryCode,
 						&regId, SOURCE_USERSPACE);
+
 	if (status != QDF_STATUS_SUCCESS) {
 		sme_err("fail to get regId for country Code %.2s",
 			apCntryCode);
@@ -1562,6 +1574,7 @@ static void init_config_param(tpAniSirGlobal pMac)
 	pMac->roam.configParam.HeartbeatThresh50 = 40;
 	pMac->roam.configParam.Is11dSupportEnabled = false;
 	pMac->roam.configParam.Is11dSupportEnabledOriginal = false;
+	pMac->roam.configParam.enable_11d_in_world_mode = false;
 	pMac->roam.configParam.Is11eSupportEnabled = true;
 	pMac->roam.configParam.Is11hSupportEnabled = true;
 	pMac->roam.configParam.RTSThreshold = 2346;
@@ -1610,6 +1623,8 @@ static void init_config_param(tpAniSirGlobal pMac)
 	pMac->roam.configParam.neighborRoamConfig.nNeighborScanMaxChanTime = 40;
 	pMac->roam.configParam.neighborRoamConfig.nNeighborScanTimerPeriod =
 		200;
+	pMac->roam.configParam.neighborRoamConfig.
+		neighbor_scan_min_timer_period = 200;
 	pMac->roam.configParam.neighborRoamConfig.neighborScanChanList.
 	numChannels = 3;
 	pMac->roam.configParam.neighborRoamConfig.neighborScanChanList.
@@ -1636,6 +1651,16 @@ static void init_config_param(tpAniSirGlobal pMac)
 
 	pMac->roam.configParam.nInitialDwellTime = 0;
 	pMac->roam.configParam.initial_scan_no_dfs_chnl = 0;
+	pMac->roam.configParam.csr_mawc_config.mawc_enabled = true;
+	pMac->roam.configParam.csr_mawc_config.mawc_roam_enabled = true;
+	pMac->roam.configParam.csr_mawc_config.mawc_roam_traffic_threshold =
+		MAWC_ROAM_TRAFFIC_THRESHOLD_DEFAULT;
+	pMac->roam.configParam.csr_mawc_config.mawc_roam_ap_rssi_threshold =
+		MAWC_ROAM_AP_RSSI_THRESHOLD_DEFAULT;
+	pMac->roam.configParam.csr_mawc_config.mawc_roam_rssi_high_adjust =
+		MAWC_ROAM_RSSI_HIGH_ADJUST_DEFAULT;
+	pMac->roam.configParam.csr_mawc_config.mawc_roam_rssi_low_adjust =
+		MAWC_ROAM_RSSI_LOW_ADJUST_DEFAULT;
 }
 
 eCsrBand csr_get_current_band(tHalHandle hHal)
@@ -2299,10 +2324,17 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 			pParam->Is11eSupportEnabled;
 		pMac->roam.configParam.FragmentationThreshold =
 			pParam->FragmentationThreshold;
-		pMac->roam.configParam.Is11dSupportEnabled =
-			pParam->Is11dSupportEnabled;
 		pMac->roam.configParam.Is11dSupportEnabledOriginal =
 			pParam->Is11dSupportEnabled;
+		pMac->roam.configParam.enable_11d_in_world_mode =
+			pParam->enable_11d_in_world_mode;
+		if ((pMac->roam.configParam.enable_11d_in_world_mode) &&
+		    (pMac->reg_hint_src == SOURCE_CORE))
+			pMac->roam.configParam.Is11dSupportEnabled =
+				true;
+		else
+			pMac->roam.configParam.Is11dSupportEnabled =
+				pParam->Is11dSupportEnabled;
 		pMac->roam.configParam.Is11hSupportEnabled =
 			pParam->Is11hSupportEnabled;
 
@@ -2502,8 +2534,9 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 			pParam->bFastRoamInConIniFeatureEnabled;
 		pMac->roam.configParam.isFastRoamIniFeatureEnabled =
 			pParam->isFastRoamIniFeatureEnabled;
-		pMac->roam.configParam.MAWCEnabled = pParam->MAWCEnabled;
-
+		qdf_mem_copy(&pMac->roam.configParam.csr_mawc_config,
+				&pParam->csr_mawc_config,
+				sizeof(pParam->csr_mawc_config));
 #ifdef FEATURE_WLAN_ESE
 		pMac->roam.configParam.isEseIniFeatureEnabled =
 			pParam->isEseIniFeatureEnabled;
@@ -2514,6 +2547,9 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 		sme_debug("nNeighborScanTimerPerioid: %d",
 			pMac->roam.configParam.neighborRoamConfig.
 			nNeighborScanTimerPeriod);
+		sme_debug("neighbor_scan_min_timer_period: %d",
+			pMac->roam.configParam.neighborRoamConfig.
+			neighbor_scan_min_timer_period);
 		sme_debug("nNeighborLookupRssiThreshold: %d",
 			pMac->roam.configParam.neighborRoamConfig.
 			nNeighborLookupRssiThreshold);
@@ -2648,6 +2684,16 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 			pParam->roam_dense_min_aps;
 		pMac->roam.configParam.roam_params.traffic_threshold =
 			pParam->roam_dense_traffic_thresh;
+
+		pMac->roam.configParam.roam_params.bg_scan_bad_rssi_thresh =
+			pParam->roam_bg_scan_bad_rssi_thresh;
+		pMac->roam.configParam.roam_params.bg_scan_client_bitmap =
+			pParam->roam_bg_scan_client_bitmap;
+
+		pMac->roam.configParam.roam_params.bg_scan_bad_rssi_thresh =
+			pParam->roam_bg_scan_bad_rssi_thresh;
+		pMac->roam.configParam.roam_params.bg_scan_client_bitmap =
+			pParam->roam_bg_scan_client_bitmap;
 
 		pMac->roam.configParam.scan_adaptive_dwell_mode =
 			pParam->scan_adaptive_dwell_mode;
@@ -2898,6 +2944,11 @@ QDF_STATUS csr_get_config_param(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
 	pParam->roam_dense_traffic_thresh =
 			cfg_params->roam_params.traffic_threshold;
 
+	pParam->roam_bg_scan_bad_rssi_thresh =
+		cfg_params->roam_params.bg_scan_bad_rssi_thresh;
+	pParam->roam_bg_scan_client_bitmap =
+		cfg_params->roam_params.bg_scan_client_bitmap;
+
 	pParam->scan_adaptive_dwell_mode =
 			cfg_params->scan_adaptive_dwell_mode;
 	pParam->roamscan_adaptive_dwell_mode =
@@ -3012,6 +3063,9 @@ QDF_STATUS csr_get_config_param(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
 		pMac->roam.configParam.rssi_channel_penalization;
 	pParam->num_disallowed_aps =
 		pMac->roam.configParam.num_disallowed_aps;
+	qdf_mem_copy(&pParam->csr_mawc_config,
+		&pMac->roam.configParam.csr_mawc_config,
+		sizeof(pParam->csr_mawc_config));
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -13303,6 +13357,16 @@ static void csr_merge_supported_and_extended_rates(
 {
 	int i;
 
+	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
+			FL("supported_rates: %d extended_rates: %d"),
+			supported_rates->numRates, extended_rates->numRates);
+
+	if (supported_rates->numRates > SIR_MAC_RATESET_EID_MAX)
+		supported_rates->numRates = SIR_MAC_RATESET_EID_MAX;
+
+	if (extended_rates->numRates > SIR_MAC_RATESET_EID_MAX)
+		extended_rates->numRates = SIR_MAC_RATESET_EID_MAX;
+
 	qdf_mem_copy(rates->rate,
 			supported_rates->rate,
 			supported_rates->numRates);
@@ -13488,11 +13552,17 @@ csr_roam_get_bss_start_parms(tpAniSirGlobal pMac,
 				opr_ch = tmp_opr_ch;
 			break;
 		}
-		pParam->operationChn = opr_ch;
+
+	pParam->operationChn = opr_ch;
 
 	if (pProfile->supported_rates.numRates ||
 	    pProfile->extended_rates.numRates) {
 		struct merged_mac_rate_set rates_driver, rates_hostapd;
+
+		qdf_mem_zero(&rates_driver,
+			sizeof(struct merged_mac_rate_set));
+		qdf_mem_zero(&rates_hostapd,
+			sizeof(struct merged_mac_rate_set));
 
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 				"Merge rates driver");
@@ -14527,6 +14597,23 @@ static QDF_STATUS csr_set_ldpc_exception(tpAniSirGlobal mac_ctx,
 
 #ifdef WLAN_FEATURE_11W
 /**
+ * csr_is_mfpc_capable() - is MFPC capable
+ * @ies: AP information element
+ *
+ * Return: true if MFPC capable, false otherwise
+ */
+bool csr_is_mfpc_capable(struct sDot11fIERSN *rsn)
+{
+	bool mfpc_capable = false;
+
+	if (rsn && rsn->present &&
+	    ((rsn->RSN_Cap[0] >> 7) & 0x01))
+		mfpc_capable = true;
+
+	return mfpc_capable;
+}
+
+/**
  * csr_set_mgmt_enc_type() - set mgmt enc type for PMF
  * @profile: roam profile
  * @ies: AP ie
@@ -14543,8 +14630,7 @@ static void csr_set_mgmt_enc_type(tCsrRoamProfile *profile,
 		csr_join_req->MgmtEncryptionType = eSIR_ED_NONE;
 	if (profile->MFPEnabled &&
 	   !(profile->MFPRequired) &&
-	   ((ies->RSN.present) &&
-	   (!(ies->RSN.RSN_Cap[0] >> 7) & 0x1)))
+	   !csr_is_mfpc_capable(&ies->RSN))
 		csr_join_req->MgmtEncryptionType = eSIR_ED_NONE;
 }
 #else
@@ -15809,22 +15895,22 @@ QDF_STATUS csr_send_assoc_ind_to_upper_layer_cnf_msg(tpAniSirGlobal pMac,
 		*pBuf = pAssocInd->ecsa_capable;
 		/* ampdu */
 		pBuf = (uint8_t *)&pMsg->ampdu;
-		*pBuf = pAssocInd->ampdu;
+		*((bool *)pBuf) = pAssocInd->ampdu;
 		/* sgi_enable */
 		pBuf = (uint8_t *)&pMsg->sgi_enable;
-		*pBuf = pAssocInd->sgi_enable;
+		*((bool *)pBuf) = pAssocInd->sgi_enable;
 		/* tx stbc */
 		pBuf = (uint8_t *)&pMsg->tx_stbc;
-		*pBuf = pAssocInd->tx_stbc;
+		*((bool *)pBuf) = pAssocInd->tx_stbc;
 		/* ch_width */
 		pBuf = (uint8_t *)&pMsg->ch_width;
-		*pBuf = pAssocInd->ch_width;
+		*((tSirMacHTChannelWidth *)pBuf) = pAssocInd->ch_width;
 		/* mode */
 		pBuf = (uint8_t *)&pMsg->mode;
-		*pBuf = pAssocInd->mode;
+		*((enum sir_sme_phy_mode *)pBuf) = pAssocInd->mode;
 		/* rx stbc */
 		pBuf = (uint8_t *)&pMsg->rx_stbc;
-		*pBuf = pAssocInd->rx_stbc;
+		*((bool *)pBuf) = pAssocInd->rx_stbc;
 		/* max supported idx */
 		pBuf = (uint8_t *)&pMsg->max_supp_idx;
 		*pBuf = pAssocInd->max_supp_idx;
@@ -18189,6 +18275,8 @@ csr_create_roam_scan_offload_request(tpAniSirGlobal mac_ctx,
 	req_buf->reason = reason;
 	req_buf->NeighborScanTimerPeriod =
 		roam_info->cfgParams.neighborScanPeriod;
+	req_buf->neighbor_scan_min_timer_period =
+		roam_info->cfgParams.neighbor_scan_min_period;
 	req_buf->NeighborRoamScanRefreshPeriod =
 		roam_info->cfgParams.neighborResultsRefreshPeriod;
 	req_buf->NeighborScanChannelMinTime =
@@ -18203,8 +18291,16 @@ csr_create_roam_scan_offload_request(tpAniSirGlobal mac_ctx,
 		roam_info->cfgParams.nRoamBmissFinalBcnt;
 	req_buf->RoamBeaconRssiWeight =
 		roam_info->cfgParams.nRoamBeaconRssiWeight;
-	/* MAWC feature */
-	req_buf->MAWCEnabled = mac_ctx->roam.configParam.MAWCEnabled;
+	qdf_mem_copy(&req_buf->mawc_roam_params,
+		&mac_ctx->roam.configParam.csr_mawc_config,
+		sizeof(req_buf->mawc_roam_params));
+	sme_debug("MAWC:global=%d,roam=%d,traffic=%d,ap_rssi=%d,high=%d,low=%d",
+			req_buf->mawc_roam_params.mawc_enabled,
+			req_buf->mawc_roam_params.mawc_roam_enabled,
+			req_buf->mawc_roam_params.mawc_roam_traffic_threshold,
+			req_buf->mawc_roam_params.mawc_roam_ap_rssi_threshold,
+			req_buf->mawc_roam_params.mawc_roam_rssi_high_adjust,
+			req_buf->mawc_roam_params.mawc_roam_rssi_low_adjust);
 #ifdef FEATURE_WLAN_ESE
 	req_buf->IsESEAssoc =
 		csr_roam_is_ese_assoc(mac_ctx, session_id) &&
@@ -18391,6 +18487,69 @@ static void check_allowed_ssid_list(tSirRoamOffloadScanReq *req_buffer,
 		roam_params->ssid_allowed_list[i].length =
 			req_buffer->ConnectedNetwork.ssId.length;
 		roam_params->num_ssid_allowed_list++;
+	}
+}
+
+/**
+ * csr_add_rssi_reject_ap_list() - add rssi reject AP list to the
+ * roam params
+ * @mac_ctx: mac ctx.
+ * @roam_params: roam params in which reject AP list needs
+ * to be populated.
+ *
+ * Return: None
+ */
+static void csr_add_rssi_reject_ap_list(tpAniSirGlobal mac_ctx,
+	struct roam_ext_params *roam_params)
+{
+	int i = 0;
+	struct sir_rssi_disallow_lst *cur_node;
+	qdf_list_node_t *cur_list = NULL;
+	qdf_list_node_t *next_list = NULL;
+	struct rssi_disallow_bssid *rssi_rejection_ap;
+	qdf_list_t *list = &mac_ctx->roam.rssi_disallow_bssid;
+	qdf_time_t cur_time =
+		qdf_do_div(qdf_get_monotonic_boottime(),
+		QDF_MC_TIMER_TO_MS_UNIT);
+
+	roam_params->num_rssi_rejection_ap = qdf_list_size(list);
+
+	if (!qdf_list_size(list))
+		return;
+
+	if (roam_params->num_rssi_rejection_ap > MAX_RSSI_AVOID_BSSID_LIST)
+		roam_params->num_rssi_rejection_ap = MAX_RSSI_AVOID_BSSID_LIST;
+
+	qdf_list_peek_front(list, &cur_list);
+	while (cur_list) {
+		int32_t rem_time;
+
+		rssi_rejection_ap = &roam_params->rssi_rejection_ap[i];
+		cur_node = qdf_container_of(cur_list,
+				struct sir_rssi_disallow_lst, node);
+		rem_time = cur_node->retry_delay -
+			(cur_time - cur_node->time_during_rejection);
+
+		if (rem_time > 0) {
+			qdf_copy_macaddr(&rssi_rejection_ap->bssid,
+					&cur_node->bssid);
+			rssi_rejection_ap->expected_rssi =
+					cur_node->expected_rssi;
+			rssi_rejection_ap->remaining_duration = rem_time;
+			i++;
+		}
+		qdf_list_peek_next(list, cur_list, &next_list);
+		cur_list = next_list;
+		next_list = NULL;
+
+		if (i >= MAX_RSSI_AVOID_BSSID_LIST)
+			break;
+	}
+	for (i = 0; i < roam_params->num_rssi_rejection_ap; i++) {
+		sme_debug("BSSID %pM expected rssi %d remaining duration %d",
+			roam_params->rssi_rejection_ap[i].bssid.bytes,
+			roam_params->rssi_rejection_ap[i].expected_rssi,
+			roam_params->rssi_rejection_ap[i].remaining_duration);
 	}
 }
 
@@ -18802,7 +18961,7 @@ csr_roam_offload_scan(tpAniSirGlobal mac_ctx, uint8_t session_id,
 	}
 	if (!csr_is_RSO_cmd_allowed(mac_ctx, command, session_id) &&
 			reason != REASON_ROAM_SET_BLACKLIST_BSSID) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 			("RSO out-of-sync command %d lastSentCmd %d"),
 			command, roam_info->last_sent_cmd);
 		return QDF_STATUS_E_FAILURE;
@@ -18857,6 +19016,15 @@ csr_roam_offload_scan(tpAniSirGlobal mac_ctx, uint8_t session_id,
 	roam_params_src = &mac_ctx->roam.configParam.roam_params;
 	if (reason == REASON_ROAM_SET_SSID_ALLOWED)
 		check_allowed_ssid_list(req_buf, roam_params_src);
+
+	/*
+	 * For CTX INT cmd if rssi disallow bssid list have any member
+	 * fill it and send it to firmware so that firmware does not
+	 * try to roam to these BSS untill RSSI OR time condition are
+	 * matched.
+	 */
+	if (reason == REASON_CTX_INIT)
+		csr_add_rssi_reject_ap_list(mac_ctx, roam_params_src);
 	/*
 	 * Configure the lookup threshold either from INI or from framework.
 	 * If both are present, give higher priority to the one from framework.
@@ -18869,7 +19037,7 @@ csr_roam_offload_scan(tpAniSirGlobal mac_ctx, uint8_t session_id,
 			(int8_t)roam_info->cfgParams.neighborLookupThreshold *
 			(-1);
 	qdf_mem_copy(roam_params_dst, roam_params_src,
-		sizeof(struct roam_ext_params));
+		sizeof(*roam_params_dst));
 	/*
 	 * rssi_diff which is updated via framework is equivalent to the
 	 * INI RoamRssiDiff parameter and hence should be updated.
@@ -18904,6 +19072,9 @@ csr_roam_offload_scan(tpAniSirGlobal mac_ctx, uint8_t session_id,
 		roam_params_dst->traffic_threshold,
 		roam_params_dst->initial_dense_status,
 		mac_ctx->scan.roam_candidate_count[session_id]);
+	sme_debug("BG Scan Bad RSSI:%d, bitmap:0x%x",
+			roam_params_dst->bg_scan_bad_rssi_thresh,
+			roam_params_dst->bg_scan_client_bitmap);
 
 	for (i = 0; i < roam_params_dst->num_bssid_avoid_list; i++) {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
@@ -19622,7 +19793,10 @@ QDF_STATUS csr_roam_channel_change_req(tpAniSirGlobal pMac,
 	 * give us rates based on original channel which may not be
 	 * suitable for new channel
 	 */
+	qdf_mem_zero(&param, sizeof(tCsrRoamStartBssParams));
+
 	csr_roam_get_bss_start_parms(pMac, profile, &param, true);
+
 	pMsg = qdf_mem_malloc(sizeof(tSirChanChangeRequest));
 	if (!pMsg)
 		return QDF_STATUS_E_NOMEM;
@@ -20734,7 +20908,7 @@ static QDF_STATUS csr_process_roam_sync_callback(tpAniSirGlobal mac_ctx,
 		/* first update connection info from wma interface */
 		cds_update_connection_info(session_id);
 		/* then update remaining parameters from roam sync ctx */
-		sme_err("Update DBS hw mode");
+		sme_debug("Update DBS hw mode");
 		cds_hw_mode_transition_cb(
 			roam_synch_data->hw_mode_trans_ind.old_hw_mode_index,
 			roam_synch_data->hw_mode_trans_ind.new_hw_mode_index,
@@ -20748,7 +20922,7 @@ static QDF_STATUS csr_process_roam_sync_callback(tpAniSirGlobal mac_ctx,
 				REASON_CONNECT);
 		return status;
 	default:
-		sme_err("LFR3: callback reason %d", reason);
+		sme_debug("LFR3: callback reason %d", reason);
 		return QDF_STATUS_E_FAILURE;
 	}
 	session->roam_synch_in_progress = true;
@@ -20808,8 +20982,8 @@ static QDF_STATUS csr_process_roam_sync_callback(tpAniSirGlobal mac_ctx,
 	 *      with AP after this point and sends new keys to the driver.
 	 *      Driver starts wait_for_key timer for that purpose.
 	 */
-	if ((roam_synch_data->authStatus
-				== CSR_ROAM_AUTH_STATUS_AUTHENTICATED)) {
+	if (roam_synch_data->authStatus
+				== CSR_ROAM_AUTH_STATUS_AUTHENTICATED) {
 		QDF_TRACE(QDF_MODULE_ID_SME,
 				QDF_TRACE_LEVEL_DEBUG,
 				FL("LFR3:Don't start waitforkey timer"));

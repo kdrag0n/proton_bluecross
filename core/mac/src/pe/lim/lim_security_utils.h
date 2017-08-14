@@ -44,6 +44,12 @@
 				 SIR_MAC_WEP_IV_LENGTH + \
 				 SIR_MAC_WEP_ICV_LENGTH)
 
+#define LIM_ENCR_AUTH_INFO_LEN  (SIR_MAC_AUTH_FRAME_INFO_LEN +\
+				 SIR_MAC_WEP_IV_LENGTH + \
+				 SIR_MAC_WEP_ICV_LENGTH + \
+				 SIR_MAC_CHALLENGE_ID_LEN)
+
+
 struct tLimPreAuthNode;
 
 uint8_t lim_is_auth_algo_supported(tpAniSirGlobal, tAniAuthType, tpPESession);
@@ -60,7 +66,7 @@ void lim_restore_from_auth_state(tpAniSirGlobal,
 uint8_t lim_delete_open_auth_pre_auth_node(tpAniSirGlobal mac_ctx);
 
 /* Encryption/Decryption related functions */
-void lim_compute_crc32(uint8_t *, uint8_t *, uint8_t);
+void lim_compute_crc32(uint8_t *, uint8_t *, uint16_t);
 void lim_rc4(uint8_t *, uint8_t *, uint8_t *, uint32_t, uint16_t);
 void lim_encrypt_auth_frame(tpAniSirGlobal, uint8_t, uint8_t *, uint8_t *,
 			    uint8_t *, uint32_t);
