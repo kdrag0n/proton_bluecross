@@ -518,7 +518,7 @@ static void hdd_get_transmit_sta_id(hdd_adapter_t *adapter,
  *
  * Return: Always returns NETDEV_TX_OK
  */
-static int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
+static netdev_tx_t __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	QDF_STATUS status;
 	sme_ac_enum_type ac;
@@ -788,7 +788,7 @@ drop_pkt_accounting:
  *
  * Return: Always returns NETDEV_TX_OK
  */
-int hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
+netdev_tx_t hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	int ret;
 
