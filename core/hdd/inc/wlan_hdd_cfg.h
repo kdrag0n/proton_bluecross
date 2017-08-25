@@ -4381,6 +4381,39 @@ enum station_keepalive_method {
 #define CFG_NEIGHBOR_LOOKUP_RSSI_THRESHOLD_MAX       (120)
 #define CFG_NEIGHBOR_LOOKUP_RSSI_THRESHOLD_DEFAULT   (78)
 
+/*
+ * <ini>
+ * lookup_threshold_5g_offset - Lookup Threshold offset for 5G band
+ * @Min: -120
+ * @Max: +120
+ * @Default: 0
+ *
+ * This ini is  used to set the 5G band lookup threshold for roaming.
+ * It depends on another INI which is gNeighborLookupThreshold.
+ * gNeighborLookupThreshold is a legacy INI item which will be used to
+ * set the RSSI lookup threshold for both 2G and 5G bands. If the
+ * user wants to setup a different threshold for a 5G band, then user
+ * can use this offset value which will be summed up to the value of
+ * gNeighborLookupThreshold and used for 5G
+ * e.g: gNeighborLookupThreshold = -76dBm
+ *      lookup_threshold_5g_offset = 6dBm
+ *      Then the 5G band will be configured to -76+6 = -70dBm
+ * A default value of Zero to lookup_threshold_5g_offset will keep the
+ * thresholds same for both 2G and 5G bands
+ *
+ * Related: gNeighborLookupThreshold
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_5G_RSSI_THRESHOLD_OFFSET_NAME      "lookup_threshold_5g_offset"
+#define CFG_5G_RSSI_THRESHOLD_OFFSET_MIN       (-120)
+#define CFG_5G_RSSI_THRESHOLD_OFFSET_MAX       (120)
+#define CFG_5G_RSSI_THRESHOLD_OFFSET_DEFAULT   (0)
+
 #define CFG_DELAY_BEFORE_VDEV_STOP_NAME              "gDelayBeforeVdevStop"
 #define CFG_DELAY_BEFORE_VDEV_STOP_MIN               (2)
 #define CFG_DELAY_BEFORE_VDEV_STOP_MAX               (200)
@@ -4759,6 +4792,36 @@ enum hdd_link_speed_rpt_type {
 #define CFG_VHT_ENABLE_2x2_CAP_FEATURE_MIN     (0)
 #define CFG_VHT_ENABLE_2x2_CAP_FEATURE_MAX     (1)
 #define CFG_VHT_ENABLE_2x2_CAP_FEATURE_DEFAULT (0)
+
+/*
+ * <ini>
+ * disable_high_ht_mcs_2x2 - disable high mcs index for 2nd stream in 2.4G
+ * @Min: 0
+ * @Max: 8
+ * @Default: 0
+ *
+ * This ini is used to disable high HT MCS index for 2.4G STA connection.
+ * It has been introduced to resolve IOT issue with one of the vendor.
+ *
+ * Note: This INI is not useful with 1x1 setting. If some platform supports
+ * only 1x1 then this INI is not useful.
+ *
+ * 0 - It won't disable any HT MCS index (just like normal HT MCS)
+ * 1 - It will disable 15th bit from HT RX MCS set (from 8-15 bits slot)
+ * 2 - It will disable 14th & 15th bits from HT RX MCS set
+ * 3 - It will disable 13th, 14th, & 15th bits from HT RX MCS set
+ * and so on.
+ *
+ * Related: STA
+ *
+ * Supported Feature: 11n
+ *
+ * Usage: External
+ */
+#define CFG_DISABLE_HIGH_HT_RX_MCS_2x2         "disable_high_ht_mcs_2x2"
+#define CFG_DISABLE_HIGH_HT_RX_MCS_2x2_MIN     (0)
+#define CFG_DISABLE_HIGH_HT_RX_MCS_2x2_MAX     (8)
+#define CFG_DISABLE_HIGH_HT_RX_MCS_2x2_DEFAULT (0)
 
 /*
  * <ini>
@@ -12110,6 +12173,7 @@ struct hdd_config {
 	bool enable_su_tx_bformer;
 	uint8_t vhtRxMCS2x2;
 	uint8_t vhtTxMCS2x2;
+	uint8_t disable_high_ht_mcs_2x2;
 	bool enable2x2;
 	uint32_t vdev_type_nss_2g;
 	uint32_t vdev_type_nss_5g;
@@ -12537,7 +12601,8 @@ struct hdd_config {
 	enum active_bpf_mode active_mc_bc_bpf_mode;
 	enum hw_filter_mode hw_filter_mode;
 	bool sap_internal_restart;
-	bool restart_beaconing_on_chan_avoid_event;
+	enum restart_beaconing_on_ch_avoid_rule
+		restart_beaconing_on_chan_avoid_event;
 	bool enable_bcast_probe_rsp;
 	bool qcn_ie_support;
 	uint8_t fils_max_chan_guard_time;
@@ -12592,7 +12657,6 @@ struct hdd_config {
 	bool is_force_1x1;
 	uint16_t num_11b_tx_chains;
 	uint16_t num_11ag_tx_chains;
-
 	/* LCA(Last connected AP) disallow configs */
 	uint32_t disallow_duration;
 	uint32_t rssi_channel_penalization;
@@ -12606,6 +12670,7 @@ struct hdd_config {
 	bool oce_sta_enabled;
 	bool oce_sap_enabled;
 	bool enable_11d_in_world_mode;
+	int8_t rssi_thresh_offset_5g;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))

@@ -1021,20 +1021,20 @@ void htt_tx_desc_display(void *tx_desc)
 	htt_tx_desc = (struct htt_tx_msdu_desc_t *)tx_desc;
 
 	/* only works for little-endian */
-	qdf_print("HTT tx desc (@ %p):", htt_tx_desc);
-	qdf_print("  msg type = %d", htt_tx_desc->msg_type);
-	qdf_print("  pkt subtype = %d", htt_tx_desc->pkt_subtype);
-	qdf_print("  pkt type = %d", htt_tx_desc->pkt_type);
-	qdf_print("  vdev ID = %d", htt_tx_desc->vdev_id);
-	qdf_print("  ext TID = %d", htt_tx_desc->ext_tid);
-	qdf_print("  postponed = %d", htt_tx_desc->postponed);
-	qdf_print("  extension = %d", htt_tx_desc->extension);
-	qdf_print("  cksum_offload = %d", htt_tx_desc->cksum_offload);
-	qdf_print("  tx_compl_req= %d", htt_tx_desc->tx_compl_req);
-	qdf_print("  length = %d", htt_tx_desc->len);
-	qdf_print("  id = %d", htt_tx_desc->id);
+	qdf_debug("HTT tx desc (@ %p):", htt_tx_desc);
+	qdf_debug("  msg type = %d", htt_tx_desc->msg_type);
+	qdf_debug("  pkt subtype = %d", htt_tx_desc->pkt_subtype);
+	qdf_debug("  pkt type = %d", htt_tx_desc->pkt_type);
+	qdf_debug("  vdev ID = %d", htt_tx_desc->vdev_id);
+	qdf_debug("  ext TID = %d", htt_tx_desc->ext_tid);
+	qdf_debug("  postponed = %d", htt_tx_desc->postponed);
+	qdf_debug("  extension = %d", htt_tx_desc->extension);
+	qdf_debug("  cksum_offload = %d", htt_tx_desc->cksum_offload);
+	qdf_debug("  tx_compl_req= %d", htt_tx_desc->tx_compl_req);
+	qdf_debug("  length = %d", htt_tx_desc->len);
+	qdf_debug("  id = %d", htt_tx_desc->id);
 #if HTT_PADDR64
-	qdf_print("  frag desc addr.lo = %#x",
+	qdf_debug("  frag desc addr.lo = %#x",
 		  htt_tx_desc->frags_desc_ptr.lo);
 	qdf_print("  frag desc addr.hi = %#x",
 		  htt_tx_desc->frags_desc_ptr.hi);
@@ -1140,9 +1140,8 @@ static int htt_tx_ipa_uc_wdi_tx_buf_alloc(struct htt_pdev_t *pdev,
 
 		ring_vaddr++;
 		if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
-			qdf_update_mem_map_table(pdev->osdev, mem_info,
-					shared_tx_buffer->mem_info.iova,
-					uc_tx_buf_sz);
+			*mem_info = pdev->ipa_uc_tx_rsc.tx_buf_pool_strg[
+						tx_buffer_count]->mem_info;
 			 mem_info++;
 		}
 	}
@@ -1192,18 +1191,39 @@ free_mem_map_table:
 static void htt_tx_buf_pool_free(struct htt_pdev_t *pdev)
 {
 	uint16_t idx;
+	qdf_mem_info_t *mem_map_table = NULL, *mem_info = NULL;
+	uint32_t num_unmapped = 0;
+
+	if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
+		mem_map_table = qdf_mem_map_table_alloc(
+					pdev->ipa_uc_tx_rsc.alloc_tx_buf_cnt);
+		if (!mem_map_table) {
+			qdf_print("%s: Failed to allocate memory for mem map table\n",
+				  __func__);
+			return;
+		}
+		mem_info = mem_map_table;
+	}
 
 	for (idx = 0; idx < pdev->ipa_uc_tx_rsc.alloc_tx_buf_cnt; idx++) {
 		if (pdev->ipa_uc_tx_rsc.tx_buf_pool_strg[idx]) {
-			if (qdf_mem_smmu_s1_enabled(pdev->osdev))
-				cds_smmu_map_unmap(false, 1,
-					&pdev->ipa_uc_tx_rsc.tx_buf_pool_strg[
-						idx]->mem_info);
+			if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
+				*mem_info = pdev->ipa_uc_tx_rsc.
+					      tx_buf_pool_strg[idx]->mem_info;
+				mem_info++;
+				num_unmapped++;
+			}
 			qdf_mem_shared_mem_free(pdev->osdev,
 						pdev->ipa_uc_tx_rsc.
 							tx_buf_pool_strg[idx]);
 			pdev->ipa_uc_tx_rsc.tx_buf_pool_strg[idx] = NULL;
 		}
+	}
+
+	if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
+		if (num_unmapped)
+			cds_smmu_map_unmap(false, num_unmapped, mem_map_table);
+		qdf_mem_free(mem_map_table);
 	}
 }
 #else
@@ -1237,7 +1257,7 @@ static int htt_tx_ipa_uc_wdi_tx_buf_alloc(struct htt_pdev_t *pdev,
 	     tx_buffer_count < (uc_tx_buf_cnt - 1); tx_buffer_count++) {
 		shared_tx_buffer = qdf_mem_shared_mem_alloc(pdev->osdev,
 							    uc_tx_buf_sz);
-		if (!!shared_tx_buffer || !shared_tx_buffer->vaddr) {
+		if (!shared_tx_buffer || !shared_tx_buffer->vaddr) {
 			qdf_print("%s: TX BUF alloc fail, loop index: %d",
 				  __func__, tx_buffer_count);
 			tx_buffer_count_pwr2 = tx_buffer_count;
@@ -1276,9 +1296,8 @@ static int htt_tx_ipa_uc_wdi_tx_buf_alloc(struct htt_pdev_t *pdev,
 
 		ring_vaddr++;
 		if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
-			qdf_update_mem_map_table(pdev->osdev, mem_info,
-					shared_tx_buffer->mem_info.iova,
-					uc_tx_buf_sz);
+			*mem_info = pdev->ipa_uc_tx_rsc.tx_buf_pool_strg[
+						tx_buffer_count]->mem_info;
 			 mem_info++;
 		}
 	}
@@ -1320,18 +1339,39 @@ free_mem_map_table:
 static void htt_tx_buf_pool_free(struct htt_pdev_t *pdev)
 {
 	uint16_t idx;
+	qdf_mem_info_t *mem_map_table = NULL, *mem_info = NULL;
+	uint32_t num_unmapped = 0;
+
+	if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
+		mem_map_table = qdf_mem_map_table_alloc(
+					pdev->ipa_uc_tx_rsc.alloc_tx_buf_cnt);
+		if (!mem_map_table) {
+			qdf_print("%s: Failed to allocate memory for mem map table\n",
+				  __func__);
+			return;
+		}
+		mem_info = mem_map_table;
+	}
 
 	for (idx = 0; idx < pdev->ipa_uc_tx_rsc.alloc_tx_buf_cnt; idx++) {
 		if (pdev->ipa_uc_tx_rsc.tx_buf_pool_strg[idx]) {
-			if (qdf_mem_smmu_s1_enabled(pdev->osdev))
-				cds_smmu_map_unmap(false, 1,
-					&pdev->ipa_uc_tx_rsc.tx_buf_pool_strg[
-						idx]->mem_info);
+			if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
+				*mem_info = pdev->ipa_uc_tx_rsc.
+					      tx_buf_pool_strg[idx]->mem_info;
+				mem_info++;
+				num_unmapped++;
+			}
 			qdf_mem_shared_mem_free(pdev->osdev,
 						pdev->ipa_uc_tx_rsc.
 							tx_buf_pool_strg[idx]);
 			pdev->ipa_uc_tx_rsc.tx_buf_pool_strg[idx] = NULL;
 		}
+	}
+
+	if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
+		if (num_unmapped)
+			cds_smmu_map_unmap(false, num_unmapped, mem_map_table);
+		qdf_mem_free(mem_map_table);
 	}
 }
 #endif

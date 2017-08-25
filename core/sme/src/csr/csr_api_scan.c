@@ -86,6 +86,8 @@
 #define CSR_SCAN_IS_OVER_BSS_LIMIT(pMac)  \
 	((pMac)->scan.nBssLimit <= (csr_ll_count(&(pMac)->scan.scanResultList)))
 
+#define MIN_11D_AP_COUNT 3
+
 static void csr_set_default_scan_timing(tpAniSirGlobal pMac,
 					tSirScanType scanType,
 					tCsrScanRequest *pScanRequest);
@@ -1674,8 +1676,8 @@ csr_save_ies(tpAniSirGlobal pMac,
  *                              and channel condition for best candidate
  *                              selection
  * @bss_info: bss information
- * @ap_cnt: No of AP count on BSS channel
  * @pcl_chan_weight: pcl weight of BSS channel
+ * @nss: NSS supported by station
  *
  * Return : int32_t
  */
@@ -1685,14 +1687,13 @@ static int32_t _csr_calculate_bss_score(tSirBssDescription *bss_info,
 	int32_t score = 0;
 	int32_t ap_load = 0;
 	int32_t normalised_width = BEST_CANDIDATE_20MHZ;
-	int32_t normalised_rssi = 0;
 	int32_t pcl_score = 0;
-	int32_t modified_rssi = 0;
 	int32_t temp_pcl_chan_weight = 0;
 	int8_t  ap_nss = 0;
 	int32_t est_air_time_percentage = 0;
 	int32_t congestion = 0;
-	int32_t congestion_penalty = 0;
+	int32_t rssi_diff = 0;
+	int32_t rssi_weight = 0;
 
 	/*
 	 * Total weight of a BSSID is calculated on basis of 100 in which
@@ -1703,25 +1704,20 @@ static int32_t _csr_calculate_bss_score(tSirBssDescription *bss_info,
 	 * BEAMFORMING_CAP_WEIGHTAGE: 2
 	 * CHAN_WIDTH_WEIGHTAGE:10
 	 * CHAN_BAND_WEIGHTAGE: 5
-	 * CCA_WEIGHTAGE: 8
-	 * OTHER_AP_WEIGHT: 28
+	 * NSS: 5
 	 * PCL: 10
-	 *
-	 * Rssi_weightage is again divided in another factors like if Rssi is
-	 * very good, very less or medium.
-	 * According to this FR, best rssi is being considered as -40.
-	 * EXCELLENT_RSSI = -40
-	 * GOOD_RSSI = -55
-	 * POOR_RSSI = -65
-	 * BAD_RSSI = -80
-	 *
-	 * And weightage to all the RSSI type is given like this.
-	 * ROAM_EXCELLENT_RSSI_WEIGHT = 100
-	 * ROAM_GOOD_RSSI_WEIGHT = 80
-	 * ROAM_BAD_RSSI_WEIGHT = 60
-	 *
+	 * CHANNEL_CONGESTION: 5
+	 * Reserved : 31
 	 */
-
+	/*
+	 * Further bucketization of rssi is also done out of 25 score.
+	 * RSSI > -55=> weight = 2500
+	 * RSSI > -60=> weight = 2250
+	 * RSSI >-65 =>weight = 2000
+	 * RSSI > -70=> weight = 1750
+	 * RSSI > -75=> weight = 1500
+	 * RSSI > -80=> weight = 1250
+	 */
 	if (bss_info->rssi) {
 		/*
 		 * if RSSI of AP is less then -80, driver should ignore that
@@ -1734,32 +1730,21 @@ static int32_t _csr_calculate_bss_score(tSirBssDescription *bss_info,
 			score = 0;
 			return score;
 		}
-		/*  If BSS is in PCL list, give a boost of -20dbm */
-		if (pcl_chan_weight)
-			modified_rssi = bss_info->rssi + PCL_ADVANTAGE;
-		else
-			modified_rssi = bss_info->rssi;
-		/*
-		 * Calculate % of rssi we are getting
-		 * max = 100
-		 * min = 0
-		 * less  than -40        = 100%
-		 * -40   - -55   = 80%
-		 * -55   - -65   = 60%
-		 * below that    = 100   - value
-		 **/
-		if (modified_rssi >= BEST_CANDIDATE_EXCELLENT_RSSI)
-			normalised_rssi = BEST_CANDIDATE_EXCELLENT_RSSI_WEIGHT;
-		else if (modified_rssi >= BEST_CANDIDATE_GOOD_RSSI)
-			normalised_rssi = BEST_CANDIDATE_GOOD_RSSI_WEIGHT;
-		else if (modified_rssi >= BEST_CANDIDATE_POOR_RSSI)
-			normalised_rssi = BEST_CANDIDATE_BAD_RSSI_WEIGHT;
-		else
-			normalised_rssi = modified_rssi - MIN_RSSI;
+		if (bss_info->rssi >= EXCELLENT_RSSI) {
+			rssi_weight = EXCELLENT_RSSI_WEIGHT *
+					RSSI_WEIGHTAGE;
+		} else {
+			rssi_diff = EXCELLENT_RSSI -
+				bss_info->rssi;
+			do_div(rssi_diff, 5);
+			rssi_weight = (rssi_diff + 1) * RSSI_WEIGHT_BUCKET;
+			rssi_weight = (EXCELLENT_RSSI_WEIGHT *
+					RSSI_WEIGHTAGE) - rssi_weight;
 
-		/* Calculate score part for rssi */
-		score += (normalised_rssi * RSSI_WEIGHTAGE);
+		}
+		score += rssi_weight;
 	}
+
 	/* If BSS is in PCL list extra pcl Weight is added n % */
 	if (pcl_chan_weight) {
 		temp_pcl_chan_weight =
@@ -1805,13 +1790,37 @@ static int32_t _csr_calculate_bss_score(tSirBssDescription *bss_info,
 	if (get_rf_band(bss_info->channelId) == SIR_BAND_5_GHZ &&
 			bss_info->rssi > RSSI_THRESHOLD_5GHZ)
 		score += BEST_CANDIDATE_MAX_WEIGHT * CHAN_BAND_WEIGHTAGE;
+	/*
+	 * If ESP is being transmitted by the AP, use the estimated airtime for
+	 * AC_BE from that, Estimated airtime 0-25% = 120, 25-50% = 250, 50-75%
+	 * = 370, 75-100% = 500.
+	 * Else if QBSSLoad is being transmitted and QBSSLoad < 25% = 500
+	 * else assing default weight of 370
+	 */
 
 	if (bss_info->air_time_fraction) {
+		/* Convert 0-255 range to percentage */
 		est_air_time_percentage =
 			bss_info->air_time_fraction * ROAM_MAX_CHANNEL_WEIGHT;
 		do_div(est_air_time_percentage,
 				MAX_ESTIMATED_AIR_TIME_FRACTION);
+		/*
+		 * Calculate channel congestion from estimated air time
+		 * fraction.
+		 */
 		congestion = MAX_CHANNEL_UTILIZATION - est_air_time_percentage;
+
+		if (congestion >= LOW_CHANNEL_CONGESTION &&
+				congestion < MODERATE_CHANNEL_CONGESTION)
+			score += LOW_CHANNEL_CONGESTION_WEIGHT;
+		else if (congestion >= MODERATE_CHANNEL_CONGESTION &&
+				congestion < CONSIDERABLE_CHANNEL_CONGESTION)
+			score += MODERATE_CHANNEL_CONGESTION_WEIGHT;
+		else if (congestion >= CONSIDERABLE_CHANNEL_CONGESTION &&
+				congestion < HIGH_CHANNEL_CONGESTION)
+			score += CONSIDERABLE_CHANNEL_CONGESTION_WEIGHT;
+		else
+			score += HIGH_CHANNEL_CONGESTION_WEIGHT;
 	} else if (bss_info->QBSSLoad_present) {
 		ap_load = (bss_info->qbss_chan_load *
 				BEST_CANDIDATE_MAX_WEIGHT);
@@ -1821,17 +1830,13 @@ static int32_t _csr_calculate_bss_score(tSirBssDescription *bss_info,
 		 */
 		do_div(ap_load, MAX_AP_LOAD);
 		congestion = ap_load;
+		if (congestion < MODERATE_CHANNEL_CONGESTION)
+			score += LOW_CHANNEL_CONGESTION_WEIGHT;
+		else
+			score += HIGH_CHANNEL_CONGESTION_WEIGHT;
+	} else {
+		score += MODERATE_CHANNEL_CONGESTION_WEIGHT;
 	}
-	if (congestion >= CONSIDERABLE_CHANNEL_CONGESTION &&
-		congestion <= HIGH_CHANNEL_CONGESTION)
-		       congestion_penalty = 25;
-	else if (congestion > HIGH_CHANNEL_CONGESTION &&
-			congestion <= EXTREME_CHANNEL_CONGESTION)
-		congestion_penalty = 50;
-	else congestion_penalty = 0;
-	if (congestion_penalty)
-		score -= congestion_penalty*10;
-
 	ap_nss = bss_info->nss;
 	if (wma_is_current_hwmode_dbs())
 		nss--;
@@ -1841,9 +1846,9 @@ static int32_t _csr_calculate_bss_score(tSirBssDescription *bss_info,
 		score += BEST_CANDIDATE_MAX_WEIGHT * NSS_WEIGHTAGE;
 
 	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
-		FL("BSSID:"MAC_ADDRESS_STR" rssi=%d normalized_rssi=%d htcaps=%d vht=%d bw=%d channel=%d beamforming=%d ap_load=%d est_air_time_percentage=%d pcl_score %d Final Score %d ap_NSS %d  nss %d"),
+		FL("BSSID:"MAC_ADDRESS_STR" rssi=%d htcaps=%d vht=%d bw=%d channel=%d beamforming=%d ap_load=%d est_air_time_percentage=%d pcl_score %d Final Score %d ap_NSS %d  nss %d"),
 		MAC_ADDR_ARRAY(bss_info->bssId),
-		bss_info->rssi, normalised_rssi, bss_info->ht_caps_present,
+		bss_info->rssi, bss_info->ht_caps_present,
 		bss_info->vht_caps_present, bss_info->chan_width,
 		bss_info->channelId,
 		bss_info->beacomforming_capable, ap_load,
@@ -2197,9 +2202,6 @@ QDF_STATUS csr_scan_get_result(tpAniSirGlobal pMac,
 
 	if (phResult)
 		*phResult = CSR_INVALID_SCANRESULT_HANDLE;
-
-	qdf_mem_set(&pMac->candidate_channel_info,
-			sizeof(struct candidate_chan_info), 0);
 
 	pRetList = qdf_mem_malloc(sizeof(struct scan_result_list));
 	if (NULL == pRetList) {
@@ -3146,12 +3148,90 @@ csr_remove_from_tmp_list(tpAniSirGlobal mac_ctx,
 	} /* end of loop */
 }
 
+
+static bool is_us_country(uint8_t *country_code)
+{
+	if ((country_code[0] == 'U') &&
+	    (country_code[1] == 'S'))
+		return true;
+
+	return false;
+}
+
+static bool is_world_mode(uint8_t *country_code)
+{
+	if ((country_code[0] == '0') &&
+	    (country_code[1] == '0'))
+		return true;
+
+	return false;
+}
+
+static bool csr_elected_country_algo_fcc(tpAniSirGlobal mac_ctx)
+{
+	bool ctry_11d_found = false;
+	uint8_t max_votes = 0;
+	uint8_t i = 0;
+	uint8_t ctry_index;
+
+	if (!mac_ctx->scan.countryCodeCount) {
+		sme_warn("No AP with 11d Country code is present in scan list");
+		return ctry_11d_found;
+	}
+
+	max_votes = mac_ctx->scan.votes11d[0].votes;
+	if (is_us_country(mac_ctx->scan.votes11d[0].countryCode)) {
+		ctry_11d_found = true;
+		ctry_index = 0;
+		goto algo_done;
+	} else if (max_votes >= MIN_11D_AP_COUNT) {
+		ctry_11d_found = true;
+		ctry_index = 0;
+	}
+
+	for (i = 1; i < mac_ctx->scan.countryCodeCount; i++) {
+		if (is_us_country(mac_ctx->scan.votes11d[i].countryCode)) {
+			ctry_11d_found = true;
+			ctry_index = i;
+			goto algo_done;
+		}
+
+		if ((max_votes < mac_ctx->scan.votes11d[i].votes) &&
+		    (mac_ctx->scan.votes11d[i].votes >= MIN_11D_AP_COUNT)) {
+			sme_debug(" Votes for Country %c%c : %d",
+				  mac_ctx->scan.votes11d[i].countryCode[0],
+				  mac_ctx->scan.votes11d[i].countryCode[1],
+				  mac_ctx->scan.votes11d[i].votes);
+			max_votes = mac_ctx->scan.votes11d[i].votes;
+			ctry_index = i;
+			ctry_11d_found = true;
+		}
+	}
+
+algo_done:
+
+	if (ctry_11d_found) {
+		qdf_mem_copy(mac_ctx->scan.countryCodeElected,
+			     mac_ctx->scan.votes11d[ctry_index].countryCode,
+			     WNI_CFG_COUNTRY_CODE_LEN);
+
+		sme_debug("Selected Country is %c%c With count %d",
+			  mac_ctx->scan.votes11d[ctry_index].countryCode[0],
+			  mac_ctx->scan.votes11d[ctry_index].countryCode[1],
+			  mac_ctx->scan.votes11d[ctry_index].votes);
+	}
+
+	return ctry_11d_found;
+}
+
+
 static void csr_move_temp_scan_results_to_main_list(tpAniSirGlobal pMac,
 						    uint8_t reason,
 						    uint8_t sessionId)
 {
 	tCsrRoamSession *pSession;
 	uint32_t i;
+	bool found_11d_ctry = false;
 
 	/* remove the BSS descriptions from temporary list */
 	csr_remove_from_tmp_list(pMac, reason, sessionId);
@@ -3171,7 +3251,14 @@ static void csr_move_temp_scan_results_to_main_list(tpAniSirGlobal pMac,
 			return;
 		}
 	}
-	if (csr_elected_country_info(pMac))
+
+	if (is_us_country(pMac->scan.countryCodeCurrent) ||
+	    is_world_mode(pMac->scan.countryCodeCurrent))
+		found_11d_ctry = csr_elected_country_algo_fcc(pMac);
+	else
+		found_11d_ctry = csr_elected_country_info(pMac);
+
+	if (found_11d_ctry)
 		csr_learn_11dcountry_information(pMac, NULL, NULL, true);
 }
 

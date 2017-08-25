@@ -1841,7 +1841,8 @@ static void wma_cleanup_vdev_resp_queue(tp_wma_handle wma)
 		return;
 	}
 
-	while (qdf_list_remove_front(&wma->vdev_resp_queue, &node1) ==
+	/* peek front, and then cleanup it in wma_vdev_resp_timer */
+	while (qdf_list_peek_front(&wma->vdev_resp_queue, &node1) ==
 				   QDF_STATUS_SUCCESS) {
 		req_msg = qdf_container_of(node1, struct wma_target_req, node);
 		qdf_spin_unlock_bh(&wma->vdev_respq_lock);
@@ -1870,13 +1871,13 @@ static void wma_cleanup_hold_req(tp_wma_handle wma)
 		return;
 	}
 
+	/* peek front, and then cleanup it in wma_hold_req_timer */
 	while (QDF_STATUS_SUCCESS ==
-		qdf_list_remove_front(&wma->wma_hold_req_queue, &node1)) {
+		qdf_list_peek_front(&wma->wma_hold_req_queue, &node1)) {
 		req_msg = qdf_container_of(node1, struct wma_target_req, node);
 		qdf_spin_unlock_bh(&wma->wma_hold_req_q_lock);
 		/* Cleanup timeout handler */
 		qdf_mc_timer_stop(&req_msg->event_timeout);
-		qdf_mc_timer_destroy(&req_msg->event_timeout);
 		wma_hold_req_timer(req_msg);
 		qdf_spin_lock_bh(&wma->wma_hold_req_q_lock);
 	}
@@ -2845,32 +2846,40 @@ end:
 	return qdf_status;
 }
 
-/**
- * wma_send_msg() - Send wma message to PE.
- * @wma_handle: wma handle
- * @msg_type: message type
- * @body_ptr: message body ptr
- * @body_val: message body value
- *
- * Return: none
- */
-void wma_send_msg(tp_wma_handle wma_handle, uint16_t msg_type,
-			 void *body_ptr, uint32_t body_val)
+void wma_send_msg_by_priority(tp_wma_handle wma_handle, uint16_t msg_type,
+		 void *body_ptr, uint32_t body_val, int is_high_priority)
 {
-	tSirMsgQ msg = { 0 };
-	uint32_t status = QDF_STATUS_SUCCESS;
-	tpAniSirGlobal pMac = cds_get_context(QDF_MODULE_ID_PE);
+	cds_msg_t msg = {0};
+	QDF_STATUS status;
 
 	msg.type = msg_type;
 	msg.bodyval = body_val;
 	msg.bodyptr = body_ptr;
-	status = lim_post_msg_api(pMac, &msg);
-	if (QDF_STATUS_SUCCESS != status) {
-		if (NULL != body_ptr)
-			qdf_mem_free(body_ptr);
-		QDF_ASSERT(0);
+
+	status = cds_mq_post_message_by_priority(QDF_MODULE_ID_PE, &msg,
+						is_high_priority);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		WMA_LOGE("Failed to post msg to PE");
+		qdf_mem_free(body_ptr);
 	}
 }
+
+
+void wma_send_msg(tp_wma_handle wma_handle, uint16_t msg_type,
+			 void *body_ptr, uint32_t body_val)
+{
+	wma_send_msg_by_priority(wma_handle, msg_type,
+				body_ptr, body_val, LOW_PRIORITY);
+}
+
+void wma_send_msg_high_priority(tp_wma_handle wma_handle, uint16_t msg_type,
+			 void *body_ptr, uint32_t body_val)
+{
+	wma_send_msg_by_priority(wma_handle, msg_type,
+				body_ptr, body_val, HIGH_PRIORITY);
+}
+
+
 
 /**
  * wma_set_base_macaddr_indicate() - set base mac address in fw
@@ -3833,6 +3842,8 @@ QDF_STATUS wma_close(void *cds_ctx)
 	wma_cleanup_hold_req(wma_handle);
 	qdf_wake_lock_destroy(&wma_handle->wmi_cmd_rsp_wake_lock);
 	qdf_runtime_lock_deinit(&wma_handle->wmi_cmd_rsp_runtime_lock);
+	qdf_spinlock_destroy(&wma_handle->vdev_respq_lock);
+	qdf_spinlock_destroy(&wma_handle->wma_hold_req_q_lock);
 	for (idx = 0; idx < wma_handle->num_mem_chunks; ++idx) {
 		qdf_mem_free_consistent(wma_handle->qdf_dev,
 					wma_handle->qdf_dev->dev,
@@ -6667,6 +6678,32 @@ static void wma_get_arp_req_stats(WMA_HANDLE handle,
 }
 
 /**
+ * wma_set_del_pmkid_cache() - API to set/delete PMKID cache entry in fw
+ * @handle: WMA handle
+ * @pmk_cache: PMK cache entry
+ * @vdev_id: vdev id
+ *
+ * Return: None
+ */
+static void wma_set_del_pmkid_cache(WMA_HANDLE handle,
+				    wmi_pmk_cache *pmk_cache,
+					uint32_t vdev_id)
+{
+	int status;
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+
+	if (!wma_handle || !wma_handle->wmi_handle) {
+		WMA_LOGE("WMA is closed, cannot send set del pmkid");
+		return;
+	}
+
+	status = wmi_unified_set_del_pmkid_cache(wma_handle->wmi_handle,
+						 pmk_cache, vdev_id);
+	if (status != EOK)
+		WMA_LOGE("failed to send set/del pmkid cmd to fw");
+}
+
+/**
  * wma_process_action_frame_random_mac() - set/clear action frame random mac
  * @wma_handle: pointer to wma handle
  * @filter: pointer to buffer containing random mac, session_id and callback
@@ -6943,6 +6980,46 @@ static QDF_STATUS wma_process_limit_off_chan(tp_wma_handle wma_handle,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#if defined(WLAN_FEATURE_FILS_SK)
+/**
+ * wma_roam_scan_send_hlp() - API to send HLP IE info to fw
+ * @wma_handle: WMA handle
+ * @req: HLP params
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS wma_roam_scan_send_hlp(tp_wma_handle wma_handle,
+					 struct hlp_params *req)
+{
+	struct hlp_params *params;
+	QDF_STATUS status;
+
+	params = qdf_mem_malloc(sizeof(*params));
+	if (!params) {
+		WMA_LOGE("%s : Memory allocation failed", __func__);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	params->vdev_id = req->vdev_id;
+	params->hlp_ie_len = req->hlp_ie_len;
+	qdf_mem_copy(params->hlp_ie, req->hlp_ie, req->hlp_ie_len);
+	status = wmi_unified_roam_send_hlp_cmd(wma_handle->wmi_handle, params);
+
+	WMA_LOGD("Send HLP status %d vdev id %d", status, params->vdev_id);
+	qdf_trace_hex_dump(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_DEBUG,
+				params->hlp_ie, 10);
+
+	qdf_mem_free(params);
+	return status;
+}
+#else
+static QDF_STATUS wma_roam_scan_send_hlp(tp_wma_handle wma_handle,
+					 struct hlp_params *req)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 /**
  * wma_mc_process_msg() - process wma messages and call appropriate function.
@@ -7853,6 +7930,16 @@ QDF_STATUS wma_mc_process_msg(void *cds_context, cds_msg_t *msg)
 		qdf_mem_free(msg->bodyptr);
 		break;
 
+	case SIR_HAL_SET_DEL_PMKID_CACHE:
+		wma_set_del_pmkid_cache(wma_handle,
+			(wmi_pmk_cache *) msg->bodyptr, msg->reserved);
+		qdf_mem_free(msg->bodyptr);
+		break;
+	case SIR_HAL_HLP_IE_INFO:
+		wma_roam_scan_send_hlp(wma_handle,
+			(struct hlp_params *)msg->bodyptr);
+		qdf_mem_free(msg->bodyptr);
+		break;
 	default:
 		WMA_LOGE("Unhandled WMA message of type %d", msg->type);
 		if (msg->bodyptr)

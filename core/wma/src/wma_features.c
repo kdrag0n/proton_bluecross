@@ -6299,7 +6299,7 @@ void wma_aggr_qos_req(tp_wma_handle wma,
 	wmi_unified_aggr_qos_cmd(wma->wmi_handle,
 			   (struct aggr_add_ts_param *)pAggrQosRspMsg);
 	/* send reponse to upper layers from here only. */
-	wma_send_msg(wma, WMA_AGGR_QOS_RSP, pAggrQosRspMsg, 0);
+	wma_send_msg_high_priority(wma, WMA_AGGR_QOS_RSP, pAggrQosRspMsg, 0);
 }
 
 #ifdef FEATURE_WLAN_ESE
@@ -6364,7 +6364,7 @@ void wma_add_ts_req(tp_wma_handle wma, tAddTsParams *msg)
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
 	}
-	wma_send_msg(wma, WMA_ADD_TS_RSP, msg, 0);
+	wma_send_msg_high_priority(wma, WMA_ADD_TS_RSP, msg, 0);
 }
 
 /**
@@ -6797,7 +6797,7 @@ static QDF_STATUS wma_send_gtk_offload_req(tp_wma_handle wma, uint8_t vdev_id,
 		qdf_mem_copy(offload_params.aKCK, params->aKCK,
 			GTK_OFFLOAD_KCK_BYTES);
 		qdf_mem_copy(offload_params.aKEK, params->aKEK,
-			GTK_OFFLOAD_KEK_BYTES);
+			params->kek_len);
 		qdf_mem_copy(&offload_params.ullKeyReplayCounter,
 			&params->ullKeyReplayCounter, GTK_REPLAY_COUNTER_BYTES);
 	} else {
@@ -6806,6 +6806,7 @@ static QDF_STATUS wma_send_gtk_offload_req(tp_wma_handle wma, uint8_t vdev_id,
 	}
 
 	enable_offload = params->ulFlags;
+	offload_params.kek_len = params->kek_len;
 
 	/* send the wmi command */
 	status = wmi_unified_send_gtk_offload_cmd(wma->wmi_handle,

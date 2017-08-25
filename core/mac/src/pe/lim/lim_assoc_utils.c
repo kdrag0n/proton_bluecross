@@ -2180,7 +2180,7 @@ lim_add_sta(tpAniSirGlobal mac_ctx,
 
 	add_sta_params->status = QDF_STATUS_SUCCESS;
 	add_sta_params->respReqd = 1;
-	/* Update HT Capability */
+	/* Update HT/VHT Capability */
 
 	if (LIM_IS_AP_ROLE(session_entry) ||
 	    LIM_IS_IBSS_ROLE(session_entry)) {
@@ -2188,6 +2188,22 @@ lim_add_sta(tpAniSirGlobal mac_ctx,
 		add_sta_params->vhtCapable =
 			sta_ds->mlmStaContext.vhtCapability;
 	}
+#ifdef FEATURE_WLAN_TDLS
+	/* SystemRole shouldn't be matter if staType is TDLS peer */
+	else if (STA_ENTRY_TDLS_PEER == sta_ds->staType) {
+		add_sta_params->htCapable = sta_ds->mlmStaContext.htCapability;
+		add_sta_params->vhtCapable =
+			 sta_ds->mlmStaContext.vhtCapability;
+	}
+#endif
+	else {
+		add_sta_params->htCapable = session_entry->htCapability;
+		add_sta_params->vhtCapable = session_entry->vhtCapability;
+
+	}
+	pe_debug("StaIdx: %d updateSta: %d htcapable: %d vhtCapable: %d",
+		add_sta_params->staIdx, add_sta_params->updateSta,
+		add_sta_params->htCapable, add_sta_params->vhtCapable);
 	/*
 	 * 2G-AS platform: SAP associates with HT (11n)clients as 2x1 in 2G and
 	 * 2X2 in 5G
@@ -2210,22 +2226,6 @@ lim_add_sta(tpAniSirGlobal mac_ctx,
 		}
 	}
 
-#ifdef FEATURE_WLAN_TDLS
-	/* SystemRole shouldn't be matter if staType is TDLS peer */
-	else if (STA_ENTRY_TDLS_PEER == sta_ds->staType) {
-		add_sta_params->htCapable = sta_ds->mlmStaContext.htCapability;
-		add_sta_params->vhtCapable =
-			 sta_ds->mlmStaContext.vhtCapability;
-	}
-#endif
-	else {
-		add_sta_params->htCapable = session_entry->htCapability;
-		add_sta_params->vhtCapable = session_entry->vhtCapability;
-
-	}
-	pe_debug("StaIdx: %d updateSta: %d htcapable: %d vhtCapable: %d",
-		add_sta_params->staIdx, add_sta_params->updateSta,
-		add_sta_params->htCapable, add_sta_params->vhtCapable);
 
 	add_sta_params->greenFieldCapable = sta_ds->htGreenfield;
 	add_sta_params->maxAmpduDensity = sta_ds->htAMpduDensity;
@@ -3234,10 +3234,6 @@ lim_check_and_announce_join_success(tpAniSirGlobal mac_ctx,
 	if ((IS_DOT11_MODE_VHT(session_entry->dot11mode)) &&
 		beacon_probe_rsp->vendor_vht_ie.VHTCaps.present) {
 		session_entry->is_vendor_specific_vhtcaps = true;
-		session_entry->vendor_specific_vht_ie_type =
-			beacon_probe_rsp->vendor_vht_ie.type;
-		session_entry->vendor_specific_vht_ie_sub_type =
-			beacon_probe_rsp->vendor_vht_ie.sub_type;
 		pe_debug("VHT caps are present in vendor specific IE");
 	}
 

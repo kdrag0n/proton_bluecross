@@ -611,6 +611,7 @@ populate_dot11f_ht_caps(tpAniSirGlobal pMac,
 	uint8_t nCfgValue8;
 	tSirRetStatus nSirStatus;
 	tSirMacHTParametersInfo *pHTParametersInfo;
+	uint8_t disable_high_ht_mcs_2x2 = 0;
 	union {
 		uint16_t nCfgValue16;
 		tSirMacHTCapabilityInfo htCapInfo;
@@ -679,6 +680,11 @@ populate_dot11f_ht_caps(tpAniSirGlobal pMac,
 		    SIZE_OF_SUPPORTED_MCS_SET);
 
 	if (psessionEntry) {
+		disable_high_ht_mcs_2x2 =
+				pMac->roam.configParam.disable_high_ht_mcs_2x2;
+		pe_debug("disable HT high MCS INI param[%d]",
+			 disable_high_ht_mcs_2x2);
+
 		if (pMac->lteCoexAntShare
 		    && (IS_24G_CH(psessionEntry->currentOperChannel))) {
 			if (!(IS_2X2_CHAIN(psessionEntry->chainMask))) {
@@ -689,8 +695,17 @@ populate_dot11f_ht_caps(tpAniSirGlobal pMac,
 				}
 			}
 		}
-		if (psessionEntry->nss == NSS_1x1_MODE)
+		if (psessionEntry->nss == NSS_1x1_MODE) {
 			pDot11f->supportedMCSSet[1] = 0;
+		} else if (IS_24G_CH(psessionEntry->currentOperChannel) &&
+			   disable_high_ht_mcs_2x2 &&
+			   (psessionEntry->pePersona == QDF_STA_MODE)) {
+				pe_debug("Disabling high HT MCS [%d]",
+					 disable_high_ht_mcs_2x2);
+				pDot11f->supportedMCSSet[1] =
+					(pDot11f->supportedMCSSet[1] >>
+						disable_high_ht_mcs_2x2);
+		}
 	}
 
 	/* If STA mode, session supported NSS > 1 and
@@ -2138,7 +2153,7 @@ sir_convert_probe_req_frame2_struct(tpAniSirGlobal pMac,
 	}
 	/* & "transliterate" from a 'tDot11fProbeRequestto' a 'tSirProbeReq'... */
 	if (!pr.SSID.present) {
-		pe_warn("Mandatory IE SSID not present!");
+		pe_debug_rate_limited(30, "Mandatory IE SSID not present!");
 	} else {
 		pProbeReq->ssidPresent = 1;
 		convert_ssid(pMac, &pProbeReq->ssId, &pr.SSID);
@@ -2284,25 +2299,25 @@ static void update_esp_data(struct sir_esp_information *esp_information,
 		esp_info = (struct sir_esp_info *)data;
 		if (esp_info->access_category == ESP_AC_BK) {
 			qdf_mem_copy(&esp_information->esp_info_AC_BK,
-					data, ESP_INFORMATION_LIST_LENGTH);
+					data, 3);
 			data = data + ESP_INFORMATION_LIST_LENGTH;
 			continue;
 		}
 		if (esp_info->access_category == ESP_AC_BE) {
 			qdf_mem_copy(&esp_information->esp_info_AC_BE,
-					data, ESP_INFORMATION_LIST_LENGTH);
+					data, 3);
 			data = data + ESP_INFORMATION_LIST_LENGTH;
 			continue;
 		}
 		if (esp_info->access_category == ESP_AC_VI) {
 			qdf_mem_copy(&esp_information->esp_info_AC_VI,
-					data, ESP_INFORMATION_LIST_LENGTH);
+					data, 3);
 			data = data + ESP_INFORMATION_LIST_LENGTH;
 			continue;
 		}
 		if (esp_info->access_category == ESP_AC_VO) {
 			qdf_mem_copy(&esp_information->esp_info_AC_VO,
-					data, ESP_INFORMATION_LIST_LENGTH);
+					data, 3);
 			data = data + ESP_INFORMATION_LIST_LENGTH;
 			break;
 		}
@@ -2478,7 +2493,7 @@ tSirRetStatus sir_convert_probe_frame2_struct(tpAniSirGlobal pMac,
 	sir_copy_caps_info(pMac, pr->Capabilities, pProbeResp);
 
 	if (!pr->SSID.present) {
-		pe_warn("Mandatory IE SSID not present!");
+		pe_debug_rate_limited(30, "Mandatory IE SSID not present!");
 	} else {
 		pProbeResp->ssidPresent = 1;
 		convert_ssid(pMac, &pProbeResp->ssId, &pr->SSID);
@@ -2653,10 +2668,6 @@ tSirRetStatus sir_convert_probe_frame2_struct(tpAniSirGlobal pMac,
 	pProbeResp->Vendor3IEPresent = pr->Vendor3IE.present;
 
 	pProbeResp->vendor_vht_ie.present = pr->vendor_vht_ie.present;
-	if (pr->vendor_vht_ie.present) {
-		pProbeResp->vendor_vht_ie.type = pr->vendor_vht_ie.type;
-		pProbeResp->vendor_vht_ie.sub_type = pr->vendor_vht_ie.sub_type;
-	}
 	if (pr->vendor_vht_ie.VHTCaps.present) {
 		qdf_mem_copy(&pProbeResp->vendor_vht_ie.VHTCaps,
 				&pr->vendor_vht_ie.VHTCaps,
@@ -2888,9 +2899,6 @@ sir_convert_assoc_req_frame2_struct(tpAniSirGlobal pMac,
 
 	pAssocReq->vendor_vht_ie.present = ar->vendor_vht_ie.present;
 	if (ar->vendor_vht_ie.present) {
-		pAssocReq->vendor_vht_ie.type = ar->vendor_vht_ie.type;
-		pAssocReq->vendor_vht_ie.sub_type = ar->vendor_vht_ie.sub_type;
-
 		if (ar->vendor_vht_ie.VHTCaps.present) {
 			qdf_mem_copy(&pAssocReq->vendor_vht_ie.VHTCaps,
 				     &ar->vendor_vht_ie.VHTCaps,
@@ -3199,10 +3207,6 @@ sir_convert_assoc_resp_frame2_struct(tpAniSirGlobal pMac,
 	}
 
 	pAssocRsp->vendor_vht_ie.present = ar->vendor_vht_ie.present;
-	if (ar->vendor_vht_ie.present) {
-		pAssocRsp->vendor_vht_ie.type = ar->vendor_vht_ie.type;
-		pAssocRsp->vendor_vht_ie.sub_type = ar->vendor_vht_ie.sub_type;
-	}
 	if (ar->OBSSScanParameters.present) {
 		qdf_mem_copy(&pAssocRsp->obss_scanparams,
 				&ar->OBSSScanParameters,
@@ -3443,7 +3447,7 @@ sir_beacon_ie_ese_bcn_report(tpAniSirGlobal pMac,
 	}
 	/* & "transliterate" from a 'tDot11fBeaconIEs' to a 'eseBcnReportMandatoryIe'... */
 	if (!pBies->SSID.present) {
-		pe_warn("Mandatory IE SSID not present!");
+		pe_debug_rate_limited(30, "Mandatory IE SSID not present!");
 	} else {
 		eseBcnReportMandatoryIe.ssidPresent = 1;
 		convert_ssid(pMac, &eseBcnReportMandatoryIe.ssId, &pBies->SSID);
@@ -3748,7 +3752,7 @@ sir_parse_beacon_ie(tpAniSirGlobal pMac,
 	}
 	/* & "transliterate" from a 'tDot11fBeaconIEs' to a 'tSirProbeRespBeacon'... */
 	if (!pBies->SSID.present) {
-		pe_warn("Mandatory IE SSID not present!");
+		pe_debug_rate_limited(30, "Mandatory IE SSID not present!");
 	} else {
 		pBeaconStruct->ssidPresent = 1;
 		convert_ssid(pMac, &pBeaconStruct->ssId, &pBies->SSID);
@@ -3935,11 +3939,6 @@ sir_parse_beacon_ie(tpAniSirGlobal pMac,
 	pBeaconStruct->Vendor1IEPresent = pBies->Vendor1IE.present;
 	pBeaconStruct->Vendor3IEPresent = pBies->Vendor3IE.present;
 	pBeaconStruct->vendor_vht_ie.present = pBies->vendor_vht_ie.present;
-	if (pBies->vendor_vht_ie.present) {
-		pBeaconStruct->vendor_vht_ie.type = pBies->vendor_vht_ie.type;
-		pBeaconStruct->vendor_vht_ie.sub_type =
-						pBies->vendor_vht_ie.sub_type;
-	}
 
 	if (pBies->vendor_vht_ie.VHTCaps.present) {
 		pBeaconStruct->vendor_vht_ie.VHTCaps.present = 1;
@@ -4120,7 +4119,7 @@ sir_convert_beacon_frame2_struct(tpAniSirGlobal pMac,
 		pBeacon->Capabilities.immediateBA;
 
 	if (!pBeacon->SSID.present) {
-		pe_warn("Mandatory IE SSID not present!");
+		pe_debug_rate_limited(30, "Mandatory IE SSID not present!");
 	} else {
 		pBeaconStruct->ssidPresent = 1;
 		convert_ssid(pMac, &pBeaconStruct->ssId, &pBeacon->SSID);
@@ -4328,11 +4327,6 @@ sir_convert_beacon_frame2_struct(tpAniSirGlobal pMac,
 	pBeaconStruct->Vendor3IEPresent = pBeacon->Vendor3IE.present;
 
 	pBeaconStruct->vendor_vht_ie.present = pBeacon->vendor_vht_ie.present;
-	if (pBeacon->vendor_vht_ie.present) {
-		pBeaconStruct->vendor_vht_ie.type = pBeacon->vendor_vht_ie.type;
-		pBeaconStruct->vendor_vht_ie.sub_type =
-			pBeacon->vendor_vht_ie.sub_type;
-	}
 	if (pBeacon->vendor_vht_ie.present)
 		pe_debug("Vendor Specific VHT caps present in Beacon Frame!");
 

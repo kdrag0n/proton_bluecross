@@ -780,7 +780,10 @@ static int wlan_hdd_scan_request_enqueue(hdd_adapter_t *adapter,
 	hdd_scan_req->source = source;
 	hdd_scan_req->scan_id = scan_id;
 	hdd_scan_req->timestamp = timestamp;
-	hdd_scan_req->scan_req_flags = scan_req->flags;
+	if (scan_req != NULL)
+		hdd_scan_req->scan_req_flags = scan_req->flags;
+	else
+		hdd_scan_req->scan_req_flags = 0;
 
 	qdf_spin_lock(&hdd_ctx->hdd_scan_req_q_lock);
 	status = qdf_list_insert_back(&hdd_ctx->hdd_scan_req_q,
@@ -2001,13 +2004,9 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	 */
 	status = wlan_hdd_tdls_scan_callback(pAdapter, wiphy,
 					request, source);
-	if (status <= 0) {
-		if (!status)
-			hdd_err("TDLS in progress.scan rejected %d",
-			status);
-		else
-			hdd_warn("TDLS teardown is ongoing %d",
-			       status);
+	if (status < 0) {
+		hdd_err("TDLS in progress.scan rejected %d",
+				status);
 		hdd_wlan_block_scan_by_tdls_event();
 		return status;
 	}
@@ -3114,7 +3113,8 @@ static void hdd_config_sched_scan_plan(tpSirPNOScanReq pno_req,
  *
  * Return: None
  */
-#if defined(CFG80211_REPORT_BETTER_BSS_IN_SCHED_SCAN)
+#if defined(CFG80211_REPORT_BETTER_BSS_IN_SCHED_SCAN) || \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
 static inline void wlan_hdd_sched_scan_update_relative_rssi(
 			tpSirPNOScanReq pno_request,
 			struct cfg80211_sched_scan_request *request)

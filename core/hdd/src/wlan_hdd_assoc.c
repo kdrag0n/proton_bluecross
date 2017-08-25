@@ -2057,6 +2057,12 @@ static void hdd_send_re_assoc_event(struct net_device *dev,
 		(u8 *)pCsrRoamInfo->pbFrames + pCsrRoamInfo->nBeaconLength,
 		pCsrRoamInfo->nAssocReqLength);
 
+	wlan_hdd_save_gtk_offload_params(pAdapter, NULL,
+			pCsrRoamInfo->kek,
+			pCsrRoamInfo->kek_len,
+			pCsrRoamInfo->replay_ctr,
+			true, GTK_OFFLOAD_ENABLE);
+
 	hdd_debug("ReAssoc Req IE dump");
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
 		assoc_req_ies, pCsrRoamInfo->nAssocReqLength);
@@ -2065,6 +2071,10 @@ static void hdd_send_re_assoc_event(struct net_device *dev,
 			assoc_req_ies, pCsrRoamInfo->nAssocReqLength,
 			rspRsnIe, rspRsnLength,
 			pCsrRoamInfo);
+	hdd_debug("Kek len %d", pCsrRoamInfo->kek_len);
+
+	hdd_update_hlp_info(dev, pCsrRoamInfo);
+
 done:
 	sme_roam_free_connect_profile(&roam_profile);
 	if (final_req_ie)
@@ -2291,7 +2301,9 @@ void hdd_perform_roam_set_key_complete(hdd_adapter_t *pAdapter)
 	pHddStaCtx->roam_info.deferKeyComplete = false;
 }
 
-#if defined(WLAN_FEATURE_FILS_SK) && defined(CFG80211_FILS_SK_OFFLOAD_SUPPORT)
+#if defined(WLAN_FEATURE_FILS_SK) && \
+	(defined(CFG80211_FILS_SK_OFFLOAD_SUPPORT) || \
+		 (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)))
 void hdd_clear_fils_connection_info(hdd_adapter_t *adapter)
 {
 	hdd_wext_state_t *wext_state;
@@ -2305,6 +2317,12 @@ void hdd_clear_fils_connection_info(hdd_adapter_t *adapter)
 	if (wext_state->roamProfile.fils_con_info) {
 		qdf_mem_free(wext_state->roamProfile.fils_con_info);
 		wext_state->roamProfile.fils_con_info = NULL;
+	}
+
+	if (wext_state->roamProfile.hlp_ie) {
+		qdf_mem_free(wext_state->roamProfile.hlp_ie);
+		wext_state->roamProfile.hlp_ie = NULL;
+		wext_state->roamProfile.hlp_ie_len = 0;
 	}
 }
 #endif

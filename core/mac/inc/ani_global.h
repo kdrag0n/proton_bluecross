@@ -333,6 +333,11 @@ typedef struct sLimTimers {
 	 */
 	TX_TIMER gLimActiveToPassiveChannelTimer;
 	TX_TIMER g_lim_periodic_auth_retry_timer;
+	/*
+	 * This timer is used for delay between shared auth failure and
+	 * open auth start
+	 */
+	TX_TIMER open_sys_auth_timer;
 
 /* ********************TIMER SECTION ENDS************************************************** */
 /* ALL THE FIELDS BELOW THIS CAN BE ZEROED OUT in lim_initialize */
@@ -969,7 +974,6 @@ typedef struct sAniSirGlobal {
 	bool sta_prefer_80MHz_over_160MHz;
 	enum  country_src reg_hint_src;
 	uint32_t rx_packet_drop_counter;
-	struct candidate_chan_info candidate_channel_info[QDF_MAX_NUM_CHAN];
 	bool snr_monitor_enabled;
 	/* channel information callback */
 	void (*chan_info_cb)(struct scan_chan_info *chan_info);

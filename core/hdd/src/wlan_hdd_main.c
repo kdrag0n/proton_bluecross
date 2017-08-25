@@ -2117,6 +2117,12 @@ static int __hdd_open(struct net_device *dev)
 	MTRACE(qdf_trace(QDF_MODULE_ID_HDD, TRACE_CODE_HDD_OPEN_REQUEST,
 		adapter->sessionId, adapter->device_mode));
 
+	/* Nothing to be done if device is unloading */
+	if (cds_is_driver_unloading()) {
+		hdd_err("Driver is unloading can not open the hdd");
+		return -EBUSY;
+	}
+
 	mutex_lock(&hdd_init_deinit_lock);
 
 	/*
@@ -4037,6 +4043,7 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 		break;
 
 	case QDF_SAP_MODE:
+		hdd_ipa_flush(hdd_ctx);
 	case QDF_P2P_GO_MODE:
 		if (hdd_ctx->config->conc_custom_rule1 &&
 			(QDF_SAP_MODE == adapter->device_mode)) {
@@ -4335,9 +4342,10 @@ struct cfg80211_bss *hdd_cfg80211_get_bss(struct wiphy *wiphy,
 }
 #endif
 
-#if defined CFG80211_CONNECT_BSS
+#if defined CFG80211_CONNECT_BSS || \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0))
 #if defined CFG80211_CONNECT_TIMEOUT_REASON_CODE || \
-	(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0))
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
 /**
  * hdd_convert_timeout_reason() - Convert to kernel specific enum
  * @timeout_reason: reason for connect timeout
@@ -4413,7 +4421,8 @@ static void __hdd_connect_bss(struct net_device *dev, const u8 *bssid,
 			     nl_timeout_reason);
 }
 #else
-#if defined CFG80211_CONNECT_TIMEOUT
+#if defined CFG80211_CONNECT_TIMEOUT || \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0))
 static void hdd_cfg80211_connect_timeout(struct net_device *dev,
 					 const u8 *bssid,
 					 tSirResultCodes timeout_reason)
@@ -4450,7 +4459,8 @@ static void __hdd_connect_bss(struct net_device *dev, const u8 *bssid,
  *
  * Return: Void
  */
-#if defined CFG80211_CONNECT_TIMEOUT
+#if defined CFG80211_CONNECT_TIMEOUT || \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0))
 static void hdd_connect_bss(struct net_device *dev, const u8 *bssid,
 			struct cfg80211_bss *bss, const u8 *req_ie,
 			size_t req_ie_len, const u8 *resp_ie,
@@ -4477,9 +4487,11 @@ static void hdd_connect_bss(struct net_device *dev, const u8 *bssid,
 }
 #endif
 
-#ifdef WLAN_FEATURE_FILS_SK
-#ifdef CFG80211_CONNECT_DONE
-#ifdef CFG80211_FILS_SK_OFFLOAD_SUPPORT
+#if defined(WLAN_FEATURE_FILS_SK)
+#if defined(CFG80211_CONNECT_DONE) || \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0))
+#if defined(CFG80211_FILS_SK_OFFLOAD_SUPPORT) || \
+		 (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0))
 /**
  * hdd_populate_fils_params() - Populate FILS keys to connect response
  * @fils_params: connect response to supplicant
@@ -4517,26 +4529,26 @@ static inline void hdd_populate_fils_params(struct cfg80211_connect_resp_params
 { }
 #endif
 
-/**
- * hdd_update_hlp_info() - Update HLP packet received in FILS assoc rsp
- * @dev: net device
- * @roam_fils_params: Fils join rsp params
- *
- * This API is used to send the received HLP packet in Assoc rsp(FILS AKM)
- * to the network layer.
- *
- * Return: None
- */
-static void hdd_update_hlp_info(struct net_device *dev,
-				struct fils_join_rsp_params *roam_fils_params)
+void hdd_update_hlp_info(struct net_device *dev, tCsrRoamInfo *roam_info)
 {
 	struct sk_buff *skb;
 	uint16_t skb_len;
 	struct llc_snap_hdr_t *llc_hdr;
 	QDF_STATUS status;
-	uint8_t *hlp_data = roam_fils_params->hlp_data;
-	uint16_t hlp_data_len = roam_fils_params->hlp_data_len;
+	uint8_t *hlp_data;
+	uint16_t hlp_data_len;
+	struct fils_join_rsp_params *roam_fils_params
+				= roam_info->fils_join_rsp;
 	hdd_adapter_t *padapter = WLAN_HDD_GET_PRIV_PTR(dev);
+
+	if (!roam_fils_params)
+		return;
+
+	if (!roam_fils_params->hlp_data_len || !roam_fils_params->hlp_data)
+		return;
+
+	hlp_data = roam_fils_params->hlp_data;
+	hlp_data_len = roam_fils_params->hlp_data_len;
 
 	/* Calculate skb length */
 	skb_len = (2 * ETH_ALEN) + hlp_data_len;
@@ -4589,7 +4601,6 @@ static void hdd_update_hlp_info(struct net_device *dev,
  * @gfp: allocation flags
  * @connect_timeout: If timed out waiting for Auth/Assoc/Probe resp
  * @timeout_reason: reason for connect timeout
- * @roam_fils_params: FILS join response params
  *
  * This API is used as wrapper to send FILS key/sequence number
  * params etc. to supplicant in case of FILS connection
@@ -4601,10 +4612,13 @@ static void hdd_connect_done(struct net_device *dev, const u8 *bssid,
 			     const u8 *req_ie, size_t req_ie_len,
 			     const u8 *resp_ie, size_t resp_ie_len, u16 status,
 			     gfp_t gfp, bool connect_timeout, tSirResultCodes
-			     timeout_reason, struct fils_join_rsp_params
-			     *roam_fils_params)
+			     timeout_reason)
 {
 	struct cfg80211_connect_resp_params fils_params;
+	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct fils_join_rsp_params *roam_fils_params =
+				roam_info->fils_join_rsp;
+
 	qdf_mem_zero(&fils_params, sizeof(fils_params));
 
 	if (!roam_fils_params) {
@@ -4626,6 +4640,11 @@ static void hdd_connect_done(struct net_device *dev, const u8 *bssid,
 					 roam_fils_params->fils_pmk_len,
 					 roam_fils_params->fils_pmkid,
 					 roam_info->fils_seq_num);
+		wlan_hdd_save_gtk_offload_params(adapter, NULL,
+					roam_fils_params->kek,
+					roam_fils_params->kek_len,
+					roam_info->replay_ctr,
+					true, GTK_OFFLOAD_ENABLE);
 	}
 	hdd_debug("FILS indicate connect status %d seq no %d",
 		  fils_params.status,
@@ -4634,7 +4653,7 @@ static void hdd_connect_done(struct net_device *dev, const u8 *bssid,
 	cfg80211_connect_done(dev, &fils_params, gfp);
 
 	if (roam_fils_params && roam_fils_params->hlp_data_len)
-		hdd_update_hlp_info(dev, roam_fils_params);
+		hdd_update_hlp_info(dev, roam_info);
 
 	/* Clear all the FILS key info */
 	if (roam_fils_params && roam_fils_params->fils_pmk)
@@ -4650,18 +4669,14 @@ static inline void hdd_connect_done(struct net_device *dev, const u8 *bssid,
 				    size_t req_ie_len, const u8 *resp_ie,
 				    size_t resp_ie_len, u16 status, gfp_t gfp,
 				    bool connect_timeout, tSirResultCodes
-				    timeout_reason, struct fils_join_rsp_params
-				    *roam_fils_params)
-{ }
-
-static inline void hdd_update_hlp_info(struct net_device *dev,
-			struct fils_join_rsp_params *roam_fils_params)
-
+				    timeout_reason)
 { }
 #endif
 #endif
 
-#if defined(CFG80211_CONNECT_DONE) && defined(WLAN_FEATURE_FILS_SK)
+#if defined(WLAN_FEATURE_FILS_SK) && \
+	(defined(CFG80211_CONNECT_DONE) || \
+		(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0)))
 /**
  * hdd_fils_update_connect_results() - API to send fils connection status to
  * supplicant.
@@ -4697,7 +4712,7 @@ static int hdd_fils_update_connect_results(struct net_device *dev,
 
 	hdd_connect_done(dev, bssid, bss, roam_info, req_ie, req_ie_len,
 			 resp_ie, resp_ie_len, status, gfp, connect_timeout,
-			 timeout_reason, roam_info->fils_join_rsp);
+			 timeout_reason);
 	return 0;
 }
 #else
@@ -6875,7 +6890,8 @@ static uint8_t hdd_get_safe_channel_from_pcl_and_acs_range(
 
 	status = cds_get_pcl_for_existing_conn(CDS_SAP_MODE,
 			pcl.pcl_list, &pcl.pcl_len,
-			pcl.weight_list, QDF_ARRAY_SIZE(pcl.weight_list));
+			pcl.weight_list, QDF_ARRAY_SIZE(pcl.weight_list),
+			false);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Get PCL failed");
 		return INVALID_CHANNEL_ID;
@@ -8804,6 +8820,7 @@ static void wlan_hdd_p2p_lo_event_callback(void *context_ptr,
 	hdd_context_t *hdd_ctx = (hdd_context_t *)context_ptr;
 	struct sir_p2p_lo_event *evt = event_ptr;
 	struct sk_buff *vendor_event;
+	hdd_adapter_t *adapter;
 
 	ENTER();
 
@@ -8812,9 +8829,16 @@ static void wlan_hdd_p2p_lo_event_callback(void *context_ptr,
 		return;
 	}
 
+	adapter = hdd_get_adapter_by_vdev(hdd_ctx, evt->vdev_id);
+	if (!adapter) {
+		hdd_err("Cannot find adapter by vdev_id = %d",
+				evt->vdev_id);
+		return;
+	}
+
 	vendor_event =
 		cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
-			NULL, sizeof(uint32_t) + NLMSG_HDRLEN,
+			&(adapter->wdev), sizeof(uint32_t) + NLMSG_HDRLEN,
 			QCA_NL80211_VENDOR_SUBCMD_P2P_LO_EVENT_INDEX,
 			GFP_KERNEL);
 
@@ -8832,6 +8856,8 @@ static void wlan_hdd_p2p_lo_event_callback(void *context_ptr,
 	}
 
 	cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+	hdd_debug("Sent P2P_LISTEN_OFFLOAD_STOP event for vdev_id = %d",
+			evt->vdev_id);
 }
 
 /**
@@ -9337,6 +9363,7 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode)
 
 	mutex_lock(&hdd_ctx->iface_change_lock);
 	hdd_ctx->stop_modules_in_progress = true;
+	cds_set_module_stop_in_progress(true);
 
 	active_threads = cds_return_external_threads_count();
 	if (active_threads > 0 || hdd_ctx->isWiphySuspended) {
@@ -9350,6 +9377,7 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode)
 			qdf_mc_timer_start(&hdd_ctx->iface_change_timer,
 				hdd_ctx->config->iface_change_wait_time);
 			hdd_ctx->stop_modules_in_progress = false;
+			cds_set_module_stop_in_progress(false);
 			return 0;
 		}
 	}
@@ -9427,6 +9455,7 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode)
 
 done:
 	hdd_ctx->stop_modules_in_progress = false;
+	cds_set_module_stop_in_progress(false);
 	mutex_unlock(&hdd_ctx->iface_change_lock);
 	EXIT();
 
@@ -11021,6 +11050,28 @@ static void wlan_hdd_state_ctrl_param_destroy(void)
 	pr_info("Device node unregistered");
 }
 
+#ifndef MODULE
+static int hdd_wait_for_probe_complete(void)
+{
+	unsigned long rc;
+
+	rc = wait_for_completion_timeout(&wlan_start_comp,
+				msecs_to_jiffies(HDD_WLAN_START_WAIT_TIME));
+
+	if (!rc) {
+		hdd_alert("Timed-out waiting for Probe to complete");
+		return -ETIMEDOUT;
+	}
+
+	return 0;
+}
+#else
+static int hdd_wait_for_probe_complete(void)
+{
+	return 0;
+}
+#endif
+
 /**
  * __hdd_module_init - Module init helper
  *
@@ -11060,6 +11111,12 @@ static int __hdd_module_init(void)
 	if (ret) {
 		pr_err("%s: driver load failure, err %d\n", WLAN_MODULE_NAME,
 			ret);
+		goto out;
+	}
+
+	if (hdd_wait_for_probe_complete()) {
+		pr_err("%s: probe of the driver failed!", __func__);
+		wlan_hdd_unregister_driver();
 		goto out;
 	}
 
@@ -11145,6 +11202,7 @@ static ssize_t wlan_boot_cb(struct kobject *kobj,
 		return -EALREADY;
 	}
 
+	init_completion(&wlan_start_comp);
 	if (__hdd_module_init()) {
 		pr_err("%s: wlan driver initialization failed\n", __func__);
 		return -EIO;
@@ -11246,7 +11304,6 @@ static int wlan_deinit_sysfs(void)
 	hdd_sysfs_cleanup();
 	return 0;
 }
-
 #endif /* MODULE */
 
 #ifdef MODULE
@@ -11363,6 +11420,7 @@ static void hdd_cleanup_present_mode(hdd_context_t *hdd_ctx,
 	case QDF_GLOBAL_FTM_MODE:
 		if (driver_status != DRIVER_MODULES_CLOSED) {
 			hdd_abort_mac_scan_all_adapters(hdd_ctx);
+			hdd_cleanup_scan_queue(hdd_ctx);
 			hdd_stop_all_adapters(hdd_ctx);
 		}
 		hdd_deinit_all_adapters(hdd_ctx, false);
@@ -11478,14 +11536,14 @@ static int __con_mode_handler(const char *kmessage, struct kernel_param *kp,
 		goto reset_flags;
 	}
 
-	/* Cleanup present mode before switching to new mode */
-	hdd_cleanup_present_mode(hdd_ctx, curr_mode);
-
 	ret = hdd_wlan_stop_modules(hdd_ctx, true);
 	if (ret) {
 		hdd_err("Stop wlan modules failed");
 		goto reset_flags;
 	}
+
+	/* Cleanup present mode before switching to new mode */
+	hdd_cleanup_present_mode(hdd_ctx, curr_mode);
 
 	hdd_set_conparam(con_mode);
 

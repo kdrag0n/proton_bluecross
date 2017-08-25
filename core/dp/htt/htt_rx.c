@@ -131,9 +131,22 @@ static void htt_rx_hash_deinit(struct htt_pdev_t *pdev)
 	struct htt_rx_hash_entry *hash_entry;
 	struct htt_rx_hash_bucket **hash_table;
 	struct htt_list_node *list_iter = NULL;
+	qdf_mem_info_t *mem_map_table = NULL, *mem_info = NULL;
+	uint32_t num_unmapped = 0;
 
 	if (NULL == pdev->rx_ring.hash_table)
 		return;
+
+	if (qdf_mem_smmu_s1_enabled(pdev->osdev) && pdev->is_ipa_uc_enabled) {
+		mem_map_table = qdf_mem_map_table_alloc(
+					pdev->rx_ring.fill_level);
+		if (!mem_map_table) {
+			qdf_print("%s: Failed to allocate memory for mem map table\n",
+				  __func__);
+			return;
+		}
+		mem_info = mem_map_table;
+	}
 
 	qdf_spin_lock_bh(&(pdev->rx_ring.rx_hash_lock));
 	hash_table = pdev->rx_ring.hash_table;
@@ -149,6 +162,16 @@ static void htt_rx_hash_deinit(struct htt_pdev_t *pdev)
 							     pdev->rx_ring.
 							     listnode_offset);
 			if (hash_entry->netbuf) {
+				if (qdf_mem_smmu_s1_enabled(pdev->osdev) &&
+						pdev->is_ipa_uc_enabled) {
+					qdf_update_mem_map_table(pdev->osdev,
+						mem_info,
+						QDF_NBUF_CB_PADDR(
+							hash_entry->netbuf),
+						HTT_RX_BUF_SIZE);
+					mem_info++;
+					num_unmapped++;
+				}
 #ifdef DEBUG_DMA_DONE
 				qdf_nbuf_unmap(pdev->osdev, hash_entry->netbuf,
 					       QDF_DMA_BIDIRECTIONAL);
@@ -172,6 +195,12 @@ static void htt_rx_hash_deinit(struct htt_pdev_t *pdev)
 
 	qdf_spinlock_destroy(&(pdev->rx_ring.rx_hash_lock));
 
+	if (qdf_mem_smmu_s1_enabled(pdev->osdev) && pdev->is_ipa_uc_enabled) {
+		if (num_unmapped)
+			cds_smmu_map_unmap(false, num_unmapped,
+					   mem_map_table);
+		qdf_mem_free(mem_map_table);
+	}
 }
 #endif
 
@@ -446,7 +475,7 @@ static int htt_rx_ring_fill_n(struct htt_pdev_t *pdev, int num)
 	int num_alloc = 0;
 
 	idx = *(pdev->rx_ring.alloc_idx.vaddr);
-	if (qdf_mem_smmu_s1_enabled(pdev->osdev) && pdev->uc_map_reqd) {
+	if (qdf_mem_smmu_s1_enabled(pdev->osdev) && pdev->is_ipa_uc_enabled) {
 		mem_map_table = qdf_mem_map_table_alloc(num);
 		if (!mem_map_table) {
 			qdf_print("%s: Failed to allocate memory for mem map table\n",
@@ -543,7 +572,8 @@ moretofill:
 			pdev->rx_ring.buf.netbufs_ring[idx] = rx_netbuf;
 		}
 
-		if (qdf_mem_smmu_s1_enabled(pdev->osdev) && pdev->uc_map_reqd) {
+		if (qdf_mem_smmu_s1_enabled(pdev->osdev) &&
+					pdev->is_ipa_uc_enabled) {
 			qdf_update_mem_map_table(pdev->osdev, mem_info,
 						 paddr, HTT_RX_BUF_SIZE);
 			mem_info++;
@@ -565,7 +595,7 @@ moretofill:
 	}
 
 free_mem_map_table:
-	if (qdf_mem_smmu_s1_enabled(pdev->osdev) && pdev->uc_map_reqd) {
+	if (qdf_mem_smmu_s1_enabled(pdev->osdev) && pdev->is_ipa_uc_enabled) {
 		cds_smmu_map_unmap(true, num_alloc, mem_map_table);
 		qdf_mem_free(mem_map_table);
 	}
@@ -702,8 +732,31 @@ void htt_rx_detach(struct htt_pdev_t *pdev)
 		htt_rx_hash_deinit(pdev);
 	} else {
 		int sw_rd_idx = pdev->rx_ring.sw_rd_idx.msdu_payld;
+		qdf_mem_info_t *mem_map_table = NULL, *mem_info = NULL;
+		uint32_t num_unmapped = 0;
 
+		if (qdf_mem_smmu_s1_enabled(pdev->osdev) &&
+					pdev->is_ipa_uc_enabled) {
+			mem_map_table = qdf_mem_map_table_alloc(
+						pdev->rx_ring.fill_level);
+			if (!mem_map_table) {
+				qdf_print("%s: Failed to allocate memory for mem map table\n",
+					  __func__);
+				return;
+			}
+			mem_info = mem_map_table;
+		}
 		while (sw_rd_idx != *(pdev->rx_ring.alloc_idx.vaddr)) {
+			if (qdf_mem_smmu_s1_enabled(pdev->osdev) &&
+						pdev->is_ipa_uc_enabled) {
+				qdf_update_mem_map_table(pdev->osdev, mem_info,
+					QDF_NBUF_CB_PADDR(
+						pdev->rx_ring.buf.netbufs_ring[
+								sw_rd_idx]),
+					HTT_RX_BUF_SIZE);
+				mem_info++;
+				num_unmapped++;
+			}
 #ifdef DEBUG_DMA_DONE
 			qdf_nbuf_unmap(pdev->osdev,
 				       pdev->rx_ring.buf.
@@ -721,6 +774,14 @@ void htt_rx_detach(struct htt_pdev_t *pdev)
 			sw_rd_idx &= pdev->rx_ring.size_mask;
 		}
 		qdf_mem_free(pdev->rx_ring.buf.netbufs_ring);
+
+		if (qdf_mem_smmu_s1_enabled(pdev->osdev) &&
+					pdev->is_ipa_uc_enabled) {
+			if (num_unmapped)
+				cds_smmu_map_unmap(false, num_unmapped,
+						   mem_map_table);
+			qdf_mem_free(mem_map_table);
+		}
 	}
 
 	qdf_mem_free_consistent(pdev->osdev, pdev->osdev->dev,
@@ -1705,10 +1766,110 @@ int htt_mon_rx_handle_amsdu_packet(qdf_nbuf_t msdu, htt_pdev_handle pdev,
 	return 1;
 }
 
+#define SHORT_PREAMBLE 1
+#define LONG_PREAMBLE  0
+#ifdef HELIUMPLUS
 /**
- * htt_mon_rx_get_phy_info() - Get rate interms of 500Kbps.
- * @rx_desc: Pointer to struct htt_host_rx_desc_base
- * @rx_status: Return variable updated with phy_info in rx_status
+ * htt_rx_get_rate() - get rate info in terms of 500Kbps from htt_rx_desc
+ * @l_sig_rate_select: OFDM or CCK rate
+ * @l_sig_rate:
+ *
+ * If l_sig_rate_select is 0:
+ * 0x8: OFDM 48 Mbps
+ * 0x9: OFDM 24 Mbps
+ * 0xA: OFDM 12 Mbps
+ * 0xB: OFDM 6 Mbps
+ * 0xC: OFDM 54 Mbps
+ * 0xD: OFDM 36 Mbps
+ * 0xE: OFDM 18 Mbps
+ * 0xF: OFDM 9 Mbps
+ * If l_sig_rate_select is 1:
+ * 0x1:  DSSS 1 Mbps long preamble
+ * 0x2:  DSSS 2 Mbps long preamble
+ * 0x3:  CCK 5.5 Mbps long preamble
+ * 0x4:  CCK 11 Mbps long preamble
+ * 0x5:  DSSS 2 Mbps short preamble
+ * 0x6:  CCK 5.5 Mbps
+ * 0x7:  CCK 11 Mbps short  preamble
+ *
+ * Return: rate interms of 500Kbps.
+ */
+static unsigned char htt_rx_get_rate(uint32_t l_sig_rate_select,
+					uint32_t l_sig_rate, uint8_t *preamble)
+{
+	char ret = 0x0;
+	*preamble = LONG_PREAMBLE;
+	if (l_sig_rate_select == 0) {
+		switch (l_sig_rate) {
+		case 0x8:
+			ret = 0x60;
+			break;
+		case 0x9:
+			ret = 0x30;
+			break;
+		case 0xA:
+			ret = 0x18;
+			break;
+		case 0xB:
+			ret = 0x0c;
+			break;
+		case 0xC:
+			ret = 0x6c;
+			break;
+		case 0xD:
+			ret = 0x48;
+			break;
+		case 0xE:
+			ret = 0x24;
+			break;
+		case 0xF:
+			ret = 0x12;
+			break;
+		default:
+			break;
+		}
+	} else if (l_sig_rate_select == 1) {
+		switch (l_sig_rate) {
+		case 0x1:
+			ret = 0x2;
+			*preamble = LONG_PREAMBLE;
+			break;
+		case 0x2:
+			ret = 0x4;
+			*preamble = LONG_PREAMBLE;
+			break;
+		case 0x3:
+			ret = 0xB;
+			*preamble = LONG_PREAMBLE;
+			break;
+		case 0x4:
+			ret = 0x16;
+			*preamble = LONG_PREAMBLE;
+			break;
+		case 0x5:
+			ret = 0x4;
+			*preamble = SHORT_PREAMBLE;
+			break;
+		case 0x6:
+			ret = 0xB;
+			break;
+		case 0x7:
+			ret = 0x16;
+			*preamble = SHORT_PREAMBLE;
+			break;
+		default:
+			break;
+		}
+	} else {
+		qdf_print("Invalid rate info\n");
+	}
+	return ret;
+}
+#else
+/**
+ * htt_rx_get_rate() - get rate info in terms of 500Kbps from htt_rx_desc
+ * @l_sig_rate_select: OFDM or CCK rate
+ * @l_sig_rate:
  *
  * If l_sig_rate_select is 0:
  * 0x8: OFDM 48 Mbps
@@ -1721,54 +1882,45 @@ int htt_mon_rx_handle_amsdu_packet(qdf_nbuf_t msdu, htt_pdev_handle pdev,
  * 0xF: OFDM 9 Mbps
  * If l_sig_rate_select is 1:
  * 0x8: CCK 11 Mbps long preamble
- * 0x9: CCK 5.5 Mbps long preamble
+ *  0x9: CCK 5.5 Mbps long preamble
  * 0xA: CCK 2 Mbps long preamble
  * 0xB: CCK 1 Mbps long preamble
  * 0xC: CCK 11 Mbps short preamble
  * 0xD: CCK 5.5 Mbps short preamble
  * 0xE: CCK 2 Mbps short preamble
  *
- * Return: None
+ * Return: rate interms of 500Kbps.
  */
-static void htt_mon_rx_get_phy_info(struct htt_host_rx_desc_base *rx_desc,
-				    struct mon_rx_status *rx_status)
+static unsigned char htt_rx_get_rate(uint32_t l_sig_rate_select,
+					uint32_t l_sig_rate, uint8_t *preamble)
 {
-#define SHORT_PREAMBLE 1
-#define LONG_PREAMBLE  0
-	char rate = 0x0;
-	uint8_t preamble = SHORT_PREAMBLE;
-	uint8_t preamble_type = rx_desc->ppdu_start.preamble_type;
-	uint8_t mcs = 0, nss = 0, sgi = 0, bw = 0, beamformed = 0;
-	uint16_t vht_flags = 0, ht_flags = 0;
-	uint32_t l_sig_rate_select = rx_desc->ppdu_start.l_sig_rate_select;
-	uint32_t l_sig_rate = rx_desc->ppdu_start.l_sig_rate;
-	bool is_stbc = 0, ldpc = 0;
-
+	char ret = 0x0;
+	*preamble = SHORT_PREAMBLE;
 	if (l_sig_rate_select == 0) {
 		switch (l_sig_rate) {
 		case 0x8:
-			rate = 0x60;
+			ret = 0x60;
 			break;
 		case 0x9:
-			rate = 0x30;
+			ret = 0x30;
 			break;
 		case 0xA:
-			rate = 0x18;
+			ret = 0x18;
 			break;
 		case 0xB:
-			rate = 0x0c;
+			ret = 0x0c;
 			break;
 		case 0xC:
-			rate = 0x6c;
+			ret = 0x6c;
 			break;
 		case 0xD:
-			rate = 0x48;
+			ret = 0x48;
 			break;
 		case 0xE:
-			rate = 0x24;
+			ret = 0x24;
 			break;
 		case 0xF:
-			rate = 0x12;
+			ret = 0x12;
 			break;
 		default:
 			break;
@@ -1776,29 +1928,29 @@ static void htt_mon_rx_get_phy_info(struct htt_host_rx_desc_base *rx_desc,
 	} else if (l_sig_rate_select == 1) {
 		switch (l_sig_rate) {
 		case 0x8:
-			rate = 0x16;
-			preamble = LONG_PREAMBLE;
+			ret = 0x16;
+			*preamble = LONG_PREAMBLE;
 			break;
 		case 0x9:
-			rate = 0x0B;
-			preamble = LONG_PREAMBLE;
+			ret = 0x0B;
+			*preamble = LONG_PREAMBLE;
 			break;
 		case 0xA:
-			rate = 0x04;
-			preamble = LONG_PREAMBLE;
+			ret = 0x4;
+			*preamble = LONG_PREAMBLE;
 			break;
 		case 0xB:
-			rate = 0x02;
-			preamble = LONG_PREAMBLE;
+			ret = 0x02;
+			*preamble = LONG_PREAMBLE;
 			break;
 		case 0xC:
-			rate = 0x16;
+			ret = 0x16;
 			break;
 		case 0xD:
-			rate = 0x0B;
+			ret = 0x0B;
 			break;
 		case 0xE:
-			rate = 0x04;
+			ret = 0x04;
 			break;
 		default:
 			break;
@@ -1806,8 +1958,33 @@ static void htt_mon_rx_get_phy_info(struct htt_host_rx_desc_base *rx_desc,
 	} else {
 		qdf_print("Invalid rate info\n");
 	}
+	return ret;
+}
+#endif /* HELIUMPLUS */
+/**
+ * htt_mon_rx_get_phy_info() - Get phy info
+ * @rx_desc: Pointer to struct htt_host_rx_desc_base
+ * @rx_status: Return variable updated with phy_info in rx_status
+ *
+ * Return: None
+ */
+static void htt_mon_rx_get_phy_info(struct htt_host_rx_desc_base *rx_desc,
+				    struct mon_rx_status *rx_status)
+{
+	uint8_t preamble = 0;
+	uint8_t preamble_type = rx_desc->ppdu_start.preamble_type;
+	uint8_t mcs = 0, nss = 0, sgi = 0, bw = 0, beamformed = 0;
+	uint16_t vht_flags = 0, ht_flags = 0;
+	uint32_t l_sig_rate_select = rx_desc->ppdu_start.l_sig_rate_select;
+	uint32_t l_sig_rate = rx_desc->ppdu_start.l_sig_rate;
+	bool is_stbc = 0, ldpc = 0;
 
 	switch (preamble_type) {
+	case 4:
+	/* legacy */
+		rx_status->rate = htt_rx_get_rate(l_sig_rate_select, l_sig_rate,
+						&preamble);
+		break;
 	case 8:
 		is_stbc = ((VHT_SIG_A_2(rx_desc) >> 4) & 3);
 		/* fallthrough */
@@ -1866,7 +2043,6 @@ static void htt_mon_rx_get_phy_info(struct htt_host_rx_desc_base *rx_desc,
 	rx_status->ldpc = ldpc;
 	rx_status->beamformed = beamformed;
 	rx_status->vht_flag_values3[0] = mcs << 0x4 | (nss + 1);
-	rx_status->rate = rate;
 	rx_status->ht_flags = ht_flags;
 	rx_status->vht_flags = vht_flags;
 	rx_status->rtap_flags |= ((preamble == SHORT_PREAMBLE) ? BIT(1) : 0);
@@ -2152,6 +2328,11 @@ uint32_t htt_rx_amsdu_rx_in_order_get_pktlog(qdf_nbuf_t rx_ind_msg)
 
 #ifndef CONFIG_HL_SUPPORT
 /* Return values: 1 - success, 0 - failure */
+#define RX_DESC_DISCARD_IS_SET ((*((u_int8_t *) &rx_desc->fw_desc.u.val)) & \
+							FW_RX_DESC_DISCARD_M)
+#define RX_DESC_MIC_ERR_IS_SET ((*((u_int8_t *) &rx_desc->fw_desc.u.val)) & \
+							FW_RX_DESC_ANY_ERR_M)
+
 static int
 htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 				qdf_nbuf_t rx_ind_msg,
@@ -2186,7 +2367,7 @@ htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 	/* Get the total number of MSDUs */
 	msdu_count = HTT_RX_IN_ORD_PADDR_IND_MSDU_CNT_GET(*(msg_word + 1));
 	HTT_RX_CHECK_MSDU_COUNT(msdu_count);
-	if (qdf_mem_smmu_s1_enabled(pdev->osdev) && pdev->uc_map_reqd) {
+	if (qdf_mem_smmu_s1_enabled(pdev->osdev) && pdev->is_ipa_uc_enabled) {
 		mem_map_table = qdf_mem_map_table_alloc(msdu_count);
 		if (!mem_map_table) {
 			qdf_print("%s: Failed to allocate memory for mem map table\n",
@@ -2219,7 +2400,8 @@ htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 	}
 
 	while (msdu_count > 0) {
-		if (qdf_mem_smmu_s1_enabled(pdev->osdev) && pdev->uc_map_reqd) {
+		if (qdf_mem_smmu_s1_enabled(pdev->osdev) &&
+					pdev->is_ipa_uc_enabled) {
 			qdf_update_mem_map_table(pdev->osdev, mem_info,
 						 QDF_NBUF_CB_PADDR(msdu),
 						 HTT_RX_BUF_SIZE);
@@ -2283,15 +2465,16 @@ htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 
 		/* calling callback function for packet logging */
 		if (pdev->rx_pkt_dump_cb) {
-			if (qdf_unlikely((*((u_int8_t *)
-				   &rx_desc->fw_desc.u.val)) &
-				   FW_RX_DESC_ANY_ERR_M))
+			if (qdf_unlikely(RX_DESC_MIC_ERR_IS_SET &&
+						!RX_DESC_DISCARD_IS_SET))
 				status = RX_PKT_FATE_FW_DROP_INVALID;
 			pdev->rx_pkt_dump_cb(msdu, peer_id, status);
 		}
-
-		if (qdf_unlikely((*((u_int8_t *) &rx_desc->fw_desc.u.val)) &
-				    FW_RX_DESC_ANY_ERR_M)) {
+		/* if discard flag is set (SA is self MAC), then
+		 * don't check mic failure.
+		 */
+		if (qdf_unlikely(RX_DESC_MIC_ERR_IS_SET &&
+					!RX_DESC_DISCARD_IS_SET)) {
 			uint8_t tid =
 				HTT_RX_IN_ORD_PADDR_IND_EXT_TID_GET(
 					*(u_int32_t *)rx_ind_data);
@@ -2364,7 +2547,7 @@ htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 	}
 
 free_mem_map_table:
-	if (qdf_mem_smmu_s1_enabled(pdev->osdev) && pdev->uc_map_reqd) {
+	if (qdf_mem_smmu_s1_enabled(pdev->osdev) && pdev->is_ipa_uc_enabled) {
 		if (num_unmapped)
 			cds_smmu_map_unmap(false, num_unmapped,
 					   mem_map_table);
@@ -3763,44 +3946,6 @@ int htt_rx_ipa_uc_detach(struct htt_pdev_t *pdev)
 				pdev->ipa_uc_rx_rsc.rx_ipa_prc_done_idx);
 
 	htt_rx_ipa_uc_free_wdi2_rsc(pdev);
-	return 0;
-}
-
-int htt_rx_ipa_uc_buf_pool_map(struct htt_pdev_t *pdev)
-{
-	struct htt_rx_hash_entry *hash_entry;
-	struct htt_list_node *list_iter = NULL;
-	qdf_mem_info_t *mem_map_table = NULL, *mem_info = NULL;
-	uint32_t num_alloc = 0;
-	uint32_t i;
-
-	mem_map_table = qdf_mem_map_table_alloc(HTT_RX_RING_SIZE_MAX);
-	if (!mem_map_table) {
-		qdf_print("%s: Failed to allocate memory for mem map table\n",
-			  __func__);
-		return 1;
-	}
-	mem_info = mem_map_table;
-	for (i = 0; i < RX_NUM_HASH_BUCKETS; i++) {
-		list_iter = pdev->rx_ring.hash_table[i]->listhead.next;
-		while (list_iter != &pdev->rx_ring.hash_table[i]->listhead) {
-			hash_entry = (struct htt_rx_hash_entry *)(
-				(char *)list_iter -
-				pdev->rx_ring.listnode_offset);
-			if (hash_entry->netbuf) {
-				qdf_update_mem_map_table(pdev->osdev,
-					mem_info,
-					QDF_NBUF_CB_PADDR(hash_entry->netbuf),
-					HTT_RX_BUF_SIZE);
-				mem_info++;
-				num_alloc++;
-			}
-			list_iter = list_iter->next;
-		}
-	}
-	cds_smmu_map_unmap(true, num_alloc, mem_map_table);
-	qdf_mem_free(mem_map_table);
-
 	return 0;
 }
 #endif /* IPA_OFFLOAD */

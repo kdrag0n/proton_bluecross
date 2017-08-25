@@ -1747,7 +1747,6 @@ struct hdd_context_s {
 	uint16_t max_num_tdls_sta;
 	/* TDLS peer connected count */
 	uint16_t connected_peer_count;
-	tdls_scan_context_t tdls_scan_ctxt;
 	/* Lock to avoid race condition during TDLS operations */
 	qdf_spinlock_t tdls_ct_spinlock;
 	/*linear mac address table for counting the packets*/
@@ -2642,7 +2641,9 @@ void hdd_chip_pwr_save_fail_detected_cb(void *hdd_ctx,
 				struct chip_pwr_save_fail_detected_params
 				*data);
 
-#if defined(WLAN_FEATURE_FILS_SK) && defined(CFG80211_FILS_SK_OFFLOAD_SUPPORT)
+#if defined(WLAN_FEATURE_FILS_SK) && \
+	(defined(CFG80211_FILS_SK_OFFLOAD_SUPPORT) || \
+		 (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)))
 /**
  * hdd_clear_fils_connection_info: API to clear fils info from roam profile and
  * free allocated memory
@@ -2689,4 +2690,21 @@ void hdd_dp_trace_init(struct hdd_config *config);
 int hdd_set_limit_off_chan_for_tos(hdd_adapter_t *adapter, enum tos tos,
 		bool is_tos_active);
 
+#if defined(WLAN_FEATURE_FILS_SK)
+/**
+ * hdd_update_hlp_info() - Update HLP packet received in FILS (re)assoc rsp
+ * @dev: net device
+ * @roam_fils_params: Fils join rsp params
+ *
+ * This API is used to send the received HLP packet in Assoc rsp(FILS AKM)
+ * to the network layer.
+ *
+ * Return: None
+ */
+void hdd_update_hlp_info(struct net_device *dev, tCsrRoamInfo *roam_info);
+#else
+static inline void hdd_update_hlp_info(struct net_device *dev,
+				       tCsrRoamInfo *roam_info)
+{}
+#endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */
