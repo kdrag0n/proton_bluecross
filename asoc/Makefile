@@ -49,3 +49,7 @@ obj-$(CONFIG_DOLBY_LICENSE) += msm-ds2-dap-config.o
 obj-$(CONFIG_DTS_SRS_TM) += msm-dts-srs-tm-config.o
 obj-$(CONFIG_QTI_PP) += msm-qti-pp-config.o
 obj-y += codecs/
+
+# for SDM845 board with MAX98927 codec
+snd-soc-sdm845-max98927-objs := sdm845_max98927.o
+obj-$(CONFIG_SND_SOC_MACHINE_SDM845_MAX98927) += snd-soc-sdm845-max98927.o

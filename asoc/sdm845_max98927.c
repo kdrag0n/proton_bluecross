@@ -21,24 +21,24 @@
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/of_device.h>
+#include <linux/mfd/msm-cdc-pinctrl.h>
 #include <sound/core.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/pcm.h>
 #include <sound/jack.h>
+#include <sound/q6afe-v2.h>
+#include <sound/q6core.h>
 #include <sound/pcm_params.h>
 #include <sound/info.h>
 #include "device_event.h"
-#include <dsp/audio_notifier.h>
-#include <dsp/q6afe-v2.h>
-#include <dsp/q6core.h>
-#include "msm-pcm-routing-v2.h"
-#include "codecs/msm-cdc-pinctrl.h"
-#include "codecs/wcd934x/wcd934x.h"
-#include "codecs/wcd934x/wcd934x-mbhc.h"
-#include "codecs/wsa881x.h"
+#include <linux/qdsp6v2/audio_notifier.h>
+#include "qdsp6v2/msm-pcm-routing-v2.h"
+#include "../codecs/wcd934x/wcd934x.h"
+#include "../codecs/wcd934x/wcd934x-mbhc.h"
+#include "../codecs/wsa881x.h"
 
-#define DRV_NAME "sdm845-asoc-snd"
+#define DRV_NAME "sdm845-asoc-snd-max9827"
 
 #define __CHIPSET__ "SDM845 "
 #define MSM_DAILINK_NAME(name) (__CHIPSET__#name)
@@ -4492,25 +4492,24 @@ static int sdm845_tdm_snd_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	int ret = 0;
 	int channels, slot_width, slots;
-	unsigned int slot_mask, rate, clk_freq;
+	unsigned int slot_mask;
 	unsigned int slot_offset[8] = {0, 4, 8, 12, 16, 20, 24, 28};
 
-	slot_width = 32;
 	pr_debug("%s: dai id = 0x%x\n", __func__, cpu_dai->id);
 
+	slots = tdm_rx_cfg[TDM_QUAT][TDM_0].channels;
+	/*2 slot config - bits 0 and 1 set for the first two slots */
+	slot_mask = 0x0000FFFF >> (16-slots);
+	slot_width = 32;
+	channels = slots;
+
+	pr_debug("%s: slot_width %d slots %d\n", __func__, slot_width, slots);
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		slots = tdm_rx_cfg[TDM_QUAT][TDM_0].channels;
-		/*2 slot config - bits 0 and 1 set for the first two slots */
-		slot_mask = 0x0000FFFF >> (16-slots);
-		channels = slots;
-
-		pr_debug("%s: tdm rx slot_width %d slots %d\n",
-			__func__, slot_width, slots);
-
+		pr_debug("%s: slot_width %d\n", __func__, slot_width);
 		ret = snd_soc_dai_set_tdm_slot(cpu_dai, 0, slot_mask,
 			slots, slot_width);
 		if (ret < 0) {
-			pr_err("%s: failed to set tdm rx slot, err:%d\n",
+			pr_err("%s: failed to set tdm slot, err:%d\n",
 				__func__, ret);
 			goto end;
 		}
@@ -4518,47 +4517,14 @@ static int sdm845_tdm_snd_hw_params(struct snd_pcm_substream *substream,
 		ret = snd_soc_dai_set_channel_map(cpu_dai,
 			0, NULL, channels, slot_offset);
 		if (ret < 0) {
-			pr_err("%s: failed to set tdm rx channel map, err:%d\n",
-				__func__, ret);
-			goto end;
-		}
-	} else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		slots = tdm_tx_cfg[TDM_QUAT][TDM_0].channels;
-		/*2 slot config - bits 0 and 1 set for the first two slots */
-		slot_mask = 0x0000FFFF >> (16-slots);
-		channels = slots;
-
-		pr_debug("%s: tdm tx slot_width %d slots %d\n",
-			__func__, slot_width, slots);
-
-		ret = snd_soc_dai_set_tdm_slot(cpu_dai, slot_mask, 0,
-			slots, slot_width);
-		if (ret < 0) {
-			pr_err("%s: failed to set tdm tx slot, err:%d\n",
-				__func__, ret);
-			goto end;
-		}
-
-		ret = snd_soc_dai_set_channel_map(cpu_dai,
-			channels, slot_offset, 0, NULL);
-		if (ret < 0) {
-			pr_err("%s: failed to set tdm tx channel map, err:%d\n",
+			pr_err("%s: failed to set channel map, err:%d\n",
 				__func__, ret);
 			goto end;
 		}
 	} else {
-		ret = -EINVAL;
 		pr_err("%s: invalid use case, err:%d\n",
 			__func__, ret);
-		goto end;
 	}
-
-	rate = params_rate(params);
-	clk_freq = rate * slot_width * slots;
-	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, clk_freq, SND_SOC_CLOCK_OUT);
-	if (ret < 0)
-		pr_err("%s: failed to set tdm clk, err:%d\n",
-			__func__, ret);
 
 end:
 	return ret;
@@ -4574,7 +4540,7 @@ static int sdm845_tdm_snd_startup(struct snd_pcm_substream *substream)
 
 	ret = msm_set_pinctrl(pinctrl_info, STATE_TDM_ACTIVE);
 	if (ret)
-		pr_err("%s: TDM TLMM pinctrl set failed with %d\n",
+		pr_err("%s: MI2S TLMM pinctrl set failed with %d\n",
 			__func__, ret);
 
 	return ret;
@@ -4590,7 +4556,7 @@ static void sdm845_tdm_snd_shutdown(struct snd_pcm_substream *substream)
 
 	ret = msm_set_pinctrl(pinctrl_info, STATE_DISABLE);
 	if (ret)
-		pr_err("%s: TDM TLMM pinctrl set failed with %d\n",
+		pr_err("%s: MI2S TLMM pinctrl set failed with %d\n",
 			__func__, ret);
 
 }
@@ -4604,23 +4570,6 @@ static struct snd_soc_ops sdm845_tdm_be_ops = {
 static int msm_mi2s_snd_init(struct snd_soc_pcm_runtime *rtd)
 {
 	int ret = 0;
-
-#if defined (CONFIG_SND_SOC_CS35L36)
-	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-	struct snd_soc_codec *codec = codec_dai->codec;
-	struct snd_soc_dai **codec_dais = rtd->codec_dais;
-	int i;
-
-	for (i = 0; i < rtd->num_codecs; i++) {
-		codec = codec_dais[i]->codec;
-		ret = snd_soc_dai_set_sysclk(codec_dais[i], 0,
-						Q6AFE_LPASS_IBIT_CLK_3_P072_MHZ,
-						SND_SOC_CLOCK_IN);
-		if (ret < 0)
-			pr_err("%s: set dai_sysclk failed, err:%d\n",
-				__func__, ret);
-	}
-#endif
 
 	return ret;
 }
@@ -4637,7 +4586,7 @@ static int msm_mi2s_snd_startup(struct snd_pcm_substream *substream)
 	struct msm_pinctrl_info *pinctrl_info = &pdata->pinctrl_info;
 	int ret_pinctrl = 0;
 
-#if IS_ENABLED(CONFIG_SND_SOC_CS35L36)
+#if IS_ENABLED(CONFIG_SND_SOC_MAX98927)
 	int i;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	struct snd_soc_codec *codec = codec_dai->codec;
@@ -4700,21 +4649,16 @@ static int msm_mi2s_snd_startup(struct snd_pcm_substream *substream)
 			goto clk_off;
 		}
 
-#if IS_ENABLED(CONFIG_SND_SOC_CS35L36)
+#if IS_ENABLED(CONFIG_SND_SOC_MAX98927)
 		for (i = 0; i < rtd->num_codecs; i++) {
 			codec = codec_dais[i]->codec;
-			ret = snd_soc_dai_set_fmt(codec_dais[i], SND_SOC_DAIFMT_CBS_CFS |
-							SND_SOC_DAIFMT_I2S);
+			ret = snd_soc_dai_set_fmt(codec_dais[i],
+						  SND_SOC_DAIFMT_CBS_CFS |
+						  SND_SOC_DAIFMT_I2S);
 			if (ret < 0)
 				pr_err("%s: set fmt failed, err:%d\n",
 					__func__, ret);
 
-			ret = snd_soc_codec_set_sysclk(codec, 0, 0,
-							Q6AFE_LPASS_IBIT_CLK_3_P072_MHZ,
-							SND_SOC_CLOCK_IN);
-			if (ret < 0)
-				pr_err("%s: set sysclk failed, err:%d\n",
-					__func__, ret);
 		}
 #endif
 
@@ -5818,7 +5762,7 @@ static struct snd_soc_dai_link msm_common_be_dai_links[] = {
 		.dpcm_capture = 1,
 		.id = MSM_BACKEND_DAI_QUAT_TDM_TX_0,
 		.be_hw_params_fixup = msm_be_hw_params_fixup,
-		.ops = &sdm845_tdm_be_ops,
+		.ops = &msm_tdm_be_ops,
 		.ignore_suspend = 1,
 	},
 };
@@ -6081,15 +6025,15 @@ static struct snd_soc_dai_link ext_disp_be_dai_link[] = {
 	},
 };
 
-#if IS_ENABLED(CONFIG_SND_SOC_CS35L36)
+#if IS_ENABLED(CONFIG_SND_SOC_MAX98927)
 static struct snd_soc_dai_link_component spk_codec[] = {
 	{
-		.name = "cs35l36.4-0041",
-		.dai_name = "cs35l36-pcm",
+		.name = "max98927.4-003a",
+		.dai_name = "max98927-aif1",
 	},
 	{
-		.name = "cs35l36.4-0040",
-		.dai_name = "cs35l36-pcm",
+		.name = "max98927.4-0039",
+		.dai_name = "max98927-aif1",
 	},
 };
 #endif
@@ -6187,7 +6131,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.stream_name = "Quaternary MI2S Playback",
 		.cpu_dai_name = "msm-dai-q6-mi2s.3",
 		.platform_name = "msm-pcm-routing",
-#if IS_ENABLED(CONFIG_SND_SOC_CS35L36)
+#if IS_ENABLED(CONFIG_SND_SOC_MAX98927)
 		.codecs = spk_codec,
 		.num_codecs = ARRAY_SIZE(spk_codec),
 #else
@@ -6207,13 +6151,12 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.name = LPASS_BE_QUAT_MI2S_TX,
 		.stream_name = "Quaternary MI2S Capture",
 		.cpu_dai_name = "msm-dai-q6-mi2s.3",
-#if IS_ENABLED(CONFIG_SND_SOC_CS35L36)
-		.platform_name = "msm-pcm-dsp.0",
+#if IS_ENABLED(CONFIG_SND_SOC_MAX98927)
+		.platform_name = "msm-pcm-routing",
 		.codecs = spk_codec,
 		.num_codecs = ARRAY_SIZE(spk_codec),
 		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
 #else
-		.platform_name = "msm-pcm-routing",
 		.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-tx",
 #endif
@@ -6401,10 +6344,10 @@ err:
 	return ret;
 }
 
-#if IS_ENABLED(CONFIG_SND_SOC_CS35L36)
+#if IS_ENABLED(CONFIG_SND_SOC_MAX98927)
 static struct snd_soc_codec_conf spk_codec_right_ch_conf[] = {
 	{
-		.dev_name		= "cs35l36.4-0041",
+		.dev_name		= "max98927.4-003a",
 		.name_prefix	= "R",
 	}
 };
@@ -6413,7 +6356,7 @@ static struct snd_soc_codec_conf spk_codec_right_ch_conf[] = {
 static struct snd_soc_card snd_soc_card_tavil_msm = {
 	.name		= "sdm845-tavil-snd-card",
 	.late_probe	= msm_snd_card_tavil_late_probe,
-#if IS_ENABLED(CONFIG_SND_SOC_CS35L36)
+#if IS_ENABLED(CONFIG_SND_SOC_MAX98927)
 	.codec_conf		= spk_codec_right_ch_conf,
 	.num_configs	= ARRAY_SIZE(spk_codec_right_ch_conf),
 #endif
@@ -6649,7 +6592,7 @@ static struct snd_soc_card snd_soc_card_stub_msm = {
 };
 
 static const struct of_device_id sdm845_asoc_machine_of_match[]  = {
-	{ .compatible = "qcom,sdm845-asoc-snd-tavil",
+	{ .compatible = "qcom,sdm845-asoc-snd-tavil-max98927",
 	  .data = "tavil_codec"},
 	{ .compatible = "qcom,sdm845-asoc-snd-stub",
 	  .data = "stub_codec"},
