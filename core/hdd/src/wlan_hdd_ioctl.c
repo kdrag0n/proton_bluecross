@@ -311,7 +311,7 @@ static int hdd_parse_setrmcenable_command(uint8_t *pValue,
 	if ('\0' == *inPtr)
 		return 0;
 
-	v = sscanf(inPtr, "%32s ", buf);
+	v = sscanf(inPtr, "%31s ", buf);
 	if (1 != v)
 		return -EINVAL;
 
@@ -349,7 +349,7 @@ static int hdd_parse_setrmcactionperiod_command(uint8_t *pValue,
 	if ('\0' == *inPtr)
 		return 0;
 
-	v = sscanf(inPtr, "%32s ", buf);
+	v = sscanf(inPtr, "%31s ", buf);
 	if (1 != v)
 		return -EINVAL;
 
@@ -3348,7 +3348,7 @@ static int drv_cmd_set_roam_mode(hdd_adapter_t *adapter,
 	value = value + SIZE_OF_SETROAMMODE + 1;
 
 	/* Convert the value from ascii to integer */
-	ret = kstrtou8(value, SIZE_OF_SETROAMMODE, &roamMode);
+	ret = kstrtou8(value, 10, &roamMode);
 	if (ret < 0) {
 		/*
 		 * If the input value is greater than max value of datatype,

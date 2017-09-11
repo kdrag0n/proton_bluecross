@@ -508,8 +508,6 @@ QDF_STATUS cds_open(void)
 		goto err_sme_close;
 	}
 
-	hdd_lro_create();
-
 	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
 		  "%s: CDS successfully Opened", __func__);
 
@@ -1859,12 +1857,51 @@ static void cds_trigger_recovery_work(void *param)
 }
 
 /**
+ * cds_get_recovery_reason() - get self recovery reason
+ * @reason: recovery reason
+ *
+ * Return: None
+ */
+void cds_get_recovery_reason(enum cds_hang_reason *reason)
+{
+	if (!gp_cds_context) {
+		cds_err("gp_cds_context is null");
+		return;
+	}
+
+	*reason = gp_cds_context->recovery_reason;
+}
+
+/**
+ * cds_reset_recovery_reason() - reset the reason to unspecified
+ *
+ * Return: None
+ */
+void cds_reset_recovery_reason(void)
+{
+	if (!gp_cds_context) {
+		cds_err("gp_cds_context is null");
+		return;
+	}
+
+	gp_cds_context->recovery_reason = CDS_REASON_UNSPECIFIED;
+}
+
+/**
  * cds_trigger_recovery() - trigger self recovery
+ * @reason: recovery reason
  *
  * Return: none
  */
-void cds_trigger_recovery(void)
+void cds_trigger_recovery(enum cds_hang_reason reason)
 {
+	if (!gp_cds_context) {
+		cds_err("gp_cds_context is null");
+		return;
+	}
+
+	gp_cds_context->recovery_reason = reason;
+
 	if (in_atomic()) {
 		qdf_queue_work(0, gp_cds_context->cds_recovery_wq,
 				&gp_cds_context->cds_recovery_work);

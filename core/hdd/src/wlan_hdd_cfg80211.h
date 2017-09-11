@@ -149,7 +149,7 @@ typedef struct {
 #define WLAN_IS_TDLS_SETUP_ACTION(action) \
 	((SIR_MAC_TDLS_SETUP_REQ <= action) && \
 	(SIR_MAC_TDLS_SETUP_CNF >= action))
-#if !defined (TDLS_MGMT_VERSION2)
+#if !defined(TDLS_MGMT_VERSION2)
 #define TDLS_MGMT_VERSION2 0
 #endif
 
@@ -398,6 +398,14 @@ int wlan_hdd_send_avoid_freq_event(hdd_context_t *pHddCtx,
 				tHddAvoidFreqList * pAvoidFreqList);
 #endif /* FEATURE_WLAN_CH_AVOID || FEATURE_WLAN_FORCE_SAP_SCC */
 
+/**
+ * wlan_hdd_send_hang_reason_event() - Send hang reason to the userspace
+ * @hdd_ctx: Pointer to hdd context
+ * @reason: cds recovery reason
+ *
+ * Return: 0 on success or failure reason
+ */
+int wlan_hdd_send_hang_reason_event(hdd_context_t *pHddCtx, uint32_t reason);
 #ifdef FEATURE_WLAN_EXTSCAN
 void wlan_hdd_cfg80211_extscan_callback(void *ctx,
 					const uint16_t evType, void *pMsg);
@@ -453,7 +461,7 @@ static inline int wlan_hdd_send_roam_auth_event(hdd_adapter_t *adapter,
 
 int wlan_hdd_cfg80211_update_apies(hdd_adapter_t *adapter);
 
-#if !(defined (SUPPORT_WDEV_CFG80211_VENDOR_EVENT_ALLOC)) &&	\
+#if !(defined(SUPPORT_WDEV_CFG80211_VENDOR_EVENT_ALLOC)) &&	\
 	(LINUX_VERSION_CODE < KERNEL_VERSION(4, 1, 0)) &&	\
 	!(defined(WITH_BACKPORTS))
 
@@ -500,7 +508,8 @@ int wlan_hdd_disable_dfs_chan_scan(hdd_context_t *hdd_ctx,
 int wlan_hdd_cfg80211_update_band(struct wiphy *wiphy,
 				  eCsrBand eBand);
 
-void hdd_get_bpf_offload_cb(void *hdd_context, struct sir_bpf_get_offload *);
+void hdd_get_bpf_offload_cb(void *hdd_context,
+			    struct sir_bpf_get_offload *data);
 void hdd_init_bpf_completion(void);
 
 #if defined(CFG80211_DISCONNECTED_V2) || \

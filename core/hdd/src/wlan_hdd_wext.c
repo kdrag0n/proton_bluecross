@@ -3630,6 +3630,7 @@ QDF_STATUS wlan_hdd_get_rssi(hdd_adapter_t *pAdapter, int8_t *rssi_value)
 	spin_unlock(&hdd_context_lock);
 
 	*rssi_value = pAdapter->rssi;
+	hdd_debug("RSSI = %d", *rssi_value);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4161,7 +4162,7 @@ uint8_t *wlan_hdd_get_vendor_oui_ie_ptr(uint8_t *oui, uint8_t oui_size,
 				eid, elem_len, left);
 			return NULL;
 		}
-		if ((elem_id == eid) && (elem_len >= oui_size)){
+		if ((elem_id == eid) && (elem_len >= oui_size)) {
 			if (memcmp(&ptr[2], oui, oui_size) == 0)
 				return ptr;
 		}
@@ -9158,8 +9159,8 @@ static int __iw_setnone_getint(struct net_device *dev,
 	{
 		sme_get_config_param(hHal, sme_config);
 		*value = (sme_config->csrConfig.enable2x2 == 0) ? 1 : 2;
-		 if (wma_is_current_hwmode_dbs())
-			 *value = *value-1;
+		if (wma_is_current_hwmode_dbs())
+			*value = *value - 1;
 		hdd_debug("GET_NSS: Current NSS:%d", *value);
 		break;
 	}
@@ -12462,16 +12463,8 @@ static int iw_set_band_config(struct net_device *dev,
 	return ret;
 }
 
-/**
- * wlan_hdd_set_mon_chan() - Set capture channel on the monitor mode interface.
- * @adapter: Handle to adapter
- * @chan: Monitor mode channel
- * @bandwidth: Capture channel bandwidth
- *
- * Return: 0 on success else error code.
- */
-static int wlan_hdd_set_mon_chan(hdd_adapter_t *adapter, uint32_t chan,
-				 uint32_t bandwidth)
+int wlan_hdd_set_mon_chan(hdd_adapter_t *adapter, uint32_t chan,
+			  uint32_t bandwidth)
 {
 	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	hdd_station_ctx_t *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
@@ -12510,6 +12503,9 @@ static int wlan_hdd_set_mon_chan(hdd_adapter_t *adapter, uint32_t chan,
 		hdd_err("Status: %d Failed to set sme_roam Channel for monitor mode",
 			status);
 	}
+
+	adapter->mon_chan = chan;
+	adapter->mon_bandwidth = bandwidth;
 
 	return qdf_status_to_os_return(status);
 }

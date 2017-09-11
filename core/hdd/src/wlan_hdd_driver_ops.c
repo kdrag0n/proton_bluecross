@@ -401,8 +401,7 @@ err_hdd_deinit:
 	if (reinit) {
 		cds_set_driver_in_bad_state(true);
 		cds_set_recovery_in_progress(false);
-	}
-	else
+	} else
 		cds_set_load_in_progress(false);
 
 	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT);
@@ -477,6 +476,24 @@ static inline void hdd_wlan_ssr_shutdown_event(void)
 #endif
 
 /**
+ * hdd_send_hang_reason() - Send hang reason to the userspace
+ *
+ * Return: None
+ */
+static void hdd_send_hang_reason(void)
+{
+	uint32_t reason = 0;
+	hdd_context_t *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return;
+
+	cds_get_recovery_reason(&reason);
+	cds_reset_recovery_reason();
+	wlan_hdd_send_hang_reason_event(hdd_ctx, reason);
+}
+
+/**
  * wlan_hdd_shutdown() - wlan_hdd_shutdown
  *
  * This is routine is called by platform driver to shutdown the
@@ -507,6 +524,7 @@ static void wlan_hdd_shutdown(void)
 	/* this is for cases, where shutdown invoked from platform */
 	cds_set_recovery_in_progress(true);
 	hdd_wlan_ssr_shutdown_event();
+	hdd_send_hang_reason();
 
 	if (!cds_wait_for_external_threads_completion(__func__))
 		hdd_err("Host is not ready for SSR, attempting anyway");
@@ -1234,6 +1252,7 @@ static void wlan_hdd_pld_uevent(struct device *dev,
 	switch (uevent->uevent) {
 	case PLD_RECOVERY:
 		cds_set_recovery_in_progress(true);
+		hdd_pld_ipa_uc_shutdown_pipes();
 		break;
 	case PLD_FW_DOWN:
 		cds_set_fw_state(CDS_FW_STATE_DOWN);

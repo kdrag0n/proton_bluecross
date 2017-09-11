@@ -58,6 +58,8 @@
 #include "pld_common.h"
 #include "wlan_hdd_power.h"
 #include <wlan_hdd_tsf.h>
+#include <net/tcp.h>
+#include "wma_api.h"
 
 #ifdef QCA_LL_TX_FLOW_CONTROL_V2
 /*
@@ -164,6 +166,18 @@ static inline struct sk_buff *hdd_skb_orphan(hdd_adapter_t *pAdapter,
 	return skb;
 }
 
+bool hdd_tx_flow_control_is_pause(void *adapter_context)
+{
+	hdd_adapter_t *pAdapter = (hdd_adapter_t *) adapter_context;
+
+	if ((NULL == pAdapter) || (WLAN_HDD_ADAPTER_MAGIC != pAdapter->magic)) {
+		/* INVALID ARG */
+		hdd_err("invalid adapter %p", pAdapter);
+		return false;
+	}
+
+	return pAdapter->pause_map & (1 << WLAN_DATA_FLOW_CONTROL);
+}
 /**
  * hdd_tx_resume_cb() - Resume OS TX Q.
  * @adapter_context: pointer to vdev apdapter
@@ -200,17 +214,10 @@ void hdd_tx_resume_cb(void *adapter_context, bool tx_resume)
 	hdd_tx_resume_false(pAdapter, tx_resume);
 }
 
-/**
- * hdd_register_tx_flow_control() - Register TX Flow control
- * @adapter: adapter handle
- * @timer_callback: timer callback
- * @flow_control_fp: txrx flow control
- *
- * Return: none
- */
 void hdd_register_tx_flow_control(hdd_adapter_t *adapter,
 		qdf_mc_timer_callback_t timer_callback,
-		ol_txrx_tx_flow_control_fp flow_control_fp)
+		ol_txrx_tx_flow_control_fp flow_control_fp,
+		ol_txrx_tx_flow_control_is_pause_fp flow_control_is_pause_fp)
 {
 	if (adapter->tx_flow_timer_initialized == false) {
 		qdf_mc_timer_init(&adapter->tx_flow_control_timer,
@@ -221,7 +228,8 @@ void hdd_register_tx_flow_control(hdd_adapter_t *adapter,
 	}
 	ol_txrx_register_tx_flow_control(adapter->sessionId,
 					flow_control_fp,
-					adapter);
+					adapter,
+					flow_control_is_pause_fp);
 }
 
 /**
@@ -286,6 +294,8 @@ static inline struct sk_buff *hdd_skb_orphan(hdd_adapter_t *pAdapter,
 
 	struct sk_buff *nskb;
 	hdd_context_t *hdd_ctx = pAdapter->pHddCtx;
+
+	hdd_skb_fill_gso_size(pAdapter->dev, skb);
 
 	nskb = skb_unshare(skb, GFP_ATOMIC);
 	if (unlikely(hdd_ctx->config->tx_orphan_enable) && (nskb == skb)) {
@@ -498,6 +508,7 @@ static int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	wlan_hdd_latency_opt(pAdapter, skb);
 
 	++pAdapter->hdd_stats.hddTxRxStats.txXmitCalled;
+	pAdapter->hdd_stats.hddTxRxStats.cont_txtimeout_cnt = 0;
 
 	if (QDF_NBUF_CB_GET_PACKET_TYPE(skb) == QDF_NBUF_CB_PACKET_TYPE_ARP) {
 		is_arp = true;
@@ -795,28 +806,6 @@ QDF_STATUS hdd_get_peer_sta_id(hdd_station_ctx_t *pHddStaCtx,
 	return QDF_STATUS_E_FAILURE;
 }
 
-#ifdef FEATURE_WLAN_DIAG_SUPPORT
-/**
- * hdd_wlan_datastall_sta_event()- send sta datastall information
- *
- * This Function send send sta datastall status diag event
- *
- * Return: void.
- */
-static void hdd_wlan_datastall_sta_event(void)
-{
-	WLAN_HOST_DIAG_EVENT_DEF(sta_data_stall,
-				struct host_event_wlan_datastall);
-	qdf_mem_zero(&sta_data_stall, sizeof(sta_data_stall));
-	sta_data_stall.reason = STA_TX_TIMEOUT;
-	WLAN_HOST_DIAG_EVENT_REPORT(&sta_data_stall, EVENT_WLAN_STA_DATASTALL);
-}
-#else
-static inline void hdd_wlan_datastall_sta_event(void)
-{
-}
-#endif
-
 /**
  * __hdd_tx_timeout() - TX timeout handler
  * @dev: pointer to network device
@@ -832,6 +821,7 @@ static void __hdd_tx_timeout(struct net_device *dev)
 	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	hdd_context_t *hdd_ctx;
 	struct netdev_queue *txq;
+	u64 diff_jiffies;
 	int i = 0;
 
 	TX_TIMEOUT_TRACE(dev, QDF_MODULE_ID_HDD_DATA);
@@ -852,12 +842,50 @@ static void __hdd_tx_timeout(struct net_device *dev)
 			   i, netif_tx_queue_stopped(txq), txq->trans_start);
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO,
+	QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_DEBUG,
 		  "carrier state: %d", netif_carrier_ok(dev));
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	wlan_hdd_display_netif_queue_history(hdd_ctx);
 	ol_tx_dump_flow_pool_info();
-	hdd_wlan_datastall_sta_event();
+
+	++adapter->hdd_stats.hddTxRxStats.tx_timeout_cnt;
+	++adapter->hdd_stats.hddTxRxStats.cont_txtimeout_cnt;
+
+	diff_jiffies = jiffies -
+		       adapter->hdd_stats.hddTxRxStats.jiffies_last_txtimeout;
+
+	if ((adapter->hdd_stats.hddTxRxStats.cont_txtimeout_cnt > 1) &&
+	    (diff_jiffies > (HDD_TX_TIMEOUT * 2))) {
+		/*
+		 * In case when there is no traffic is running, it may
+		 * possible tx time-out may once happen and later system
+		 * recovered then continuous tx timeout count has to be
+		 * reset as it is gets modified only when traffic is running.
+		 * If over a period of time if this count reaches to threshold
+		 * then host triggers a false subsystem restart. In genuine
+		 * time out case kernel will call the tx time-out back to back
+		 * at interval of HDD_TX_TIMEOUT. Here now check if previous
+		 * TX TIME out has occurred more than twice of HDD_TX_TIMEOUT
+		 * back then host may recovered here from data stall.
+		 */
+		adapter->hdd_stats.hddTxRxStats.cont_txtimeout_cnt = 0;
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_DEBUG,
+			  "Reset continous tx timeout stat");
+	}
+
+	adapter->hdd_stats.hddTxRxStats.jiffies_last_txtimeout = jiffies;
+
+	if (adapter->hdd_stats.hddTxRxStats.cont_txtimeout_cnt >
+	    HDD_TX_STALL_THRESHOLD) {
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
+			  "Data stall due to continuous TX timeouts");
+		adapter->hdd_stats.hddTxRxStats.cont_txtimeout_cnt = 0;
+		ol_txrx_post_data_stall_event(
+					DATA_STALL_LOG_INDICATOR_HOST_DRIVER,
+					DATA_STALL_LOG_HOST_STA_TX_TIMEOUT,
+					0xFF, 0xFF,
+					DATA_STALL_LOG_RECOVERY_TRIGGER_PDR);
+	}
 }
 
 /**
@@ -1158,6 +1186,212 @@ static bool hdd_is_rx_wake_lock_needed(struct sk_buff *skb)
 }
 
 /**
+ * hdd_resolve_rx_ol_mode() - Resolve Rx offload method, LRO or GRO
+ * @hdd_ctx: pointer to HDD Station Context
+ *
+ * Return: None
+ */
+static inline void hdd_resolve_rx_ol_mode(hdd_context_t *hdd_ctx)
+{
+	if (!(hdd_ctx->config->lro_enable ^
+	    hdd_ctx->config->gro_enable)) {
+		hdd_ctx->config->lro_enable && hdd_ctx->config->gro_enable ?
+		hdd_err("Can't enable both LRO and GRO, disabling Rx offload") :
+		hdd_debug("LRO and GRO both are disabled");
+		hdd_ctx->ol_enable = 0;
+	} else if (hdd_ctx->config->lro_enable) {
+		hdd_debug("Rx offload LRO is enabled");
+		hdd_ctx->ol_enable = CFG_LRO_ENABLED;
+	} else {
+		hdd_debug("Rx offload GRO is enabled");
+		hdd_ctx->ol_enable = CFG_GRO_ENABLED;
+	}
+}
+
+#ifdef HELIUMPLUS
+/**
+ * hdd_gro_rx() - Handle Rx procesing via GRO
+ * @pAdapter: pointer to adapter context
+ * @skb: pointer to sk_buff
+ *
+ * Return: QDF_STATUS_SUCCESS if processed via GRO or non zero return code
+ */
+static inline QDF_STATUS hdd_gro_rx(hdd_adapter_t *adapter,
+					       struct sk_buff *skb)
+{
+	struct napi_struct *napi;
+	void *napid;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	/* Only enabling it for STA mode like LRO today */
+	if (QDF_STA_MODE != adapter->device_mode)
+		return QDF_STATUS_E_NOSUPPORT;
+
+	napid = hdd_napi_get_all();
+	if (unlikely(napid == NULL))
+		goto out;
+
+	napi = hif_get_napi(QDF_NBUF_CB_RX_CTX_ID(skb), napid);
+	if (unlikely(napi == NULL))
+		goto out;
+
+	skb_set_hash(skb, QDF_NBUF_CB_RX_FLOW_ID_TOEPLITZ(skb),
+			PKT_HASH_TYPE_L4);
+
+	if (GRO_DROP != napi_gro_receive(napi, skb))
+		status = QDF_STATUS_SUCCESS;
+
+out:
+	return status;
+}
+
+/**
+ * hdd_register_rx_ol() - Allocate LRO managers via callbacks
+ *
+ * Return: none
+ */
+static inline void hdd_register_rx_ol(void)
+{
+	hdd_context_t *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if  (!hdd_ctx)
+		hdd_err("HDD context is NULL");
+
+	if (hdd_ctx->ol_enable == CFG_LRO_ENABLED) {
+		/* Register the flush callback */
+		hdd_lro_create();
+		hdd_ctx->receive_offload_cb = hdd_lro_rx;
+		hdd_debug("LRO is enabled");
+	} else if (hdd_ctx->ol_enable == CFG_GRO_ENABLED) {
+		hdd_ctx->receive_offload_cb = hdd_gro_rx;
+		hdd_debug("GRO is enabled");
+	}
+}
+#else
+static inline void hdd_register_rx_ol(void) { }
+#endif
+
+/**
+ * hdd_rx_ol_init() - Initialize Rx mode(LRO or GRO) method
+ * @hdd_ctx: pointer to HDD Station Context
+ *
+ * Return: 0 on success and non zero on failure.
+ */
+int hdd_rx_ol_init(hdd_context_t *hdd_ctx)
+{
+	struct wma_lro_config_cmd_t lro_config = {0};
+
+	hdd_resolve_rx_ol_mode(hdd_ctx);
+
+	hdd_register_rx_ol();
+
+	/*
+	 * This will enable flow steering and Toeplitz hash
+	 * So enable it for LRO or GRO processing.
+	 */
+	if (hdd_napi_enabled(HDD_NAPI_ANY) == 0) {
+		hdd_warn("NAPI is disabled");
+		return 0;
+	}
+
+	lro_config.lro_enable = 1;
+	lro_config.tcp_flag = TCPHDR_ACK;
+	lro_config.tcp_flag_mask = TCPHDR_FIN | TCPHDR_SYN | TCPHDR_RST |
+		TCPHDR_ACK | TCPHDR_URG | TCPHDR_ECE | TCPHDR_CWR;
+
+	get_random_bytes(lro_config.toeplitz_hash_ipv4,
+		 (sizeof(lro_config.toeplitz_hash_ipv4[0]) *
+		 LRO_IPV4_SEED_ARR_SZ));
+
+	get_random_bytes(lro_config.toeplitz_hash_ipv6,
+		 (sizeof(lro_config.toeplitz_hash_ipv6[0]) *
+		 LRO_IPV6_SEED_ARR_SZ));
+
+	if (0 != wma_lro_init(&lro_config)) {
+		hdd_err("Failed to send LRO configuration!");
+		hdd_ctx->ol_enable = 0;
+		return -EAGAIN;
+	}
+
+	return 0;
+}
+
+/**
+ * hdd_enable_rx_ol_in_concurrency() - Enable Rx offload
+ * @hdd_ctx: hdd context
+ *
+ * Enable Rx offload if for inactive concurrency is not active
+ *
+ * Return: none
+ */
+void hdd_enable_rx_ol_in_concurrency(hdd_context_t *hdd_ctx)
+{
+	if (hdd_ctx->config->enable_tcp_delack) {
+		hdd_debug("Disable TCP delack as Rx Offload is enabled");
+		hdd_ctx->config->enable_tcp_delack = 0;
+		hdd_reset_tcp_delack(hdd_ctx);
+	}
+	qdf_atomic_set(&hdd_ctx->disable_lro_in_concurrency, 0);
+}
+
+/**
+ * hdd_disable_rx_ol_in_concurrency() - Disable Rx offload due to concurrency
+ * @hdd_ctx: hdd context
+ *
+ * Return: none
+ */
+void hdd_disable_rx_ol_in_concurrency(hdd_context_t *hdd_ctx)
+{
+	if (!hdd_ctx->config->enable_tcp_delack) {
+		struct wlan_rx_tp_data rx_tp_data = {0};
+
+		hdd_debug("Enable TCP delack as Rx offload disabled in concurrency");
+		rx_tp_data.rx_tp_flags |= TCP_DEL_ACK_IND;
+		rx_tp_data.level = hdd_ctx->cur_rx_level;
+		wlan_hdd_send_svc_nlink_msg(hdd_ctx->radio_index,
+			WLAN_SVC_WLAN_TP_IND, &rx_tp_data, sizeof(rx_tp_data));
+		hdd_ctx->config->enable_tcp_delack = 1;
+	}
+	qdf_atomic_set(&hdd_ctx->disable_lro_in_concurrency, 1);
+}
+
+/**
+ * hdd_disable_rx_ol_for_low_tput() - Disable Rx offload in low TPUT scenario
+ * @hdd_ctx: hdd context
+ * @disable: 1 disable, 0 enable
+ *
+ * Return: none
+ */
+void hdd_disable_rx_ol_for_low_tput(hdd_context_t *hdd_ctx, bool disable)
+{
+	if (disable)
+		qdf_atomic_set(&hdd_ctx->disable_lro_in_low_tput, 1);
+	else
+		qdf_atomic_set(&hdd_ctx->disable_lro_in_low_tput, 0);
+}
+
+/**
+ * hdd_can_handle_receive_offload() - Check for dynamic disablement
+ * @hdd_ctx: hdd context
+ * @skb: pointer to sk_buff which will be processed by Rx OL
+ *
+ * Check for dynamic disablement of Rx offload
+ *
+ * Return: false if we cannot process otherwise true
+ */
+static inline bool hdd_can_handle_receive_offload(hdd_context_t *hdd_ctx,
+		struct sk_buff *skb)
+{
+	if (!QDF_NBUF_CB_RX_TCP_PROTO(skb) ||
+	    qdf_atomic_read(&hdd_ctx->disable_lro_in_concurrency) ||
+	    QDF_NBUF_CB_RX_PEER_CACHED_FRM(skb) ||
+	    qdf_atomic_read(&hdd_ctx->disable_lro_in_low_tput))
+		return false;
+	else
+		return true;
+}
+
+/**
  * hdd_rx_packet_cbk() - Receive packet handler
  * @context: pointer to HDD context
  * @rxBuf: pointer to rx qdf_nbuf
@@ -1173,7 +1407,8 @@ QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 {
 	hdd_adapter_t *pAdapter = NULL;
 	hdd_context_t *pHddCtx = NULL;
-	int rxstat;
+	int rxstat = 0;
+	QDF_STATUS rx_ol_status = QDF_STATUS_E_FAILURE;
 	struct sk_buff *skb = NULL;
 	hdd_station_ctx_t *pHddStaCtx = NULL;
 	unsigned int cpu_index;
@@ -1298,32 +1533,31 @@ QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 
 	hdd_rx_timestamp(skb, ktime_to_us(skb->tstamp));
 
-	if (HDD_LRO_NO_RX ==
-		 hdd_lro_rx(pHddCtx, pAdapter, skb)) {
+	if (hdd_can_handle_receive_offload(pHddCtx, skb) &&
+	    pHddCtx->receive_offload_cb)
+		rx_ol_status = pHddCtx->receive_offload_cb(pAdapter, skb);
+
+	if (rx_ol_status != QDF_STATUS_SUCCESS) {
 		if (hdd_napi_enabled(HDD_NAPI_ANY) &&
 		    !pHddCtx->enableRxThread &&
 		    !QDF_NBUF_CB_RX_PEER_CACHED_FRM(skb))
 			rxstat = netif_receive_skb(skb);
 		else
 			rxstat = netif_rx_ni(skb);
+	}
 
-		if (NET_RX_SUCCESS == rxstat) {
-			++pAdapter->hdd_stats.hddTxRxStats.
-				 rxDelivered[cpu_index];
-			if (track_arp)
-				++pAdapter->hdd_stats.hdd_arp_stats.
-						rx_delivered;
-		} else {
-			++pAdapter->hdd_stats.hddTxRxStats.
-				rxRefused[cpu_index];
-			if (track_arp)
-				++pAdapter->hdd_stats.hdd_arp_stats.
-						rx_refused;
-		}
-
-	} else {
+	if (!rxstat) {
 		++pAdapter->hdd_stats.hddTxRxStats.
 			 rxDelivered[cpu_index];
+		if (track_arp)
+			++pAdapter->hdd_stats.hdd_arp_stats.
+					rx_delivered;
+	} else {
+		++pAdapter->hdd_stats.hddTxRxStats.
+			rxRefused[cpu_index];
+		if (track_arp)
+			++pAdapter->hdd_stats.hdd_arp_stats.
+					rx_refused;
 	}
 
 	pAdapter->dev->last_rx = jiffies;
@@ -1641,10 +1875,6 @@ int hdd_set_mon_rx_cb(struct net_device *dev)
 	QDF_STATUS qdf_status;
 	struct ol_txrx_desc_type sta_desc = {0};
 	struct ol_txrx_ops txrx_ops;
-
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != ret)
-		return ret;
 
 	qdf_mem_zero(&txrx_ops, sizeof(txrx_ops));
 	txrx_ops.rx.rx = hdd_mon_rx_packet_cbk;

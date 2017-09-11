@@ -299,6 +299,30 @@ enum hdd_dot11_mode {
 
 /*
  * <ini>
+ * override_ht20_40_24g - use channel Bonding in 24 GHz from supplicant
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to use channel Bonding in 24 GHz from supplicant if
+ * gChannelBondingMode24GHz is set
+ *
+ * Related: gChannelBondingMode24GHz
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+
+#define CFG_OVERRIDE_HT40_20_24GHZ_NAME    "override_ht20_40_24g"
+#define CFG_OVERRIDE_HT40_20_24GHZ_MIN           0
+#define CFG_OVERRIDE_HT40_20_24GHZ_MAX           1
+#define CFG_OVERRIDE_HT40_20_24GHZ_DEFAULT       0
+
+/*
+ * <ini>
  * gChannelBondingMode5GHz - Configures Channel Bonding in 5 GHz
  * @Min: 0
  * @Max: 10
@@ -7165,6 +7189,34 @@ enum hdd_link_speed_rpt_type {
 #define CFG_IPA_LOW_BANDWIDTH_MBPS_DEFAULT       (100)
 
 /*
+ * <ini>
+ * gIPAMccTxDescSize - hdd_ipa_tx_desc pool size for MCC TX
+ * @Min: 512
+ * @Max: 4096
+ * @Default: 1024
+ *
+ * This ini is used to specify hdd_ipa_tx_desc pool size for MCC TX path.
+ * The pool is maintained to have a one-to-one mapping with desc from IPA
+ * driver so that when wlan TX completes, wlan driver could replenish the
+ * correct desc to IPA driver. Note that in MCC TX case, desc size is limited
+ * to global tx desc pool size. Therefore the real hdd_ipa_tx_desc pool size
+ * is the minimum of this ini and global tx desc pool size.
+ *
+ *
+ * Related: STA/SAP
+ *
+ * Supported Feature: IPA offload
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_IPA_MCC_TX_DESC_SIZE                 "gIPAMccTxDescSize"
+#define CFG_IPA_MCC_TX_DESC_SIZE_MIN             (512)
+#define CFG_IPA_MCC_TX_DESC_SIZE_MAX             (4096)
+#define CFG_IPA_MCC_TX_DESC_SIZE_DEFAULT         (1024)
+
+/*
  * Firmware uart print
  */
 #define CFG_ENABLE_FW_UART_PRINT_NAME             "gEnablefwprint"
@@ -8360,15 +8412,15 @@ enum hdd_link_speed_rpt_type {
 
 /*
  * <ini>
- * LROEnable - Control to enable lro feature
+ * LROEnable - Control to enable LRO
  *
- * @Min: 0
+ * @Min: 0 Disable LRO
  * @Max: 1
  * @Default: 0
  *
- * This ini is used to enable LRO feature
- *
- * Supported Feature: LRO
+ * This ini is used to enable/disable LRO
+ * If this is enabled make sure to disable GRO.
+ * LRO and GRO are mutually exclusive.
  *
  * Usage: Internal
  *
@@ -8378,6 +8430,27 @@ enum hdd_link_speed_rpt_type {
 #define CFG_LRO_ENABLED_MIN            (0)
 #define CFG_LRO_ENABLED_MAX            (1)
 #define CFG_LRO_ENABLED_DEFAULT        (0)
+
+/*
+ * <ini>
+ * GROEnable - Control to enable GRO
+ *
+ * @Min: 0 Disable GRO
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable GRO
+ * If this is enabled make sure to disable LRO.
+ * LRO and GRO are mutually exclusive.
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_GRO_ENABLED_NAME           "GROEnable"
+#define CFG_GRO_ENABLED_MIN            (0)
+#define CFG_GRO_ENABLED_MAX            (1)
+#define CFG_GRO_ENABLED_DEFAULT        (0)
 
 /*
  * Enable Rx traffic flow steering to enable Rx interrupts on multiple CEs based
@@ -11861,6 +11934,190 @@ enum hw_filter_mode {
 #define CFG_ENABLE_11D_IN_WORLD_MODE_MAX     (1)
 #define CFG_ENABLE_11D_IN_WORLD_MODE_DEFAULT (0)
 
+/*
+ * <ini>
+ * rssi_weightage - Rssi Weightage to calculate best candidate
+ * @Min: 0
+ * @Max: 100
+ * @Default: 25
+ *
+ * This ini is used to increase/decrease rssi weightage in best candidate
+ * selection. AP with better RSSI will get more weightage.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_RSSI_WEIGHTAGE_NAME    "rssi_weightage"
+#define CFG_RSSI_WEIGHTAGE_DEFAULT (25)
+#define CFG_RSSI_WEIGHTAGE_MIN     (0)
+#define CFG_RSSI_WEIGHTAGE_MAX     (100)
+/*
+ * <ini>
+ * ht_caps_weightage - HT caps weightage to calculate best candidate
+ * @Min: 0
+ * @Max: 100
+ * @Default: 7
+ *
+ * This ini is used to increase/decrease HT caps weightage in best candidate
+ * selection. If AP supports HT caps, AP will get additional Weightage with
+ * this param.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_HT_CAPABILITY_WEIGHTAGE_NAME   "ht_caps_weightage"
+#define CFG_HT_CAPABILITY_WEIGHTAGE_DEFAULT (7)
+#define CFG_HT_CAPABILITY_WEIGHTAGE_MIN     (0)
+#define CFG_HT_CAPABILITY_WEIGHTAGE_MAX     (100)
+/*
+ * <ini>
+ * vht_caps_weightage - VHT caps Weightage to calculate best candidate
+ * @Min: 0
+ * @Max: 100
+ * @Default: 5
+ *
+ * This ini is used to increase/decrease VHT caps weightage in best candidate
+ * selection. If AP supports VHT caps, AP will get additional weightage with
+ * this param.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_VHT_CAPABILITY_WEIGHTAGE_NAME    "vht_caps_weightage"
+#define CFG_VHT_CAPABILITY_WEIGHTAGE_DEFAULT (5)
+#define CFG_VHT_CAPABILITY_WEIGHTAGE_MIN     (0)
+#define CFG_VHT_CAPABILITY_WEIGHTAGE_MAX     (100)
+/*
+ * <ini>
+ * chan_width_weightage - Channel Width Weightage to calculate best candidate
+ * @Min: 0
+ * @Max: 100
+ * @Default: 10
+ *
+ * This ini is used to increase/decrease Channel Width weightage in best
+ * candidate selection. AP with Higher channel width will get higher weightage.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_CHAN_WIDTH_WEIGHTAGE_NAME    "chan_width_weightage"
+#define CFG_CHAN_WIDTH_WEIGHTAGE_DEFAULT (10)
+#define CFG_CHAN_WIDTH_WEIGHTAGE_MIN     (0)
+#define CFG_CHAN_WIDTH_WEIGHTAGE_MAX     (100)
+/*
+ * <ini>
+ * chan_band_weightage - Channel Band perferance to 5GHZ to
+ * calculate best candidate
+ * @Min: 0
+ * @Max: 100
+ * @Default: 5
+ *
+ * This ini is used to increase/decrease Channel Band Perferance weightage
+ * in best candidate selection. 5GHZ AP get this additional boost compare
+ * to 2GHZ AP.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_CHAN_BAND_WEIGHTAGE_NAME    "chan_band_weightage"
+#define CFG_CHAN_BAND_WEIGHTAGE_DEFAULT (5)
+#define CFG_CHAN_BAND_WEIGHTAGE_MIN     (0)
+#define CFG_CHAN_BAND_WEIGHTAGE_MAX     (100)
+/*
+ * <ini>
+ * nss_weightage - NSS Weightage to calculate best candidate
+ * @Min: 0
+ * @Max: 100
+ * @Default: 5
+ *
+ * This ini is used to increase/decrease NSS weightage in best candidate
+ * selection. If there are two AP, one AP supports 2x2 and another one
+ * supports 1x1 and station supports 2X2, first A will get this additional
+ * weightage.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_NSS_WEIGHTAGE_NAME    "nss_weightage"
+#define CFG_NSS_WEIGHTAGE_DEFAULT (5)
+#define CFG_NSS_WEIGHTAGE_MIN     (0)
+#define CFG_NSS_WEIGHTAGE_MAX     (100)
+/*
+ * <ini>
+ * beamforming_cap_weightage - Beam Forming Weightage to
+ *                             calculate best candidate
+ * @Min: 0
+ * @Max: 100
+ * @Default: 2
+ *
+ * This ini is used to increase/decrease Beam forming Weightage if
+ * some AP support Beam forming or not. If AP suppoets Beam forming,
+ * that AP will get additional boost of this weightage
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_BEAMFORMING_CAP_WEIGHTAGE_NAME "beamforming_cap_weightage"
+#define CFG_BEAMFORMING_CAP_WEIGHTAGE_DEFAULT (2)
+#define CFG_BEAMFORMING_CAP_WEIGHTAGE_MIN     (0)
+#define CFG_BEAMFORMING_CAP_WEIGHTAGE_MAX     (100)
+/*
+ * <ini>
+ * pcl_weightage - PCL Weightage to calculate best candidate
+ * @Min: 0
+ * @Max: 100
+ * @Default: 10
+ *
+ * This ini is used to increase/decrease PCL weightage in best candidate
+ * selection. If some APs are in PCL list, those AP will get addition
+ * weightage.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_PCL_WEIGHT_WEIGHTAGE_NAME "pcl_weightage"
+#define CFG_PCL_WEIGHT_DEFAULT        (10)
+#define CFG_PCL_WEIGHT_MIN            (0)
+#define CFG_PCL_WEIGHT_MAX            (100)
+/*
+ * <ini>
+ * channel_congestion_weightage - channel Congestion Weightage to
+ * calculate best candidate
+ * @Min: 0
+ * @Max: 100
+ * @Default: 5
+ *
+ * This ini is used to increase/decrease channel congestion weightage
+ * in candidate selection. Congestion is mesaured with the help of ESP/QBSS.
+ * selection.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_CHANNEL_CONGESTION_WEIGHTAGE_NAME "channel_congestion_weightage"
+#define CFG_CHANNEL_CONGESTION_WEIGHTAGE_DEFAULT (5)
+#define CFG_CHANNEL_CONGESTION_WEIGHTAGE_MIN     (0)
+#define CFG_CHANNEL_CONGESTION_WEIGHTAGE_MAX     (100)
+
+
 /*---------------------------------------------------------------------------
    Type declarations
    -------------------------------------------------------------------------*/
@@ -11890,6 +12147,7 @@ struct hdd_config {
 	uint32_t nBmpsMinListenInterval;
 	enum hdd_dot11_mode dot11Mode;
 	uint32_t nChannelBondingMode24GHz;
+	bool override_ht20_40_24g;
 	uint32_t nChannelBondingMode5GHz;
 	uint32_t MaxRxAmpduFactor;
 	uint16_t TxRate;
@@ -12275,6 +12533,7 @@ struct hdd_config {
 	uint32_t IpaHighBandwidthMbps;
 	uint32_t IpaMediumBandwidthMbps;
 	uint32_t IpaLowBandwidthMbps;
+	uint32_t IpaMccTxDescSize;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	uint32_t WlanMccToSccSwitchMode;
 #endif
@@ -12454,6 +12713,7 @@ struct hdd_config {
 	bool sendDeauthBeforeCon;
 	bool tso_enable;
 	bool lro_enable;
+	bool gro_enable;
 	bool flow_steering_enable;
 	bool active_mode_offload;
 	bool bpf_packet_filter_enable;
@@ -12671,6 +12931,16 @@ struct hdd_config {
 	bool oce_sap_enabled;
 	bool enable_11d_in_world_mode;
 	int8_t rssi_thresh_offset_5g;
+	bool is_fils_roaming_supported;
+	uint8_t rssi_weightage;
+	uint8_t ht_caps_weightage;
+	uint8_t vht_caps_weightage;
+	uint8_t chan_width_weightage;
+	uint8_t chan_band_weightage;
+	uint8_t nss_weightage;
+	uint8_t beamforming_cap_weightage;
+	uint8_t pcl_weightage;
+	uint8_t channel_congestion_weightage;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))

@@ -480,7 +480,7 @@ static int htt_rx_ring_fill_n(struct htt_pdev_t *pdev, int num)
 		if (!mem_map_table) {
 			qdf_print("%s: Failed to allocate memory for mem map table\n",
 				  __func__);
-			goto fail;
+			goto update_alloc_idx;
 		}
 		mem_info = mem_map_table;
 	}
@@ -588,11 +588,30 @@ moretofill:
 		filled++;
 		idx &= pdev->rx_ring.size_mask;
 	}
+
+	if (qdf_mem_smmu_s1_enabled(pdev->osdev) && pdev->is_ipa_uc_enabled) {
+		cds_smmu_map_unmap(true, num_alloc, mem_map_table);
+		qdf_mem_free(mem_map_table);
+	}
+
+	num_alloc = 0;
 	if (debt_served <  qdf_atomic_read(&pdev->rx_ring.refill_debt)) {
 		num = qdf_atomic_read(&pdev->rx_ring.refill_debt);
 		debt_served += num;
+		if (qdf_mem_smmu_s1_enabled(pdev->osdev) &&
+				pdev->is_ipa_uc_enabled) {
+			mem_map_table = qdf_mem_map_table_alloc(num);
+			if (!mem_map_table) {
+				qdf_print("%s: Failed to allocate memory for mem map table\n",
+					  __func__);
+				goto update_alloc_idx;
+			}
+			mem_info = mem_map_table;
+		}
 		goto moretofill;
 	}
+
+	goto update_alloc_idx;
 
 free_mem_map_table:
 	if (qdf_mem_smmu_s1_enabled(pdev->osdev) && pdev->is_ipa_uc_enabled) {
@@ -600,7 +619,7 @@ free_mem_map_table:
 		qdf_mem_free(mem_map_table);
 	}
 
-fail:
+update_alloc_idx:
 	/*
 	 * Make sure alloc index write is reflected correctly before FW polls
 	 * remote ring write index as compiler can reorder the instructions
@@ -1594,6 +1613,12 @@ htt_rx_offload_msdu_pop_ll(htt_pdev_handle pdev,
 	uint32_t *msdu_hdr, msdu_len;
 
 	*head_buf = *tail_buf = buf = htt_rx_netbuf_pop(pdev);
+
+	if (qdf_unlikely(NULL == buf)) {
+		qdf_print("%s: netbuf pop failed!\n", __func__);
+		return 1;
+	}
+
 	/* Fake read mpdu_desc to keep desc ptr in sync */
 	htt_rx_mpdu_desc_list_next(pdev, NULL);
 	qdf_nbuf_set_pktlen(buf, HTT_RX_BUF_SIZE);
@@ -1641,7 +1666,7 @@ htt_rx_offload_paddr_msdu_pop_ll(htt_pdev_handle pdev,
 
 	if (qdf_unlikely(NULL == buf)) {
 		qdf_print("%s: netbuf pop failed!\n", __func__);
-		return 0;
+		return 1;
 	}
 	qdf_nbuf_set_pktlen(buf, HTT_RX_BUF_SIZE);
 #ifdef DEBUG_DMA_DONE
@@ -3471,8 +3496,10 @@ qdf_nbuf_t htt_rx_hash_list_lookup(struct htt_pdev_t *pdev,
 
 	qdf_spin_lock_bh(&(pdev->rx_ring.rx_hash_lock));
 
-	if (!pdev->rx_ring.hash_table)
+	if (!pdev->rx_ring.hash_table) {
+		qdf_spin_unlock_bh(&(pdev->rx_ring.rx_hash_lock));
 		return NULL;
+	}
 
 	i = RX_HASH_FUNCTION(paddr);
 
@@ -3518,7 +3545,7 @@ qdf_nbuf_t htt_rx_hash_list_lookup(struct htt_pdev_t *pdev,
 		qdf_print("rx hash: %s: no entry found for %p!\n",
 			  __func__, (void *)paddr);
 		if (cds_is_self_recovery_enabled())
-			cds_trigger_recovery();
+			cds_trigger_recovery(CDS_RX_HASH_NO_ENTRY_FOUND);
 		else
 			HTT_ASSERT_ALWAYS(0);
 	}

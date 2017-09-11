@@ -1002,6 +1002,7 @@ typedef struct tagCsrRoamProfile {
 	tSirMacRateSet  supported_rates;
 	tSirMacRateSet  extended_rates;
 	struct qdf_mac_addr bssid_hint;
+	bool force_24ghz_in_ht20;
 	bool do_not_roam;
 #ifdef WLAN_FEATURE_FILS_SK
 	bool fils_connection;
@@ -1126,6 +1127,31 @@ struct csr_sta_roam_policy_params {
 	enum sta_roam_policy_dfs_mode dfs_mode;
 	bool skip_unsafe_channels;
 	uint8_t sap_operating_band;
+};
+
+/**
+ * struct best_candidate_wt_cfg_param - weight params to
+ * calculate best candidate
+ * @rssi_weightage: RSSI weightage
+ * @ht_caps_weightage: HT caps weightage
+ * @vht_caps_weightage: VHT caps weightage
+ * @chan_width_weightage: Channel width weightage
+ * @chan_band_weightage: Channel band weightage
+ * @nss_weightage: NSS weightage
+ * @beamforming_cap_weightage: Beamforming caps weightage
+ * @pcl_weightage: PCL weightage
+ * @channel_congestion_weightage: channel congestion weightage
+ */
+struct  best_candidate_wt_cfg_param {
+	uint8_t rssi_weightage;
+	uint8_t ht_caps_weightage;
+	uint8_t vht_caps_weightage;
+	uint8_t chan_width_weightage;
+	uint8_t chan_band_weightage;
+	uint8_t nss_weightage;
+	uint8_t beamforming_cap_weightage;
+	uint8_t pcl_weightage;
+	uint8_t channel_congestion_weightage;
 };
 
 typedef struct tagCsrConfigParam {
@@ -1359,6 +1385,7 @@ typedef struct tagCsrConfigParam {
 	uint32_t num_disallowed_aps;
 	uint32_t scan_probe_repeat_time;
 	uint32_t scan_num_probes;
+	struct  best_candidate_wt_cfg_param best_candidate_weight_config;
 } tCsrConfigParam;
 
 /* Tush */
@@ -1369,6 +1396,8 @@ typedef struct tagCsrUpdateConfigParam {
 #define csr_roamIsRoamOffloadEnabled(pMac) \
 	(pMac->roam.configParam.isRoamOffloadEnabled)
 #define DEFAULT_REASSOC_FAILURE_TIMEOUT 1000
+#else
+#define csr_roamIsRoamOffloadEnabled(pMac)  false
 #endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD

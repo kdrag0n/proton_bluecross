@@ -1294,6 +1294,7 @@ typedef struct sSirSmeJoinReq {
 #endif
 	bool ignore_assoc_disallowed;
 	bool enable_bcast_probe_rsp;
+	bool force_24ghz_in_ht20;
 	tSirBssDescription bssDescription;
 	/*
 	 * WARNING: Pls make bssDescription as last variable in struct
@@ -3239,6 +3240,30 @@ typedef struct {
 
 #define ALLOWED_ACTION_FRAME_MAP_WORDS (SIR_MAC_ACTION_MAX / 32)
 
+#ifndef ANI_SUPPORT_11H
+/*
+ * DROP_SPEC_MGMT_ACTION_FRAME_BITMAP
+ *
+ * Bitmask is based on the below. The frames with 1's
+ * set to their corresponding bit can be dropped in FW.
+ *
+ * ----------------------------------+-----+------+
+ *         Type                      | Bit | Drop |
+ * ----------------------------------+-----+------+
+ * SIR_MAC_ACTION_MEASURE_REQUEST_ID    0     1
+ * SIR_MAC_ACTION_TPC_REQUEST_ID        1     1
+ * ----------------------------------+-----+------+
+ */
+#define DROP_SPEC_MGMT_ACTION_FRAME_BITMAP \
+		((1 << SIR_MAC_ACTION_MEASURE_REQUEST_ID) |\
+		 (1 << SIR_MAC_ACTION_TPC_REQUEST_ID))
+#else
+/*
+ * If 11H support is defined, dont drop the above action category of
+ * spectrum mgmt action frames as host driver is processing them.
+ */
+#define DROP_SPEC_MGMT_ACTION_FRAME_BITMAP 0
+#endif /* ANI_SUPPORT_11H */
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 typedef struct {
@@ -7974,6 +7999,7 @@ struct sir_del_all_tdls_peers {
 	uint16_t msg_type;
 	uint16_t msg_len;
 	struct qdf_mac_addr bssid;
+	bool disable_tdls_state;
 };
 
 /**

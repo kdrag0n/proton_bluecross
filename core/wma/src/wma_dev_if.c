@@ -610,7 +610,11 @@ out:
 		qdf_mem_free(iface->addBssStaContext);
 	if (iface->staKeyParams)
 		qdf_mem_free(iface->staKeyParams);
+
+	wma_vdev_deinit(iface);
 	qdf_mem_zero(iface, sizeof(*iface));
+	wma_vdev_init(iface);
+
 	del_sta_self_req_param->status = status;
 	if (generate_rsp)
 		wma_send_del_sta_self_resp(del_sta_self_req_param);
@@ -2173,6 +2177,24 @@ ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 				self_sta_req->fils_max_chan_guard_time);
 		if (QDF_IS_STATUS_ERROR(ret))
 			WMA_LOGE("Failed to set WMI_VDEV_PARAM_FILS_MAX_CHANNEL_GUARD_TIME");
+
+		/* Pass down the Probe Request tx delay(in ms) to FW */
+		ret = wma_vdev_set_param(
+				wma_handle->wmi_handle,
+				self_sta_req->session_id,
+				WMI_VDEV_PARAM_PROBE_DELAY,
+				PROBE_REQ_TX_DELAY);
+		if (QDF_IS_STATUS_ERROR(ret))
+			WMA_LOGE("Failed to set WMI_VDEV_PARAM_PROBE_DELAY");
+
+		/* Pass down the probe request tx time gap(in ms) to FW */
+		ret = wma_vdev_set_param(
+				wma_handle->wmi_handle,
+				self_sta_req->session_id,
+				WMI_VDEV_PARAM_REPEAT_PROBE_TIME,
+				PROBE_REQ_TX_TIME_GAP);
+		if (QDF_IS_STATUS_ERROR(ret))
+			WMA_LOGE("Failed to set WMI_VDEV_PARAM_REPEAT_PROBE_TIME");
 	}
 
 	/* Initialize BMISS parameters */
@@ -3093,7 +3115,10 @@ void wma_vdev_resp_timer(void *data)
 			qdf_mem_free(iface->addBssStaContext);
 		if (iface->staKeyParams)
 			qdf_mem_free(iface->staKeyParams);
+
+		wma_vdev_deinit(iface);
 		qdf_mem_zero(iface, sizeof(*iface));
+		wma_vdev_init(iface);
 	} else if (tgt_req->msg_type == WMA_ADD_BSS_REQ) {
 		tpAddBssParams params = (tpAddBssParams) tgt_req->user_data;
 
@@ -4951,6 +4976,44 @@ fail_del_bss_ho_fail:
 		WMA_DELETE_BSS_HO_FAIL_RSP, (void *)params, 0);
 }
 
+#ifdef WLAN_FEATURE_HOST_ROAM
+/**
+ * wma_wait_tx_complete() - Wait till tx packets are drained
+ * @wma: wma handle
+ * @session_id: vdev id
+ *
+ * Return: none
+ */
+static void wma_wait_tx_complete(tp_wma_handle wma,
+				uint32_t session_id)
+{
+	ol_txrx_pdev_handle pdev;
+	uint8_t max_wait_iterations = 0;
+
+	if (!wma->interfaces[session_id].is_vdev_valid) {
+		WMA_LOGE("%s: Vdev is not valid: %d",
+			 __func__, session_id);
+		return;
+	}
+
+	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	max_wait_iterations =
+		wma->interfaces[session_id].delay_before_vdev_stop /
+		WMA_TX_Q_RECHECK_TIMER_WAIT;
+
+	while (ol_txrx_get_tx_pending(pdev) && max_wait_iterations) {
+		WMA_LOGW(FL("Waiting for outstanding packet to drain."));
+		qdf_wait_single_event(&wma->tx_queue_empty_event,
+				      WMA_TX_Q_RECHECK_TIMER_WAIT);
+		max_wait_iterations--;
+	}
+}
+#else
+static void wma_wait_tx_complete(tp_wma_handle wma)
+{
+
+}
+#endif
 /**
  * wma_delete_bss() - process delete bss request from upper layer
  * @wma: wma handle
@@ -4965,7 +5028,6 @@ void wma_delete_bss(tp_wma_handle wma, tpDeleteBssParams params)
 	struct wma_target_req *msg;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t peer_id;
-	uint8_t max_wait_iterations = 0;
 	ol_txrx_vdev_handle txrx_vdev = NULL;
 	bool roam_synch_in_progress = false;
 	struct wma_txrx_node *iface;
@@ -5062,17 +5124,7 @@ void wma_delete_bss(tp_wma_handle wma, tpDeleteBssParams params)
 	WMA_LOGW(FL("Outstanding msdu packets: %d"),
 		 ol_txrx_get_tx_pending(pdev));
 
-	max_wait_iterations =
-		wma->interfaces[params->smesessionId].delay_before_vdev_stop /
-		WMA_TX_Q_RECHECK_TIMER_WAIT;
-
-	while (ol_txrx_get_tx_pending(pdev) && max_wait_iterations) {
-		WMA_LOGW(FL("Waiting for outstanding packet to drain."));
-		qdf_wait_single_event(&wma->tx_queue_empty_event,
-				      WMA_TX_Q_RECHECK_TIMER_MAX_WAIT);
-		max_wait_iterations--;
-	}
-
+	wma_wait_tx_complete(wma, params->smesessionId);
 	if (ol_txrx_get_tx_pending(pdev)) {
 		WMA_LOGW(FL("Outstanding msdu packets before VDEV_STOP : %d"),
 			 ol_txrx_get_tx_pending(pdev));

@@ -1662,6 +1662,26 @@ static void init_config_param(tpAniSirGlobal pMac)
 		MAWC_ROAM_RSSI_HIGH_ADJUST_DEFAULT;
 	pMac->roam.configParam.csr_mawc_config.mawc_roam_rssi_low_adjust =
 		MAWC_ROAM_RSSI_LOW_ADJUST_DEFAULT;
+
+	pMac->roam.configParam.best_candidate_weight_config.
+		rssi_weightage = RSSI_WEIGHTAGE;
+	pMac->roam.configParam.best_candidate_weight_config.
+		ht_caps_weightage = HT_CAPABILITY_WEIGHTAGE;
+	pMac->roam.configParam.best_candidate_weight_config.
+		vht_caps_weightage = VHT_CAP_WEIGHTAGE;
+	pMac->roam.configParam.best_candidate_weight_config.
+		chan_width_weightage = CHAN_WIDTH_WEIGHTAGE;
+	pMac->roam.configParam.best_candidate_weight_config.
+		chan_band_weightage = CHAN_BAND_WEIGHTAGE;
+	pMac->roam.configParam.best_candidate_weight_config.
+		nss_weightage = NSS_WEIGHTAGE;
+	pMac->roam.configParam.best_candidate_weight_config.
+		beamforming_cap_weightage = BEAMFORMING_CAP_WEIGHTAGE;
+	pMac->roam.configParam.best_candidate_weight_config.
+		pcl_weightage = PCL_WEIGHT;
+	pMac->roam.configParam.best_candidate_weight_config.
+		channel_congestion_weightage = CHANNEL_CONGESTION_WEIGHTAGE;
+
 }
 
 eCsrBand csr_get_current_band(tHalHandle hHal)
@@ -2811,6 +2831,10 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 		pMac->roam.configParam.num_disallowed_aps =
 			pParam->num_disallowed_aps;
 
+		qdf_mem_copy(&pMac->roam.configParam.
+			best_candidate_weight_config,
+			&pParam->best_candidate_weight_config,
+			sizeof(struct csr_best_candidate_weight_config));
 	}
 	return status;
 }
@@ -3072,6 +3096,9 @@ QDF_STATUS csr_get_config_param(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
 	qdf_mem_copy(&pParam->csr_mawc_config,
 		&pMac->roam.configParam.csr_mawc_config,
 		sizeof(pParam->csr_mawc_config));
+	qdf_mem_copy(&pParam->best_candidate_weight_config,
+		&pMac->roam.configParam.best_candidate_weight_config,
+		sizeof(struct best_candidate_wt_cfg_param));
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4301,6 +4328,12 @@ QDF_STATUS csr_roam_prepare_bss_config(tpAniSirGlobal pMac,
 				pBssDesc->channelId, pIes);
 	else
 		pBssConfig->cbMode = PHY_SINGLE_CHANNEL_CENTERED;
+
+	if (CDS_IS_CHANNEL_24GHZ(pBssDesc->channelId) &&
+	    pProfile->force_24ghz_in_ht20) {
+		pBssConfig->cbMode = PHY_SINGLE_CHANNEL_CENTERED;
+		sme_debug("force_24ghz_in_ht20 is set so set cbMode to 0");
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -7104,6 +7137,7 @@ static void csr_roam_process_join_res(tpAniSirGlobal mac_ctx,
 	}
 	session = CSR_GET_SESSION(mac_ctx, session_id);
 
+	qdf_mem_set(&roam_info, sizeof(roam_info), 0);
 	conn_profile = &session->connectedProfile;
 	if (eCsrReassocSuccess == res) {
 		roam_info.reassoc = true;
@@ -7113,7 +7147,6 @@ static void csr_roam_process_join_res(tpAniSirGlobal mac_ctx,
 		ind_qos = SME_QOS_CSR_ASSOC_COMPLETE;
 	}
 	sme_debug("receives association indication");
-	qdf_mem_set(&roam_info, sizeof(roam_info), 0);
 	/* always free the memory here */
 	if (session->pWpaRsnRspIE) {
 		session->nWpaRsnRspIeLength = 0;
@@ -7827,6 +7860,7 @@ QDF_STATUS csr_roam_copy_profile(tpAniSirGlobal pMac,
 	/*Save the WPS info */
 	pDstProfile->bWPSAssociation = pSrcProfile->bWPSAssociation;
 	pDstProfile->bOSENAssociation = pSrcProfile->bOSENAssociation;
+	pDstProfile->force_24ghz_in_ht20 = pSrcProfile->force_24ghz_in_ht20;
 	pDstProfile->uapsd_mask = pSrcProfile->uapsd_mask;
 	pDstProfile->beaconInterval = pSrcProfile->beaconInterval;
 	pDstProfile->privacy = pSrcProfile->privacy;
@@ -12978,6 +13012,7 @@ static ePhyChanBondState csr_get_cb_mode_from_ies(tpAniSirGlobal pMac,
 	ePhyChanBondState eRet = PHY_SINGLE_CHANNEL_CENTERED;
 	uint8_t centerChn;
 	uint32_t ChannelBondingMode;
+	struct ch_params_s ch_params = {0};
 
 	if (CDS_IS_CHANNEL_24GHZ(primaryChn)) {
 		ChannelBondingMode =
@@ -13042,12 +13077,14 @@ static ePhyChanBondState csr_get_cb_mode_from_ies(tpAniSirGlobal pMac,
 		break;
 	}
 
-	if ((PHY_SINGLE_CHANNEL_CENTERED != eRet) &&
-	    (QDF_STATUS_SUCCESS != sme_check_ch_in_band(pMac,
-							centerChn - 2, 2))) {
-		sme_err("Invalid center channel (%d), disable 40MHz mode",
-			centerChn);
-		eRet = PHY_SINGLE_CHANNEL_CENTERED;
+	if (PHY_SINGLE_CHANNEL_CENTERED != eRet) {
+		ch_params.ch_width = CH_WIDTH_MAX;
+		cds_set_channel_params(primaryChn, 0, &ch_params);
+		if (ch_params.ch_width == CH_WIDTH_20MHZ) {
+			sme_err("40Mhz not supported for channel %d, continue with 20Mhz",
+				primaryChn);
+			eRet = PHY_SINGLE_CHANNEL_CENTERED;
+		}
 	}
 	return eRet;
 }
@@ -14840,8 +14877,11 @@ QDF_STATUS csr_send_join_req_msg(tpAniSirGlobal pMac, uint32_t sessionId,
 		csr_join_req->staPersona = (uint8_t) pProfile->csrPersona;
 		csr_join_req->wps_registration = pProfile->bWPSAssociation;
 		csr_join_req->cbMode = (uint8_t) pSession->bssParams.cbMode;
-		sme_debug("CSR PERSONA: %d CSR CbMode: %d",
-			  pProfile->csrPersona, pSession->bssParams.cbMode);
+		csr_join_req->force_24ghz_in_ht20 =
+			pProfile->force_24ghz_in_ht20;
+		sme_debug("CSR PERSONA: %d CSR CbMode: %d force 24ghz ht20 %d",
+			  pProfile->csrPersona, pSession->bssParams.cbMode,
+			  csr_join_req->force_24ghz_in_ht20);
 		csr_join_req->uapsdPerAcBitmask = pProfile->uapsd_mask;
 		pSession->uapsd_mask = pProfile->uapsd_mask;
 		status =
@@ -18967,17 +19007,19 @@ QDF_STATUS csr_update_fils_config(tpAniSirGlobal mac, uint8_t session_id,
  * @str: Source string
  * @dst: Destination string
  * @c: Character before which all characters need to be copied
+ * @max_dst_len: Maximum length destination can accomodate.
  *
  * Return: length of the copied string, if success. zero otherwise.
  */
-static uint32_t copy_all_before_char(char *str, char *dst, char c)
+static uint32_t copy_all_before_char(char *str, char *dst,
+		char c, uint16_t max_dst_len)
 {
 	uint32_t len = 0;
 
 	if (!str)
 		return len;
 
-	while (*str != '\0' && *str != c) {
+	while (*str != '\0' && *str != c && (len < max_dst_len)) {
 		*dst++ = *str++;
 		len++;
 	}
@@ -19016,7 +19058,8 @@ static void csr_update_fils_params_rso(tpAniSirGlobal mac,
 	req_buffer->is_fils_connection = true;
 	roam_fils_params->username_length =
 			copy_all_before_char(fils_info->keyname_nai,
-				roam_fils_params->username, '@');
+				roam_fils_params->username, '@',
+				WMI_FILS_MAX_USERNAME_LENGTH);
 
 	roam_fils_params->next_erp_seq_num =
 			(fils_info->sequence_number + 1);
@@ -19098,6 +19141,14 @@ csr_roam_offload_scan(tpAniSirGlobal mac_ctx, uint8_t session_id,
 	    && (ROAM_SCAN_OFFLOAD_START == command)) {
 		sme_err("Roam Scan Offload is already started");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Roaming is not supported currently for FILS akm */
+	if (session->pCurRoamProfile && CSR_IS_AUTH_TYPE_FILS(
+	    session->pCurRoamProfile->AuthType.authType[0]) &&
+				!mac_ctx->is_fils_roaming_supported) {
+		sme_info("FILS Roaming not suppprted by fw");
+		return QDF_STATUS_SUCCESS;
 	}
 
 	/*
@@ -20949,7 +21000,7 @@ void csr_roam_fill_tdls_info(tpAniSirGlobal mac_ctx, tCsrRoamInfo *roam_info,
 }
 #endif
 
-#if defined(WLAN_FEATURE_FILS_SK)
+#if defined(WLAN_FEATURE_FILS_SK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 static void csr_copy_fils_join_rsp_roam_info(tCsrRoamInfo *roam_info,
 				      roam_offload_synch_ind *roam_synch_data)
 {

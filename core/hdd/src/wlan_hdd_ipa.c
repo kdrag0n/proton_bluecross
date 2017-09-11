@@ -458,6 +458,7 @@ struct hdd_ipa_priv {
 	qdf_spinlock_t q_lock;
 
 	struct list_head pend_desc_head;
+	uint16_t tx_desc_size;
 	struct hdd_ipa_tx_desc *tx_desc_list;
 	struct list_head free_tx_desc_head;
 
@@ -550,13 +551,9 @@ struct hdd_ipa_priv {
 	(((_hdd_ctx)->config->IpaConfig & (_mask)) == (_mask))
 
 #define HDD_IPA_INCREASE_INTERNAL_DROP_COUNT(hdd_ipa) \
-			do { \
-				hdd_ipa->ipa_rx_internel_drop_count++; \
-			} while (0)
+				hdd_ipa->ipa_rx_internel_drop_count++;
 #define HDD_IPA_INCREASE_NET_SEND_COUNT(hdd_ipa) \
-			do { \
-				hdd_ipa->ipa_rx_net_send_count++; \
-			} while (0)
+				hdd_ipa->ipa_rx_net_send_count++;
 #define HDD_BW_GET_DIFF(_x, _y) (unsigned long)((ULONG_MAX - (_y)) + (_x) + 1)
 
 #if defined(QCA_WIFI_3_0) && defined(CONFIG_IPA3)
@@ -4884,14 +4881,23 @@ int hdd_ipa_resume(hdd_context_t *hdd_ctx)
 static int hdd_ipa_alloc_tx_desc_list(struct hdd_ipa_priv *hdd_ipa)
 {
 	int i;
-	uint32_t max_desc_cnt;
 	struct hdd_ipa_tx_desc *tmp_desc;
+	struct ol_txrx_pdev_t *pdev;
 
-	max_desc_cnt = hdd_ipa->hdd_ctx->config->IpaUcTxBufCount;
+	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	if (!pdev) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR, "pdev is NULL");
+		return -ENODEV;
+	}
+
+	hdd_ipa->tx_desc_size = QDF_MIN(
+			hdd_ipa->hdd_ctx->config->IpaMccTxDescSize,
+			pdev->tx_desc.pool_size);
 
 	INIT_LIST_HEAD(&hdd_ipa->free_tx_desc_head);
 
-	tmp_desc = qdf_mem_malloc(sizeof(struct hdd_ipa_tx_desc)*max_desc_cnt);
+	tmp_desc = qdf_mem_malloc(sizeof(struct hdd_ipa_tx_desc) *
+			hdd_ipa->tx_desc_size);
 
 	if (!tmp_desc) {
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
@@ -4902,7 +4908,7 @@ static int hdd_ipa_alloc_tx_desc_list(struct hdd_ipa_priv *hdd_ipa)
 	hdd_ipa->tx_desc_list = tmp_desc;
 
 	qdf_spin_lock_bh(&hdd_ipa->q_lock);
-	for (i = 0; i < max_desc_cnt; i++) {
+	for (i = 0; i < hdd_ipa->tx_desc_size; i++) {
 		tmp_desc->id = i;
 		tmp_desc->ipa_tx_desc_ptr = NULL;
 		list_add_tail(&tmp_desc->link,
@@ -5018,7 +5024,7 @@ static int hdd_ipa_setup_sys_pipe(struct hdd_ipa_priv *hdd_ipa)
 		hdd_ipa->sys_pipe[HDD_IPA_RX_PIPE].conn_hdl_valid = 1;
 	}
 
-       /* Allocate free Tx desc list */
+	/* Allocate free Tx desc list */
 	ret = hdd_ipa_alloc_tx_desc_list(hdd_ipa);
 	if (ret)
 		goto setup_sys_pipe_fail;
@@ -5045,7 +5051,6 @@ setup_sys_pipe_fail:
 static void hdd_ipa_teardown_sys_pipe(struct hdd_ipa_priv *hdd_ipa)
 {
 	int ret = 0, i;
-	uint32_t max_desc_cnt;
 	struct hdd_ipa_tx_desc *tmp_desc;
 	struct ipa_rx_data *ipa_tx_desc;
 
@@ -5063,10 +5068,8 @@ static void hdd_ipa_teardown_sys_pipe(struct hdd_ipa_priv *hdd_ipa)
 	}
 
 	if (hdd_ipa->tx_desc_list) {
-		max_desc_cnt = hdd_ipa->hdd_ctx->config->IpaUcTxBufCount;
-
 		qdf_spin_lock_bh(&hdd_ipa->q_lock);
-		for (i = 0; i < max_desc_cnt; i++) {
+		for (i = 0; i < hdd_ipa->tx_desc_size; i++) {
 			tmp_desc = hdd_ipa->tx_desc_list + i;
 			ipa_tx_desc = tmp_desc->ipa_tx_desc_ptr;
 			if (ipa_tx_desc)
@@ -5795,12 +5798,11 @@ static int __hdd_ipa_wlan_evt(hdd_adapter_t *adapter, uint8_t sta_id,
 				qdf_mutex_release(&hdd_ipa->ipa_lock);
 			}
 			return 0;
-		} else {
-			HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
-				    "IPA resource %s completed",
-				    hdd_ipa->resource_loading ?
-				    "load" : "unload");
 		}
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+			    "IPA resource %s completed",
+			    hdd_ipa->resource_loading ?
+			    "load" : "unload");
 	}
 
 	hdd_ipa->stats.event[type]++;

@@ -506,6 +506,19 @@ enum ds_mode {
 #define WMA_SCAN_END_EVENT	(WMI_SCAN_EVENT_COMPLETED |	\
 				WMI_SCAN_EVENT_DEQUEUED   |	\
 				WMI_SCAN_EVENT_START_FAILED)
+/*
+ * PROBE_REQ_TX_DELAY
+ * param to specify probe request Tx delay for scans triggered on this VDEV
+ */
+#define PROBE_REQ_TX_DELAY 10
+
+/* PROBE_REQ_TX_TIME_GAP
+ * param to specify the time gap between each set of probe request transmission.
+ * The number of probe requests in each set depends on the ssid_list and,
+ * bssid_list in the scan request. This parameter will get applied only,
+ * for the scans triggered on this VDEV.
+ */
+#define PROBE_REQ_TX_TIME_GAP 20
 
 /**
  * struct probeTime_dwellTime - probe time, dwell time map
@@ -1519,6 +1532,8 @@ typedef struct {
 	uint32_t phy_capability;
 	uint32_t max_frag_entry;
 	uint32_t wmi_service_bitmap[WMI_SERVICE_BM_SIZE];
+	uint32_t wmi_service_ext_offset;
+	uint32_t wmi_service_ext_bitmap[WMI_SERVICE_SEGMENT_BM_SIZE32];
 	wmi_resource_config wlan_resource_config;
 	uint32_t frameTransRequired;
 	tBssSystemRole wmaGlobalSystemRole;
@@ -2374,16 +2389,8 @@ static inline QDF_STATUS wma_set_gateway_params(tp_wma_handle wma,
 }
 #endif /* FEATURE_LFR_SUBNET_DETECTION */
 
-#if defined(FEATURE_LRO)
 QDF_STATUS wma_lro_config_cmd(tp_wma_handle wma_handle,
 	 struct wma_lro_config_cmd_t *wma_lro_cmd);
-#else
-static inline QDF_STATUS wma_lro_config_cmd(tp_wma_handle wma_handle,
-	 struct wma_lro_config_cmd_t *wma_lro_cmd)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
 bool wma_is_current_hwmode_dbs(void);
 void
 wma_indicate_err(enum ol_rx_err_type err_type,

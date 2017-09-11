@@ -669,7 +669,7 @@ static tSirRetStatus lim_send_tdls_dis_req_frame(tpAniSirGlobal pMac,
 					lim_mgmt_tdls_tx_complete,
 					HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME |
 					HAL_USE_PEER_STA_REQUESTED_MASK,
-					smeSessionId, false, 0);
+					smeSessionId, false, 0, RATEID_DEFAULT);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		pMac->lim.tdls_frm_session_id = NO_SESSION;
 		pe_err("could not send TDLS Discovery Request frame");
@@ -975,7 +975,8 @@ static tSirRetStatus lim_send_tdls_dis_rsp_frame(tpAniSirGlobal pMac,
 					      lim_tx_complete, pFrame,
 					      lim_mgmt_tdls_tx_complete,
 					      HAL_USE_SELF_STA_REQUESTED_MASK,
-					      smeSessionId, false, 0);
+					      smeSessionId, false, 0,
+					      RATEID_DEFAULT);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		pMac->lim.tdls_frm_session_id = NO_SESSION;
 		pe_err("could not send TDLS Discovery Response frame!");
@@ -1057,7 +1058,7 @@ wma_tx_frame_with_tx_complete_send(tpAniSirGlobal pMac, void *pPacket,
 					  lim_mgmt_tdls_tx_complete,
 					  HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME
 					  | HAL_USE_PEER_STA_REQUESTED_MASK,
-					  smeSessionId, flag, 0);
+					  smeSessionId, flag, 0, RATEID_DEFAULT);
 }
 #else
 
@@ -1077,7 +1078,7 @@ wma_tx_frame_with_tx_complete_send(tpAniSirGlobal pMac, void *pPacket,
 					  lim_mgmt_tdls_tx_complete,
 					  HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME
 					  | HAL_USE_PEER_STA_REQUESTED_MASK,
-					  smeSessionId, false, 0);
+					  smeSessionId, false, 0, RATEID_DEFAULT);
 }
 #endif
 
@@ -3343,18 +3344,20 @@ tSirRetStatus lim_process_sme_del_all_tdls_peers(tpAniSirGlobal mac_ctx,
 
 	lim_check_aid_and_delete_peer(mac_ctx, session_entry);
 
-	if (mac_ctx->lim.sme_msg_callback) {
-		tdls_state_disable = qdf_mem_malloc(
-						sizeof(*tdls_state_disable));
-		if (NULL == tdls_state_disable) {
-			pe_err("memory allocation failed");
-			return eSIR_FAILURE;
+	if (msg->disable_tdls_state) {
+		if (mac_ctx->lim.sme_msg_callback) {
+			tdls_state_disable = qdf_mem_malloc(
+					sizeof(*tdls_state_disable));
+			if (NULL == tdls_state_disable) {
+				pe_err("memory allocation failed");
+				return eSIR_FAILURE;
+			}
+			tdls_state_disable->session_id = session_entry->smeSessionId;
+			cds_msg.type = eWNI_SME_TDLS_NOTIFY_SET_STATE_DISABLE;
+			cds_msg.bodyptr = tdls_state_disable;
+			cds_msg.bodyval = 0;
+			mac_ctx->lim.sme_msg_callback(mac_ctx, &cds_msg);
 		}
-		tdls_state_disable->session_id = session_entry->smeSessionId;
-		cds_msg.type = eWNI_SME_TDLS_NOTIFY_SET_STATE_DISABLE;
-		cds_msg.bodyptr = tdls_state_disable;
-		cds_msg.bodyval = 0;
-		mac_ctx->lim.sme_msg_callback(mac_ctx, &cds_msg);
 	}
 
 	return eSIR_SUCCESS;
