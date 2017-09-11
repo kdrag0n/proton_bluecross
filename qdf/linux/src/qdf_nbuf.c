@@ -1545,7 +1545,7 @@ void qdf_netbuf_free_debug_add(qdf_nbuf_t net_buf,
 	p_node->line_num = line_num;
 	p_node->time = qdf_get_log_timestamp();
 }
-EXPORT_SYMBOL(qdf_netbuf_free_debug_add);
+qdf_export_symbol(qdf_netbuf_free_debug_add);
 
 /**
  * qdf_net_buf_debug_hash() - hash network buffer pointer
@@ -2013,38 +2013,44 @@ uint32_t __qdf_nbuf_get_tso_info(qdf_device_t osdev, struct sk_buff *skb,
 		curr_seg->seg.num_frags++;
 
 		while (more_tso_frags) {
-			curr_seg->seg.tso_frags[i].vaddr = tso_frag_vaddr;
-			curr_seg->seg.tso_frags[i].length = tso_frag_len;
-			curr_seg->seg.total_len += tso_frag_len;
-			curr_seg->seg.tso_flags.ip_len +=  tso_frag_len;
-			curr_seg->seg.num_frags++;
-			skb_proc = skb_proc - tso_frag_len;
+			if (tso_frag_len > 0) {
+				curr_seg->seg.tso_frags[i].vaddr =
+							tso_frag_vaddr;
+				curr_seg->seg.tso_frags[i].length =
+							tso_frag_len;
+				curr_seg->seg.total_len += tso_frag_len;
+				curr_seg->seg.tso_flags.ip_len += tso_frag_len;
+				curr_seg->seg.num_frags++;
+				skb_proc = skb_proc - tso_frag_len;
 
-			/* increment the TCP sequence number */
-			tso_cmn_info.tcp_seq_num += tso_frag_len;
-			curr_seg->seg.tso_frags[i].paddr = tso_frag_paddr;
-			TSO_DEBUG("%s[%d] frag %d frag len %d total_len %u vaddr %p\n",
-				__func__, __LINE__,
-				i,
-				tso_frag_len,
-				curr_seg->seg.total_len,
-				curr_seg->seg.tso_frags[i].vaddr);
+				/* increment the TCP sequence number */
+				tso_cmn_info.tcp_seq_num += tso_frag_len;
+				curr_seg->seg.tso_frags[i].paddr =
+								tso_frag_paddr;
+				TSO_DEBUG("%s[%d] frag %d frag len %d "
+					"total_len %u vaddr %p\n",
+					__func__, __LINE__,
+					i,
+					tso_frag_len,
+					curr_seg->seg.total_len,
+					curr_seg->seg.tso_frags[i].vaddr);
 
-			/* if there is no more data left in the skb */
-			if (!skb_proc)
-				return tso_info->num_segs;
+				/* if there is no more data left in the skb */
+				if (!skb_proc)
+					return tso_info->num_segs;
 
-			/* get the next payload fragment information */
-			/* check if there are more fragments in this segment */
-			if (tso_frag_len < tso_seg_size) {
-				tso_seg_size = tso_seg_size - tso_frag_len;
-				more_tso_frags = 1;
-				i++;
-			} else {
-				more_tso_frags = 0;
-				/* reset i and the tso payload size */
-				i = 1;
-				tso_seg_size = skb_shinfo(skb)->gso_size;
+				/* get the next payload fragment information */
+				/* check if there are more fragments in this segment */
+				if (tso_frag_len < tso_seg_size) {
+					tso_seg_size = tso_seg_size - tso_frag_len;
+					more_tso_frags = 1;
+					i++;
+				} else {
+					more_tso_frags = 0;
+					/* reset i and the tso payload size */
+					i = 1;
+					tso_seg_size = skb_shinfo(skb)->gso_size;
+				}
 			}
 
 			/* if the next fragment is contiguous */
@@ -2177,7 +2183,7 @@ uint32_t __qdf_nbuf_get_tso_num_seg(struct sk_buff *skb)
 	gso_size = skb_shinfo(skb)->gso_size;
 	tmp_len = skb->len - ((skb_transport_header(skb) - skb_mac_header(skb))
 		+ tcp_hdrlen(skb));
-	while (tmp_len) {
+	while (tmp_len > 0) {
 		num_segs++;
 		if (tmp_len > gso_size)
 			tmp_len -= gso_size;
@@ -2192,14 +2198,14 @@ qdf_export_symbol(__qdf_nbuf_get_tso_num_seg);
 
 struct sk_buff *__qdf_nbuf_inc_users(struct sk_buff *skb)
 {
-	atomic_inc(&skb->users);
+	qdf_nbuf_users_inc(&skb->users);
 	return skb;
 }
 qdf_export_symbol(__qdf_nbuf_inc_users);
 
 int __qdf_nbuf_get_users(struct sk_buff *skb)
 {
-	return atomic_read(&skb->users);
+	return qdf_nbuf_users_read(&skb->users);
 }
 qdf_export_symbol(__qdf_nbuf_get_users);
 

@@ -40,12 +40,12 @@
 #include "hif_hw_version.h"
 #if defined(HIF_PCI) || defined(HIF_SNOC) || defined(HIF_AHB)
 #include "ce_tasklet.h"
+#include "ce_api.h"
 #endif
 #include "qdf_trace.h"
 #include "qdf_status.h"
 #include "hif_debug.h"
 #include "mp_dev.h"
-#include "ce_api.h"
 #include "hif_napi.h"
 
 void hif_dump(struct hif_opaque_softc *hif_ctx, uint8_t cmd_id, bool start)
@@ -788,6 +788,21 @@ struct hif_target_info *hif_get_target_info_handle(
 
 }
 
+/**
+ * hif_get_rx_ctx_id - Returns NAPI instance ID based on CE ID
+ * @ctx_id: Rx CE context ID
+ * @hif_hdl: HIF Context
+ *
+ * Return: LRO instance ID
+ */
+int hif_get_rx_ctx_id(int ctx_id, struct hif_opaque_softc *hif_hdl)
+{
+	if (hif_napi_enabled(hif_hdl, -1))
+		return NAPI_PIPE2ID(ctx_id);
+	else
+		return ctx_id;
+}
+
 #if defined(FEATURE_LRO)
 /**
  * hif_lro_flush_cb_register - API to register for LRO Flush Callback
@@ -829,21 +844,6 @@ void *hif_get_lro_info(int ctx_id, struct hif_opaque_softc *hif_hdl)
 }
 
 /**
- * hif_get_rx_ctx_id - Returns LRO instance ID based on underlying LRO instance
- * @ctx_id: LRO context ID
- * @hif_hdl: HIF Context
- *
- * Return: LRO instance ID
- */
-int hif_get_rx_ctx_id(int ctx_id, struct hif_opaque_softc *hif_hdl)
-{
-	if (hif_napi_enabled(hif_hdl, -1))
-		return NAPI_PIPE2ID(ctx_id);
-	else
-		return ctx_id;
-}
-
-/**
  * hif_lro_flush_cb_deregister - API to deregister for LRO Flush Callbacks
  * @hif_hdl: HIF Context
  * @lro_deinit_cb: LRO deinit callback
@@ -855,11 +855,6 @@ void hif_lro_flush_cb_deregister(struct hif_opaque_softc *hif_hdl,
 {
 	hif_napi_lro_flush_cb_deregister(hif_hdl, lro_deinit_cb);
 	ce_lro_flush_cb_deregister(hif_hdl, lro_deinit_cb);
-}
-#else /* !defined(FEATURE_LRO) */
-int hif_get_rx_ctx_id(int ctx_id, struct hif_opaque_softc *hif_hdl)
-{
-	return 0;
 }
 #endif
 
