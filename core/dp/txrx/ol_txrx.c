@@ -4824,9 +4824,10 @@ static inline int ol_txrx_drop_nbuf_list(qdf_nbuf_t buf_list)
  *
  * Return: None
  */
-static void ol_rx_data_cb(struct ol_txrx_pdev_t *pdev,
-			  qdf_nbuf_t buf_list, uint16_t staid)
+static void ol_rx_data_cb(void *_pdev, void *_buf_list, uint16_t staid)
 {
+	struct ol_txrx_pdev_t *pdev = (struct ol_txrx_pdev_t *)_pdev;
+	qdf_nbuf_t buf_list = (qdf_nbuf_t)_buf_list;
 	void *cds_ctx = cds_get_global_context();
 	void *osif_dev;
 	uint8_t drop_count = 0;
@@ -5023,8 +5024,7 @@ void ol_rx_data_process(struct ol_txrx_peer_t *peer,
 			if (!pkt)
 				goto drop_rx_buf;
 
-			pkt->callback = (cds_ol_rx_thread_cb)
-					ol_rx_data_cb;
+			pkt->callback = ol_rx_data_cb;
 			pkt->context = (void *)pdev;
 			pkt->Rxpkt = (void *)rx_buf_list;
 			pkt->staId = peer->local_id;
