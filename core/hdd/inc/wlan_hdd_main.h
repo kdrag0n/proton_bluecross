@@ -72,12 +72,15 @@
 #define NUM_TX_QUEUES 4
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0)) || \
+	defined(CFG80211_REMOVE_IEEE80211_BACKPORT)
 #define HDD_NL80211_BAND_2GHZ   NL80211_BAND_2GHZ
 #define HDD_NL80211_BAND_5GHZ   NL80211_BAND_5GHZ
+#define HDD_NUM_NL80211_BANDS   NUM_NL80211_BANDS
 #else
 #define HDD_NL80211_BAND_2GHZ   IEEE80211_BAND_2GHZ
 #define HDD_NL80211_BAND_5GHZ   IEEE80211_BAND_5GHZ
+#define HDD_NUM_NL80211_BANDS   ((enum nl80211_band)IEEE80211_NUM_BANDS)
 #endif
 
 /** Length of the TX queue for the netdev */
@@ -1404,6 +1407,7 @@ struct hdd_adapter_s {
 	struct action_frame_random_mac random_mac[MAX_RANDOM_MAC_ADDRS];
 	uint32_t mon_chan;
 	uint32_t mon_bandwidth;
+	uint8_t active_ac;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.station)
@@ -1991,7 +1995,6 @@ struct hdd_context_s {
 	hdd_adapter_t *cap_tsf_context;
 #endif
 	struct sta_ap_intf_check_work_ctx *sta_ap_intf_check_work_info;
-	uint8_t active_ac;
 };
 
 int hdd_validate_channel_and_bandwidth(hdd_adapter_t *adapter,
@@ -2493,7 +2496,16 @@ int hdd_wlan_start_modules(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode);
 int hdd_start_adapter(hdd_adapter_t *adapter);
 void hdd_populate_random_mac_addr(hdd_context_t *hdd_ctx, uint32_t num);
-
+/**
+ * hdd_is_interface_up()- Checkfor interface up before ssr
+ * @hdd_ctx: HDD context
+ *
+ * check  if there are any wlan interfaces before SSR accordingly start
+ * the interface.
+ *
+ * Return: 0 if interface was opened else false
+ */
+bool hdd_is_interface_up(hdd_adapter_t *adapter);
 /**
  * hdd_get_bss_entry() - Get the bss entry matching the chan, bssid and ssid
  * @wiphy: wiphy
@@ -2710,6 +2722,14 @@ void hdd_dp_trace_init(struct hdd_config *config);
  */
 int hdd_set_limit_off_chan_for_tos(hdd_adapter_t *adapter, enum tos tos,
 		bool is_tos_active);
+
+/**
+ * hdd_reset_limit_off_chan() - reset limit off-channel command parameters
+ * @adapter - HDD adapter
+ *
+ * Return: 0 on success and non zero value on failure
+ */
+int hdd_reset_limit_off_chan(hdd_adapter_t *adapter);
 
 #if defined(WLAN_FEATURE_FILS_SK)
 /**

@@ -462,11 +462,14 @@ QDF_STATUS cds_open(void)
 			  "%s: HTCHandle is null!", __func__);
 		goto err_wma_close;
 	}
-	if (htc_wait_target(HTCHandle)) {
+
+	qdf_status = htc_wait_target(HTCHandle);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_FATAL,
 			  "%s: Failed to complete BMI phase", __func__);
 
-		if (!cds_is_fw_down())
+		if (qdf_status != QDF_STATUS_E_NOMEM
+				&& !cds_is_fw_down())
 			QDF_BUG(0);
 
 		goto err_wma_close;
@@ -901,6 +904,10 @@ QDF_STATUS cds_post_disable(void)
 	hif_disable_isr(hif_ctx);
 	hif_reset_soc(hif_ctx);
 
+	if (gp_cds_context->htc_ctx) {
+		htc_stop(gp_cds_context->htc_ctx);
+	}
+
 	ol_txrx_pdev_pre_detach(txrx_pdev, 1);
 
 	return QDF_STATUS_SUCCESS;
@@ -929,7 +936,6 @@ QDF_STATUS cds_close(v_CONTEXT_t cds_context)
 	hdd_lro_destroy();
 
 	if (gp_cds_context->htc_ctx) {
-		htc_stop(gp_cds_context->htc_ctx);
 		htc_destroy(gp_cds_context->htc_ctx);
 		gp_cds_context->htc_ctx = NULL;
 	}
@@ -1776,7 +1782,9 @@ static QDF_STATUS cds_force_assert_target(qdf_device_t qdf_ctx)
 		  "Self Recovery not supported via Platform driver assert");
 
 	cds_set_recovery_in_progress(false);
-	QDF_BUG(0);
+
+	if (!cds_is_fw_down())
+		QDF_BUG(0);
 
 	return QDF_STATUS_E_INVAL;
 }

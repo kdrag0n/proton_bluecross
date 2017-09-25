@@ -734,9 +734,12 @@ QDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 			 chan_list->chanParam[i].dfsSet,
 			 chan_list->chanParam[i].pwr);
 
-		if (chan_list->chanParam[i].dfsSet)
+		if (chan_list->chanParam[i].dfsSet) {
 			WMI_SET_CHANNEL_FLAG(tchan_info,
 					     WMI_CHAN_FLAG_PASSIVE);
+			WMI_SET_CHANNEL_FLAG(tchan_info,
+					     WMI_CHAN_FLAG_DFS);
+		}
 
 		if (tchan_info->mhz < WMA_2_4_GHZ_MAX_FREQ) {
 			WMI_SET_CHANNEL_MODE(tchan_info, MODE_11G);
@@ -2448,6 +2451,9 @@ static int wma_fill_roam_synch_buffer(tp_wma_handle wma,
 		roam_synch_ind_ptr->next_erp_seq_num =
 				fils_info->next_erp_seq_num;
 
+		WMA_LOGD("Update ERP Seq Num %d, Next ERP Seq Num %d",
+			 roam_synch_ind_ptr->update_erp_next_seq_num,
+			 roam_synch_ind_ptr->next_erp_seq_num);
 		WMA_LOGD("%s: KEK dump", __func__);
 		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
 				   roam_synch_ind_ptr->kek, fils_info->kek_len);

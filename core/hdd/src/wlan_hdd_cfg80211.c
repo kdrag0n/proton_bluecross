@@ -4701,6 +4701,9 @@ static int wlan_hdd_add_fils_params_roam_auth_event(struct sk_buff *skb,
 		return -EINVAL;
 	}
 
+	hdd_debug("Update ERP Seq Num %d, Next ERP Seq Num %d",
+			roam_info->update_erp_next_seq_num,
+			roam_info->next_erp_seq_num);
 	if (roam_info->update_erp_next_seq_num &&
 	    nla_put_u16(skb,
 			QCA_WLAN_VENDOR_ATTR_ROAM_AUTH_FILS_ERP_NEXT_SEQ_NUM,
@@ -4951,6 +4954,7 @@ wlan_hdd_wifi_config_policy[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1] = {
 	[ANT_DIV_ACK_SNR_WEIGHT] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_LISTEN_INTERVAL] = {.type = NLA_U32 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_LRO] = {.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_ENABLE] = {.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_TOTAL_BEACON_MISS_COUNT] = {
 			.type = NLA_U8},
 };
@@ -5154,6 +5158,12 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 		enable_flag = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_CONFIG_LRO]);
 		ret_val = hdd_lro_set_reset(hdd_ctx, adapter,
 							 enable_flag);
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_ENABLE]) {
+		enable_flag =
+			nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_ENABLE]);
+		sme_set_scan_disable(hdd_ctx->hHal, !enable_flag);
 	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_QPOWER]) {
@@ -11743,6 +11753,23 @@ static void wlan_hdd_cfg80211_add_connected_pno_support(struct wiphy *wiphy)
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+static inline void
+hdd_wiphy_set_max_sched_scans(struct wiphy *wiphy, uint8_t max_scans)
+{
+	if (max_scans == 0)
+		wiphy->flags &= ~WIPHY_FLAG_SUPPORTS_SCHED_SCAN;
+	else
+		wiphy->flags |= WIPHY_FLAG_SUPPORTS_SCHED_SCAN;
+}
+#else
+static inline void
+hdd_wiphy_set_max_sched_scans(struct wiphy *wiphy, uint8_t max_scans)
+{
+	wiphy->max_sched_scan_reqs = max_scans;
+}
+#endif /* KERNEL_VERSION(4, 12, 0) */
+
 #if ((LINUX_VERSION_CODE > KERNEL_VERSION(4, 4, 0)) || \
 	defined(CFG80211_MULTI_SCAN_PLAN_BACKPORT)) && \
 	defined(FEATURE_WLAN_SCAN_PNO)
@@ -11757,7 +11784,7 @@ static void hdd_config_sched_scan_plans_to_wiphy(struct wiphy *wiphy,
 						 struct hdd_config *config)
 {
 	if (config->configPNOScanSupport) {
-		wiphy->flags |= WIPHY_FLAG_SUPPORTS_SCHED_SCAN;
+		hdd_wiphy_set_max_sched_scans(wiphy, 1);
 		wiphy->max_sched_scan_ssids = SIR_PNO_MAX_SUPP_NETWORKS;
 		wiphy->max_match_sets = SIR_PNO_MAX_SUPP_NETWORKS;
 		wiphy->max_sched_scan_ie_len = SIR_MAC_MAX_IE_LENGTH;
@@ -11818,7 +11845,7 @@ int wlan_hdd_cfg80211_update_band(struct wiphy *wiphy, eCsrBand eBand)
 
 	ENTER();
 
-	for (i = 0; i < NUM_NL80211_BANDS; i++) {
+	for (i = 0; i < HDD_NUM_NL80211_BANDS; i++) {
 
 		if (NULL == wiphy->bands[i])
 			continue;
@@ -12110,7 +12137,7 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 		}
 	}
 
-	for (i = 0; i < NUM_NL80211_BANDS; i++) {
+	for (i = 0; i < HDD_NUM_NL80211_BANDS; i++) {
 
 		if (NULL == wiphy->bands[i])
 			continue;
@@ -12206,7 +12233,7 @@ void wlan_hdd_cfg80211_deinit(struct wiphy *wiphy)
 {
 	int i;
 
-	for (i = 0; i < NUM_NL80211_BANDS; i++) {
+	for (i = 0; i < HDD_NUM_NL80211_BANDS; i++) {
 		if (NULL != wiphy->bands[i] &&
 		   (NULL != wiphy->bands[i]->channels)) {
 			qdf_mem_free(wiphy->bands[i]->channels);
@@ -12327,7 +12354,7 @@ void wlan_hdd_cfg80211_update_wiphy_caps(struct wiphy *wiphy)
 	 * control comes here. Here just we need to clear it if firmware doesn't
 	 * have PNO support. */
 	if (!pCfg->PnoOffload) {
-		wiphy->flags &= ~WIPHY_FLAG_SUPPORTS_SCHED_SCAN;
+		hdd_wiphy_set_max_sched_scans(wiphy, 0);
 		wiphy->max_sched_scan_ssids = 0;
 		wiphy->max_match_sets = 0;
 		wiphy->max_sched_scan_ie_len = 0;
@@ -13064,6 +13091,7 @@ done:
 	return 0;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 /**
  * wlan_hdd_cfg80211_change_iface() - change interface cfg80211 op
  * @wiphy: Pointer to the wiphy structure
@@ -13089,6 +13117,22 @@ static int wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 
 	return ret;
 }
+#else
+static int wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
+					  struct net_device *ndev,
+					  enum nl80211_iftype type,
+					  struct vif_params *params)
+{
+	int ret;
+
+	cds_ssr_protect(__func__);
+	ret = __wlan_hdd_cfg80211_change_iface(wiphy, ndev, type,
+					       &params->flags, params);
+	cds_ssr_unprotect(__func__);
+
+	return ret;
+}
+#endif /* KERNEL_VERSION(4, 12, 0) */
 
 #ifdef FEATURE_WLAN_TDLS
 static bool wlan_hdd_is_duplicate_channel(uint8_t *arr,
@@ -17486,6 +17530,13 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 						pAdapter->aStaInfo[i].
 							macAddrSTA.bytes,
 						QDF_MAC_ADDR_SIZE);
+					if (hdd_ipa_uc_is_enabled(pHddCtx)) {
+						hdd_ipa_wlan_evt(pAdapter,
+						    pAdapter->aStaInfo[i].
+						    ucSTAId,
+						    HDD_IPA_CLIENT_DISCONNECT,
+						    mac);
+					}
 					hdd_debug("Delete STA with MAC::"
 						  MAC_ADDRESS_STR,
 					       MAC_ADDR_ARRAY(mac));
@@ -17524,6 +17575,11 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 					  MAC_ADDRESS_STR,
 				       MAC_ADDR_ARRAY(mac));
 				return -ENOENT;
+			}
+
+			if (hdd_ipa_uc_is_enabled(pHddCtx)) {
+				hdd_ipa_wlan_evt(pAdapter, staId,
+					HDD_IPA_CLIENT_DISCONNECT, mac);
 			}
 
 			if (pAdapter->aStaInfo[staId].isDeauthInProgress ==

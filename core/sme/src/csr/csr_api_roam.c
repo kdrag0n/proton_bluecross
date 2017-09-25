@@ -192,6 +192,8 @@ static const uint8_t
 csr_start_ibss_channels50[CSR_NUM_IBSS_START_CHANNELS_50] = { 36, 40, 44, 48 };
 static const uint8_t
 csr_start_ibss_channels24[CSR_NUM_IBSS_START_CHANNELS_24] = { 1, 6, 11 };
+static const uint8_t
+social_channel[MAX_SOCIAL_CHANNELS] = { 1, 6, 11 };
 static void init_config_param(tpAniSirGlobal pMac);
 static bool csr_roam_process_results(tpAniSirGlobal pMac, tSmeCmd *pCommand,
 				     enum csr_roamcomplete_result Result,
@@ -301,6 +303,11 @@ static void csr_ser_des_unpack_diassoc_rsp(uint8_t *pBuf,
 					   tSirSmeDisassocRsp *pRsp);
 static void csr_init_operating_classes(tHalHandle hHal);
 
+static void csr_add_len_of_social_channels(tpAniSirGlobal mac,
+		uint8_t *num_chan);
+static void csr_add_social_channels(tpAniSirGlobal mac,
+		tSirUpdateChanList *chan_list, tCsrScanStruct *pScan,
+		uint8_t *num_chan);
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS csr_process_same_ap_reassoc_cmd(tpAniSirGlobal mac_ctx,
 					tSmeCmd *sme_cmd)
@@ -789,6 +796,71 @@ scan_list_sort_error:
 	qdf_mem_free(chan_list_non_greedy);
 }
 
+#ifdef WLAN_ENABLE_SOCIAL_CHANNELS_5G_ONLY
+static void csr_add_len_of_social_channels(tpAniSirGlobal mac,
+		uint8_t *num_chan)
+{
+	uint8_t i;
+	uint8_t no_chan = *num_chan;
+
+	sme_debug("add len of social channels, before adding - num_chan:%hu",
+			*num_chan);
+	if (CSR_IS_5G_BAND_ONLY(mac)) {
+		for (i = 0; i < MAX_SOCIAL_CHANNELS; i++) {
+			if (cds_get_channel_state(social_channel[i])
+					== CHANNEL_STATE_ENABLE)
+				no_chan++;
+		}
+	}
+	*num_chan = no_chan;
+	sme_debug("after adding - num_chan:%hu", *num_chan);
+}
+
+static void csr_add_social_channels(tpAniSirGlobal mac,
+		tSirUpdateChanList *chan_list, tCsrScanStruct *pScan,
+		uint8_t *num_chan)
+{
+	uint8_t i;
+	uint8_t no_chan = *num_chan;
+
+	sme_debug("add social channels chan_list %p, num_chan %hu", chan_list,
+			*num_chan);
+	if (CSR_IS_5G_BAND_ONLY(mac)) {
+		for (i = 0; i < MAX_SOCIAL_CHANNELS; i++) {
+			if (cds_get_channel_state(social_channel[i])
+					!= CHANNEL_STATE_ENABLE)
+				continue;
+			chan_list->chanParam[no_chan].chanId =
+				social_channel[i];
+			chan_list->chanParam[no_chan].pwr =
+				csr_find_channel_pwr(pScan->defaultPowerTable,
+						social_channel[i]);
+			chan_list->chanParam[no_chan].dfsSet = false;
+			if (cds_is_5_mhz_enabled())
+				chan_list->chanParam[no_chan].quarter_rate
+					= 1;
+			else if (cds_is_10_mhz_enabled())
+				chan_list->chanParam[no_chan].half_rate = 1;
+			no_chan++;
+		}
+		sme_debug("after adding -num_chan %hu", no_chan);
+	}
+	*num_chan = no_chan;
+}
+#else
+static void csr_add_len_of_social_channels(tpAniSirGlobal mac,
+		uint8_t *num_chan)
+{
+	sme_debug("skip adding len of social channels");
+}
+static void csr_add_social_channels(tpAniSirGlobal mac,
+		tSirUpdateChanList *chan_list, tCsrScanStruct *pScan,
+		uint8_t *num_chan)
+{
+	sme_debug("skip social channels");
+}
+#endif
+
 QDF_STATUS csr_update_channel_list(tpAniSirGlobal pMac)
 {
 	tSirUpdateChanList *pChanList;
@@ -797,7 +869,7 @@ QDF_STATUS csr_update_channel_list(tpAniSirGlobal pMac)
 	uint8_t num_channel = 0;
 	uint32_t bufLen;
 	cds_msg_t msg;
-	uint8_t i, j, social_channel[MAX_SOCIAL_CHANNELS] = { 1, 6, 11 };
+	uint8_t i;
 	uint8_t channel_state;
 	uint16_t unsafe_chan[NUM_CHANNELS];
 	uint16_t unsafe_chan_cnt = 0;
@@ -815,13 +887,7 @@ QDF_STATUS csr_update_channel_list(tpAniSirGlobal pMac)
 		    &unsafe_chan_cnt,
 		    sizeof(unsafe_chan));
 
-	if (CSR_IS_5G_BAND_ONLY(pMac)) {
-		for (i = 0; i < MAX_SOCIAL_CHANNELS; i++) {
-			if (cds_get_channel_state(social_channel[i])
-			    == CHANNEL_STATE_ENABLE)
-				numChan++;
-		}
-	}
+	csr_add_len_of_social_channels(pMac, &numChan);
 
 	bufLen = sizeof(tSirUpdateChanList) +
 		 (sizeof(tSirUpdateChanParam) * (numChan));
@@ -930,25 +996,8 @@ QDF_STATUS csr_update_channel_list(tpAniSirGlobal pMac)
 		}
 	}
 
-	if (CSR_IS_5G_BAND_ONLY(pMac)) {
-		for (j = 0; j < MAX_SOCIAL_CHANNELS; j++) {
-			if (cds_get_channel_state(social_channel[j])
-			    != CHANNEL_STATE_ENABLE)
-				continue;
-			pChanList->chanParam[num_channel].chanId =
-				social_channel[j];
-			pChanList->chanParam[num_channel].pwr =
-				csr_find_channel_pwr(pScan->defaultPowerTable,
-						     social_channel[j]);
-			pChanList->chanParam[num_channel].dfsSet = false;
-			if (cds_is_5_mhz_enabled())
-				pChanList->chanParam[num_channel].quarter_rate
-									= 1;
-			else if (cds_is_10_mhz_enabled())
-				pChanList->chanParam[num_channel].half_rate = 1;
-			num_channel++;
-		}
-	}
+	csr_add_social_channels(pMac, pChanList, pScan, &num_channel);
+
 	if (pMac->roam.configParam.early_stop_scan_enable)
 		csr_roam_sort_channel_for_early_stop(pMac, pChanList,
 						     num_channel);
@@ -4311,14 +4360,19 @@ QDF_STATUS csr_roam_prepare_bss_config(tpAniSirGlobal pMac,
 	 * Join timeout: if we find a BeaconInterval in the BssDescription,
 	 * then set the Join Timeout to be 10 x the BeaconInterval.
 	 */
-	if (pBssDesc->beaconInterval)
+	if (pBssDesc->beaconInterval) {
 		/* Make sure it is bigger than the minimal */
 		pBssConfig->uJoinTimeOut =
 			QDF_MAX(10 * pBssDesc->beaconInterval,
 				CSR_JOIN_FAILURE_TIMEOUT_MIN);
-	else
+		/* make sure it is less than max allowed */
+		pBssConfig->uJoinTimeOut =
+			QDF_MIN(pBssConfig->uJoinTimeOut,
+				WNI_CFG_JOIN_FAILURE_TIMEOUT_STAMAX);
+	} else {
 		pBssConfig->uJoinTimeOut =
 			CSR_JOIN_FAILURE_TIMEOUT_DEFAULT;
+	}
 	/* validate CB */
 	if ((pBssConfig->uCfgDot11Mode == eCSR_CFG_DOT11_MODE_11N)
 	    || (pBssConfig->uCfgDot11Mode == eCSR_CFG_DOT11_MODE_11AC)
@@ -11198,6 +11252,11 @@ csr_roam_chk_lnk_disassoc_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 		qdf_mem_free(cmd);
 		return;
 	}
+
+	/* Update the disconnect stats */
+	session->disconnect_stats.disconnection_cnt++;
+	session->disconnect_stats.disassoc_by_peer++;
+
 	if (csr_is_conn_state_infra(mac_ctx, sessionId))
 		session->connectState = eCSR_ASSOC_STATE_TYPE_NOT_CONNECTED;
 #ifndef WLAN_MDM_CODE_REDUCTION_OPT
@@ -11306,6 +11365,30 @@ csr_roam_chk_lnk_deauth_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 	if (!session) {
 		sme_err("session %d not found", sessionId);
 		return;
+	}
+
+	/* Update the disconnect stats */
+	switch (pDeauthInd->reasonCode) {
+	case eSIR_MAC_DISASSOC_DUE_TO_INACTIVITY_REASON:
+		session->disconnect_stats.disconnection_cnt++;
+		session->disconnect_stats.peer_kickout++;
+		break;
+	case eSIR_MAC_UNSPEC_FAILURE_REASON:
+	case eSIR_MAC_PREV_AUTH_NOT_VALID_REASON:
+	case eSIR_MAC_DEAUTH_LEAVING_BSS_REASON:
+	case eSIR_MAC_CLASS2_FRAME_FROM_NON_AUTH_STA_REASON:
+	case eSIR_MAC_CLASS3_FRAME_FROM_NON_ASSOC_STA_REASON:
+	case eSIR_MAC_STA_NOT_PRE_AUTHENTICATED_REASON:
+		session->disconnect_stats.disconnection_cnt++;
+		session->disconnect_stats.deauth_by_peer++;
+		break;
+	case eSIR_BEACON_MISSED:
+		session->disconnect_stats.disconnection_cnt++;
+		session->disconnect_stats.bmiss++;
+		break;
+	default:
+		/* Unknown reason code */
+		break;
 	}
 
 	if (csr_is_conn_state_infra(mac_ctx, sessionId))
@@ -15349,7 +15432,8 @@ QDF_STATUS csr_send_join_req_msg(tpAniSirGlobal pMac, uint32_t sessionId,
 		 * Set MU Bformee only if SU Bformee is enabled and
 		 * MU Bformee is enabled in INI
 		 */
-		if (value && csr_join_req->vht_config.su_beam_formee)
+		if (value && csr_join_req->vht_config.su_beam_formee &&
+				pIes->VHTCaps.muBeamformerCap)
 			csr_join_req->vht_config.mu_beam_formee = 1;
 		else
 			csr_join_req->vht_config.mu_beam_formee = 0;
@@ -15572,6 +15656,11 @@ QDF_STATUS csr_send_mb_disassoc_req_msg(tpAniSirGlobal pMac, uint32_t sessionId,
 	pMsg->reasonCode = reasonCode;
 	pMsg->process_ho_fail = (pSession->disconnect_reason ==
 		eCSR_DISCONNECT_REASON_ROAM_HO_FAIL) ? true : false;
+
+	/* Update the disconnect stats */
+	pSession->disconnect_stats.disconnection_cnt++;
+	pSession->disconnect_stats.disconnection_by_app++;
+
 	/*
 	 * The state will be DISASSOC_HANDOFF only when we are doing
 	 * handoff. Here we should not send the disassoc over the air
@@ -15765,6 +15854,10 @@ QDF_STATUS csr_send_mb_deauth_req_msg(tpAniSirGlobal pMac, uint32_t sessionId,
 	/* Set the peer MAC address before sending the message to LIM */
 	qdf_mem_copy(&pMsg->peer_macaddr.bytes, bssId, QDF_MAC_ADDR_SIZE);
 	pMsg->reasonCode = reasonCode;
+
+	/* Update the disconnect stats */
+	pSession->disconnect_stats.disconnection_cnt++;
+	pSession->disconnect_stats.disconnection_by_app++;
 
 	return cds_send_mb_message_to_mac(pMsg);
 }
@@ -21347,6 +21440,9 @@ static QDF_STATUS csr_process_roam_sync_callback(tpAniSirGlobal mac_ctx,
 	roam_info->update_erp_next_seq_num =
 			roam_synch_data->update_erp_next_seq_num;
 	roam_info->next_erp_seq_num = roam_synch_data->next_erp_seq_num;
+	sme_debug("Update ERP Seq Num : %d, Next ERP Seq Num : %d",
+			roam_info->update_erp_next_seq_num,
+			roam_info->next_erp_seq_num);
 	qdf_mem_copy(roam_info->replay_ctr, roam_synch_data->replay_ctr,
 			SIR_REPLAY_CTR_LEN);
 	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,

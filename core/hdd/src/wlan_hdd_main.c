@@ -2375,6 +2375,9 @@ static int __hdd_stop(struct net_device *dev)
 		hdd_debug("Closing all modules from the hdd_stop");
 		qdf_mc_timer_start(&hdd_ctx->iface_change_timer,
 				   hdd_ctx->config->iface_change_wait_time);
+		hdd_prevent_suspend_timeout(
+			hdd_ctx->config->iface_change_wait_time,
+			WIFI_POWER_EVENT_WAKELOCK_IFACE_CHANGE_TIMER);
 	}
 
 	EXIT();
@@ -4335,7 +4338,10 @@ QDF_STATUS hdd_reset_all_adapters(hdd_context_t *hdd_ctx)
 
 		hdd_deinit_tx_rx(adapter);
 		hdd_lro_disable(hdd_ctx, adapter);
-		hdd_clear_fils_connection_info(adapter);
+
+		if (adapter->device_mode == QDF_STA_MODE)
+			hdd_clear_fils_connection_info(adapter);
+
 		cds_decr_session_set_pcl(adapter->device_mode,
 						adapter->sessionId);
 		if (test_bit(WMM_INIT_DONE, &adapter->event_flags)) {
@@ -4390,16 +4396,7 @@ bool hdd_check_for_opened_interfaces(hdd_context_t *hdd_ctx)
 	return close_modules;
 }
 
-/**
- * hdd_is_interface_up()- Checkfor interface up before ssr
- * @hdd_ctx: HDD context
- *
- * check  if there are any wlan interfaces before SSR accordingly start
- * the interface.
- *
- * Return: 0 if interface was opened else false
- */
-static bool hdd_is_interface_up(hdd_adapter_t *adapter)
+bool hdd_is_interface_up(hdd_adapter_t *adapter)
 {
 	if (test_bit(DEVICE_IFACE_OPENED, &adapter->event_flags))
 		return true;
@@ -5840,6 +5837,8 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 		hdd_stop_all_adapters(hdd_ctx);
 	}
 
+	unregister_netdevice_notifier(&hdd_netdev_notifier);
+
 	/*
 	 * Close the scheduler before calling cds_close to make sure
 	 * no thread is scheduled after the each module close is
@@ -5852,6 +5851,8 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 	}
 
 	hdd_wlan_stop_modules(hdd_ctx, false);
+
+	qdf_nbuf_deinit_replenish_timer();
 
 	qdf_spinlock_destroy(&hdd_ctx->hdd_adapter_lock);
 	qdf_spinlock_destroy(&hdd_ctx->sta_update_info_lock);
@@ -5867,9 +5868,6 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 
 	hdd_runtime_suspend_context_deinit(hdd_ctx);
 	hdd_close_all_adapters(hdd_ctx, false);
-
-	unregister_netdevice_notifier(&hdd_netdev_notifier);
-
 	hdd_ipa_cleanup(hdd_ctx);
 
 	/* Free up RoC request queue and flush workqueue */
@@ -5889,7 +5887,6 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 	wlan_hdd_deinit_chan_info(hdd_ctx);
 	hdd_exit_netlink_services(hdd_ctx);
 	mutex_destroy(&hdd_ctx->iface_change_lock);
-	qdf_mem_free(hdd_ctx->target_hw_name);
 	hdd_context_destroy(hdd_ctx);
 }
 
@@ -7834,7 +7831,6 @@ static hdd_context_t *hdd_context_create(struct device *dev)
 
 	cds_set_multicast_logging(hdd_ctx->config->multicast_host_fw_msgs);
 
-	wlan_hdd_init_chan_info(hdd_ctx);
 	ret = wlan_hdd_init_tx_rx_histogram(hdd_ctx);
 	if (ret)
 		goto err_deinit_hdd_context;
@@ -8293,6 +8289,8 @@ static int hdd_update_cds_config(hdd_context_t *hdd_ctx)
 	cds_cfg->max_station = hdd_ctx->config->maxNumberOfPeers;
 	cds_cfg->sub_20_channel_width = WLAN_SUB_20_CH_WIDTH_NONE;
 	cds_cfg->flow_steering_enabled = hdd_ctx->config->flow_steering_enable;
+	cds_cfg->max_msdus_per_rxinorderind =
+		hdd_ctx->config->max_msdus_per_rxinorderind;
 	cds_cfg->self_recovery_enabled = hdd_ctx->config->enableSelfRecovery;
 	cds_cfg->fw_timeout_crash = hdd_ctx->config->fw_timeout_crash;
 	cds_cfg->active_uc_bpf_mode = hdd_ctx->config->active_uc_bpf_mode;
@@ -9355,6 +9353,9 @@ int hdd_configure_cds(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 		sme_cli_set_command(0, WMI_PDEV_PARAM_FAST_PWR_TRANSITION,
 			hdd_ctx->config->enable_phy_reg_retention, PDEV_CMD);
 
+	sme_cli_set_command(0, (int)WMI_PDEV_AUTO_DETECT_POWER_FAILURE,
+			    hdd_ctx->config->auto_pwr_save_fail_mode, PDEV_CMD);
+
 	cds_get_dfs_region(&dfs_reg);
 	cds_set_wma_dfs_region(dfs_reg);
 
@@ -9473,6 +9474,9 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode)
 			mutex_unlock(&hdd_ctx->iface_change_lock);
 			qdf_mc_timer_start(&hdd_ctx->iface_change_timer,
 				hdd_ctx->config->iface_change_wait_time);
+			hdd_prevent_suspend_timeout(
+				hdd_ctx->config->iface_change_wait_time,
+				WIFI_POWER_EVENT_WAKELOCK_IFACE_CHANGE_TIMER);
 			hdd_ctx->stop_modules_in_progress = false;
 			cds_set_module_stop_in_progress(false);
 			return 0;
@@ -9534,6 +9538,11 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode)
 	if (!hif_ctx) {
 		hdd_err("Hif context is Null");
 		ret = -EINVAL;
+	}
+
+	if (hdd_ctx->target_hw_name) {
+		qdf_mem_free(hdd_ctx->target_hw_name);
+		hdd_ctx->target_hw_name = NULL;
 	}
 
 	hdd_hif_close(hif_ctx);
@@ -9756,6 +9765,8 @@ int hdd_wlan_startup(struct device *dev)
 	qdf_mc_timer_init(&hdd_ctx->iface_change_timer, QDF_TIMER_TYPE_SW,
 			  hdd_iface_change_callback, (void *)hdd_ctx);
 
+	qdf_nbuf_init_replenish_timer();
+
 	mutex_init(&hdd_ctx->iface_change_lock);
 
 	ret = hdd_init_netlink_services(hdd_ctx);
@@ -9780,6 +9791,8 @@ int hdd_wlan_startup(struct device *dev)
 		hdd_err("HAL context is null");
 		goto err_stop_modules;
 	}
+
+	wlan_hdd_init_chan_info(hdd_ctx);
 
 	ret = hdd_wiphy_init(hdd_ctx);
 	if (ret) {
@@ -9905,6 +9918,9 @@ int hdd_wlan_startup(struct device *dev)
 
 	qdf_mc_timer_start(&hdd_ctx->iface_change_timer,
 			   hdd_ctx->config->iface_change_wait_time);
+	hdd_prevent_suspend_timeout(
+		hdd_ctx->config->iface_change_wait_time,
+		WIFI_POWER_EVENT_WAKELOCK_IFACE_CHANGE_TIMER);
 
 	hdd_start_complete(0);
 	goto success;
@@ -9944,6 +9960,7 @@ err_hdd_free_context:
 	else
 		hdd_start_complete(ret);
 
+	qdf_nbuf_deinit_replenish_timer();
 	qdf_mc_timer_destroy(&hdd_ctx->iface_change_timer);
 	mutex_destroy(&hdd_ctx->iface_change_lock);
 	hdd_context_destroy(hdd_ctx);
@@ -12023,16 +12040,19 @@ int hdd_set_limit_off_chan_for_tos(hdd_adapter_t *adapter, enum tos tos,
 	ac_bit = limit_off_chan_tbl[tos][HDD_AC_BIT_INDX];
 
 	if (is_tos_active)
-		hdd_ctx->active_ac |= ac_bit;
+		adapter->active_ac |= ac_bit;
 	else
-		hdd_ctx->active_ac &= ~ac_bit;
+		adapter->active_ac &= ~ac_bit;
 
-	if (hdd_ctx->active_ac) {
-		if (hdd_ctx->active_ac & HDD_AC_VO_BIT) {
+	hdd_debug("session id %hu active_ac %0x",
+			adapter->sessionId, adapter->active_ac);
+
+	if (adapter->active_ac) {
+		if (adapter->active_ac & HDD_AC_VO_BIT) {
 			cmd->max_off_chan_time =
 				limit_off_chan_tbl[TOS_VO][HDD_DWELL_TIME_INDX];
 			cds_set_cur_conc_system_pref(CDS_LATENCY);
-		} else if (hdd_ctx->active_ac & HDD_AC_VI_BIT) {
+		} else if (adapter->active_ac & HDD_AC_VI_BIT) {
 			cmd->max_off_chan_time =
 				limit_off_chan_tbl[TOS_VI][HDD_DWELL_TIME_INDX];
 			cds_set_cur_conc_system_pref(CDS_LATENCY);
@@ -12051,6 +12071,49 @@ int hdd_set_limit_off_chan_for_tos(hdd_adapter_t *adapter, enum tos tos,
 	cmd->is_tos_active = is_tos_active;
 	cmd->rest_time = hdd_ctx->config->nRestTimeConc;
 	cmd->skip_dfs_chans = true;
+
+	ret = hdd_send_limit_off_chan_cmd(cmd);
+	if (ret)
+		qdf_mem_free(cmd);
+
+	return ret;
+}
+
+/**
+ * hdd_reset_limit_off_chan() - reset limit off-channel command parameters
+ * @adapter - HDD adapter
+ *
+ * Return: 0 on success and non zero value on failure
+ */
+
+int hdd_reset_limit_off_chan(hdd_adapter_t *adapter)
+{
+	struct sir_limit_off_chan *cmd;
+	hdd_context_t *hdd_ctx;
+	int ret;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+
+	if (ret < 0)
+		return ret;
+
+	cmd = qdf_mem_malloc(sizeof(struct sir_limit_off_chan));
+	if (!cmd) {
+		hdd_err("qdf_mem_malloc failed for limit off channel");
+		return -ENOMEM;
+	}
+
+	cds_set_cur_conc_system_pref(hdd_ctx->config->conc_system_pref);
+
+	/* clear the bitmap */
+	adapter->active_ac = 0;
+
+	hdd_debug("reset ac_bitmap for session %hu active_ac %0x",
+			adapter->sessionId, adapter->active_ac);
+
+	cmd->vdev_id = adapter->sessionId;
+	cmd->is_tos_active = false;
 
 	ret = hdd_send_limit_off_chan_cmd(cmd);
 	if (ret)

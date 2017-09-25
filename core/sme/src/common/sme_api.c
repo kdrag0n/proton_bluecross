@@ -1284,6 +1284,7 @@ void sme_set_scan_disable(tHalHandle h_hal, int value)
 {
 	tpAniSirGlobal mac_ctx = PMAC_STRUCT(h_hal);
 
+	sme_info("scan disable %d", value);
 	mac_ctx->lim.scan_disabled = value;
 }
 /**
@@ -18471,4 +18472,40 @@ QDF_STATUS sme_set_bmiss_bcnt(uint32_t vdev_id, uint32_t first_cnt,
 		uint32_t final_cnt)
 {
 	return wma_config_bmiss_bcnt_params(vdev_id, first_cnt, final_cnt);
+}
+
+void sme_display_disconnect_stats(tHalHandle hal, uint8_t session_id)
+{
+	tCsrRoamSession *session;
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+
+	if (!CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
+		sme_err("%s Invalid session id: %d", __func__, session_id);
+		return;
+	}
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+	if (!session) {
+		sme_err("%s Failed to get session for id: %d",
+			__func__, session_id);
+		return;
+	}
+
+	sme_debug("Total No. of Disconnections: %d",
+		  session->disconnect_stats.disconnection_cnt);
+
+	sme_debug("No. of Diconnects Triggered by Application: %d",
+		  session->disconnect_stats.disconnection_by_app);
+
+	sme_debug("No. of Disassoc Sent by Peer: %d",
+		  session->disconnect_stats.disassoc_by_peer);
+
+	sme_debug("No. of Deauth Sent by Peer: %d",
+		  session->disconnect_stats.deauth_by_peer);
+
+	sme_debug("No. of Disconnections due to Beacon Miss: %d",
+		  session->disconnect_stats.bmiss);
+
+	sme_debug("No. of Disconnections due to Peer Kickout: %d",
+		  session->disconnect_stats.peer_kickout);
 }

@@ -142,7 +142,7 @@ static int dot11p_validate_channel(struct wiphy *wiphy,
 	struct ieee80211_supported_band *current_band;
 	struct ieee80211_channel *current_channel;
 
-	for (band_idx = 0; band_idx < NUM_NL80211_BANDS; band_idx++) {
+	for (band_idx = 0; band_idx < HDD_NUM_NL80211_BANDS; band_idx++) {
 		current_band = wiphy->bands[band_idx];
 		if (!current_band)
 			continue;
@@ -881,10 +881,6 @@ static int __wlan_hdd_cfg80211_ocb_set_config(struct wiphy *wiphy,
 	config->def_tx_param_size = def_tx_param_size;
 
 	/* Read the channel array */
-	if (!tb[QCA_WLAN_VENDOR_ATTR_OCB_SET_CONFIG_CHANNEL_ARRAY]) {
-		hdd_err("CHANNEL_ARRAY is not present");
-		return -EINVAL;
-	}
 	channel_array = tb[QCA_WLAN_VENDOR_ATTR_OCB_SET_CONFIG_CHANNEL_ARRAY];
 	if (!channel_array) {
 		hdd_err("No channel present");
