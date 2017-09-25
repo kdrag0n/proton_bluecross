@@ -49,6 +49,7 @@ enum {
 	ENC_FMT_AAC_V2 = ASM_MEDIA_FMT_AAC_V2,
 	ENC_FMT_APTX = ASM_MEDIA_FMT_APTX,
 	ENC_FMT_APTX_HD = ASM_MEDIA_FMT_APTX_HD,
+	ENC_FMT_CELT = ASM_MEDIA_FMT_CELT,
 };
 
 enum {
@@ -2146,7 +2147,12 @@ static int msm_dai_q6_afe_enc_cfg_get(struct snd_kcontrol *kcontrol,
 		case ENC_FMT_APTX_HD:
 			memcpy(ucontrol->value.bytes.data + format_size,
 				&dai_data->enc_config.data,
-				sizeof(struct asm_aac_enc_cfg_v2_t));
+				sizeof(struct asm_custom_enc_cfg_t));
+			break;
+		case ENC_FMT_CELT:
+			memcpy(ucontrol->value.bytes.data + format_size,
+				&dai_data->enc_config.data,
+				sizeof(struct asm_celt_enc_cfg_t));
 			break;
 		default:
 			pr_debug("%s: unknown format = %d\n",
@@ -2190,7 +2196,12 @@ static int msm_dai_q6_afe_enc_cfg_put(struct snd_kcontrol *kcontrol,
 		case ENC_FMT_APTX_HD:
 			memcpy(&dai_data->enc_config.data,
 				ucontrol->value.bytes.data + format_size,
-				sizeof(struct asm_custom_enc_cfg_aptx_t));
+				sizeof(struct asm_custom_enc_cfg_t));
+			break;
+		case ENC_FMT_CELT:
+			memcpy(&dai_data->enc_config.data,
+				ucontrol->value.bytes.data + format_size,
+				sizeof(struct asm_celt_enc_cfg_t));
 			break;
 		default:
 			pr_debug("%s: Ignore enc config for unknown format = %d\n",
@@ -3632,7 +3643,6 @@ static int msm_dai_q6_dai_mi2s_remove(struct snd_soc_dai *dai)
 		clear_bit(STATUS_PORT_STARTED,
 			  mi2s_dai_data->tx_dai.mi2s_dai_data.status_mask);
 	}
-	kfree(mi2s_dai_data);
 	return 0;
 }
 
@@ -5128,6 +5138,25 @@ static int msm_dai_tdm_q6_probe(struct platform_device *pdev)
 	dev_dbg(&pdev->dev, "%s: Clk Rate from DT file %d\n",
 		__func__, tdm_clk_set.clk_freq_in_hz);
 
+	/* initialize static tdm clk attribute to default value */
+	tdm_clk_set.clk_attri = Q6AFE_LPASS_CLK_ATTRIBUTE_INVERT_COUPLE_NO;
+
+	/* extract tdm clk attribute into static */
+	if (of_find_property(pdev->dev.of_node,
+			"qcom,msm-cpudai-tdm-clk-attribute", NULL)) {
+		rc = of_property_read_u16(pdev->dev.of_node,
+			"qcom,msm-cpudai-tdm-clk-attribute",
+			&tdm_clk_set.clk_attri);
+		if (rc) {
+			dev_err(&pdev->dev, "%s: value for clk attribute not found %s\n",
+				__func__, "qcom,msm-cpudai-tdm-clk-attribute");
+			goto rtn;
+		}
+		dev_dbg(&pdev->dev, "%s: clk attribute from DT file %d\n",
+			__func__, tdm_clk_set.clk_attri);
+	} else
+		dev_dbg(&pdev->dev, "%s: clk attribute not found\n", __func__);
+
 	/* extract tdm clk src master/slave info into static */
 	rc = of_property_read_u32(pdev->dev.of_node,
 		"qcom,msm-cpudai-tdm-clk-internal",
@@ -6105,10 +6134,13 @@ static int msm_dai_q6_tdm_set_tdm_slot(struct snd_soc_dai *dai,
 		return -EINVAL;
 	}
 
-	/* HW only supports 16 and 8 slots configuration */
+	/* HW supports 1-32 slots configuration. Typical: 1, 2, 4, 8, 16, 32 */
 	switch (slots) {
 	case 2:
 		cap_mask = 0x03;
+		break;
+	case 4:
+		cap_mask = 0x0F;
 		break;
 	case 8:
 		cap_mask = 0xFF;
@@ -6202,6 +6234,40 @@ static int msm_dai_q6_tdm_set_tdm_slot(struct snd_soc_dai *dai,
 	}
 
 	return rc;
+}
+
+static int msm_dai_q6_tdm_set_sysclk(struct snd_soc_dai *dai,
+				int clk_id, unsigned int freq, int dir)
+{
+	struct msm_dai_q6_tdm_dai_data *dai_data =
+		dev_get_drvdata(dai->dev);
+
+	switch (dai->id) {
+	case AFE_PORT_ID_QUATERNARY_TDM_RX:
+	case AFE_PORT_ID_QUATERNARY_TDM_RX_1:
+	case AFE_PORT_ID_QUATERNARY_TDM_RX_2:
+	case AFE_PORT_ID_QUATERNARY_TDM_RX_3:
+	case AFE_PORT_ID_QUATERNARY_TDM_RX_4:
+	case AFE_PORT_ID_QUATERNARY_TDM_RX_5:
+	case AFE_PORT_ID_QUATERNARY_TDM_RX_6:
+	case AFE_PORT_ID_QUATERNARY_TDM_RX_7:
+	case AFE_PORT_ID_QUATERNARY_TDM_TX:
+	case AFE_PORT_ID_QUATERNARY_TDM_TX_1:
+	case AFE_PORT_ID_QUATERNARY_TDM_TX_2:
+	case AFE_PORT_ID_QUATERNARY_TDM_TX_3:
+	case AFE_PORT_ID_QUATERNARY_TDM_TX_4:
+	case AFE_PORT_ID_QUATERNARY_TDM_TX_5:
+	case AFE_PORT_ID_QUATERNARY_TDM_TX_6:
+	case AFE_PORT_ID_QUATERNARY_TDM_TX_7:
+		dai_data->clk_set.clk_freq_in_hz = freq;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	dev_dbg(dai->dev, "%s: dai id = 0x%x, group clk_freq = %d\n",
+			__func__, dai->id, freq);
+	return 0;
 }
 
 static int msm_dai_q6_tdm_set_channel_map(struct snd_soc_dai *dai,
@@ -6633,6 +6699,7 @@ static struct snd_soc_dai_ops msm_dai_q6_tdm_ops = {
 	.hw_params        = msm_dai_q6_tdm_hw_params,
 	.set_tdm_slot     = msm_dai_q6_tdm_set_tdm_slot,
 	.set_channel_map  = msm_dai_q6_tdm_set_channel_map,
+	.set_sysclk       = msm_dai_q6_tdm_set_sysclk,
 	.shutdown         = msm_dai_q6_tdm_shutdown,
 };
 

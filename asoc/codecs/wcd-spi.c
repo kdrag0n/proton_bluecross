@@ -522,7 +522,7 @@ static int wcd_spi_cmd_rdsr(struct spi_device *spi,
 	struct spi_transfer *tx_xfer = &wcd_spi->xfer2[0];
 	struct spi_transfer *rx_xfer = &wcd_spi->xfer2[1];
 	u8 rdsr_cmd;
-	u32 status;
+	u32 status = 0;
 	int ret;
 
 	rdsr_cmd = WCD_SPI_CMD_RDSR;
@@ -1374,6 +1374,10 @@ static void wcd_spi_component_unbind(struct device *dev,
 {
 	struct spi_device *spi = to_spi_device(dev);
 	struct wcd_spi_priv *wcd_spi = spi_get_drvdata(spi);
+	struct wcd_spi_debug_data *dbg_data = &wcd_spi->debug_data;
+
+	debugfs_remove_recursive(dbg_data->dir);
+	dbg_data->dir = NULL;
 
 	wcd_spi->m_dev = NULL;
 	wcd_spi->m_ops = NULL;

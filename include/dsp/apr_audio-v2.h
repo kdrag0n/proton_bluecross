@@ -623,6 +623,9 @@ struct audproc_softvolume_params {
  */
 #define AUDPROC_PARAM_ID_MFC_OUTPUT_MEDIA_FORMAT            0x00010913
 
+/* Param ID of Channel Mixer used by AUDPROC_MODULE_ID_MFC */
+#define AUDPROC_CHMIXER_PARAM_ID_COEFF                      0x00010342
+
 
 struct audproc_mfc_output_media_fmt {
 	struct adm_cmd_set_pp_params_v5 params;
@@ -3252,7 +3255,7 @@ struct asm_aac_enc_cfg_v2_t {
 #define PCM_CHANNEL_R         2
 #define PCM_CHANNEL_C         3
 
-struct asm_custom_enc_cfg_aptx_t {
+struct asm_custom_enc_cfg_t {
 	uint32_t    sample_rate;
 	/* Mono or stereo */
 	uint16_t    num_channels;
@@ -3262,6 +3265,52 @@ struct asm_custom_enc_cfg_aptx_t {
 	 */
 	uint8_t     channel_mapping[8];
 	uint32_t    custom_size;
+} __packed;
+#define ASM_MEDIA_FMT_CELT 0x00013221
+struct asm_celt_specific_enc_cfg_t {
+	/*
+	 * Bit rate used for encoding.
+	 * This is used to calculate the upper threshold
+	 * for bytes per frame if vbr_flag is 1.
+	 * Or else, this will be used as a regular constant
+	 * bit rate for encoder output.
+	 * @Range : 32000 to 1536000
+	 * @Default: 128
+	 */
+	uint32_t                     bit_rate;
+	/*
+	 * Frame size used for encoding.
+	 * @Range : 64, 128, 256, 512
+	 * @Default: 256
+	 */
+	uint16_t                     frame_size;
+	/*
+	 * complexity of algorithm.
+	 * @Range : 0-10
+	 * @Default: 3
+	 */
+	uint16_t                     complexity;
+	/*
+	 * Switch variable for prediction feature.
+	 * Used to choose between the level of interframe
+	 * predictions allowed while encoding.
+	 * @Range:
+	 * 0: Independent Frames.
+	 * 1: Short Term interframe prediction allowed.
+	 * 2: Long term prediction allowed.
+	 * @Default: 2
+	 */
+	uint16_t                     prediction_mode;
+	/*
+	 * Variable Bit Rate flag.
+	 * @Default: 0
+	 */
+	uint16_t                     vbr_flag;
+} __packed;
+
+struct asm_celt_enc_cfg_t {
+	struct asm_custom_enc_cfg_t  custom_config;
+	struct asm_celt_specific_enc_cfg_t  celt_specific_config;
 } __packed;
 
 struct afe_enc_fmt_id_param_t {
@@ -3331,7 +3380,8 @@ struct afe_port_media_type_t {
 union afe_enc_config_data {
 	struct asm_sbc_enc_cfg_t sbc_config;
 	struct asm_aac_enc_cfg_v2_t aac_config;
-	struct asm_custom_enc_cfg_aptx_t  aptx_config;
+	struct asm_custom_enc_cfg_t  custom_config;
+	struct asm_celt_enc_cfg_t  celt_config;
 };
 
 struct afe_enc_config {
@@ -3666,7 +3716,7 @@ struct afe_lpass_core_shared_clk_config_command {
 #define DEFAULT_POPP_TOPOLOGY				0x00010BE4
 #define COMPRESSED_PASSTHROUGH_DEFAULT_TOPOLOGY         0x0001076B
 #define COMPRESSED_PASSTHROUGH_NONE_TOPOLOGY            0x00010774
-#define VPM_TX_SM_ECNS_COPP_TOPOLOGY			0x00010F71
+#define VPM_TX_SM_ECNS_V2_COPP_TOPOLOGY			0x00010F89
 #define VPM_TX_DM_FLUENCE_COPP_TOPOLOGY			0x00010F72
 #define VPM_TX_QMIC_FLUENCE_COPP_TOPOLOGY		0x00010F75
 #define VPM_TX_DM_RFECNS_COPP_TOPOLOGY			0x00010F86
@@ -9264,7 +9314,7 @@ struct avs_svc_api_info {
 
 struct avcs_fwk_ver_info {
 	struct avcs_get_fwk_version avcs_fwk_version;
-	struct avs_svc_api_info *services;
+	struct avs_svc_api_info services[0];
 } __packed;
 
 /* LSM Specific */
