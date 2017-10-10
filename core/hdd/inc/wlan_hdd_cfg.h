@@ -1584,6 +1584,29 @@ enum hdd_dot11_mode {
 
 /*
  * <ini>
+ * rssi_abs_thresh - The min RSSI of the candidate AP to consider roam
+ * @Min: -96
+ * @Max: 0
+ * @Default: 0
+ *
+ * The RSSI value of the candidate AP should be higher than rssi_abs_thresh
+ * to roam to the AP. 0 means no absolute minimum RSSI is required.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_RSSI_ABS_THRESHOLD_NAME        "rssi_abs_thresh"
+#define CFG_ROAM_RSSI_ABS_THRESHOLD_MIN         (-96)
+#define CFG_ROAM_RSSI_ABS_THRESHOLD_MAX         (0)
+#define CFG_ROAM_RSSI_ABS_THRESHOLD_DEFAULT     (0)
+
+/*
+ * <ini>
  * gRoamScanNProbes - Sets the number of probes to be sent for firmware roaming
  * @Min: 1
  * @Max: 10
@@ -2090,6 +2113,36 @@ enum hdd_dot11_mode {
 #define CFG_ROAM_BG_SCAN_CLIENT_BITMAP_MIN      (0)
 #define CFG_ROAM_BG_SCAN_CLIENT_BITMAP_MAX      (0x7FF)
 #define CFG_ROAM_BG_SCAN_CLIENT_BITMAP_DEFAULT  (0x424)
+
+/*
+ * <ini>
+ * roam_bad_rssi_thresh_offset_2g - RSSI threshold offset for 2G to 5G roam
+ * @Min: 0
+ * @Max: 86
+ * @Default: 40
+ *
+ * If the DUT is connected to an AP with weak signal in 2G band, then the
+ * bad RSSI offset for 2g would be used as offset from the bad RSSI
+ * threshold configured and then use the resulting rssi for an opportunity
+ * to use the scan results from other scan clients and try to roam to
+ * 5G Band ONLY if there is a better AP available in the environment.
+ *
+ * For example if the roam_bg_scan_bad_rssi_thresh is -76 and
+ * roam_bad_rssi_thresh_offset_2g is 40 then the difference of -36 would be
+ * used as a trigger to roam to a 5G AP if DUT initially connected to a 2G AP
+ *
+ * Related: roam_bg_scan_bad_rssi_thresh
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G_NAME "roam_bad_rssi_thresh_offset_2g"
+#define CFG_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G_MIN     (0)
+#define CFG_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G_MAX     (86)
+#define CFG_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G_DEFAULT (40)
 
 /*
  * <ini>
@@ -5472,17 +5525,27 @@ enum hdd_link_speed_rpt_type {
  * <ini>
  * gEnableRTSProfiles - It will use configuring different RTS profiles
  * @Min: 0
- * @Max: 34
+ * @Max: 66
  * @Default: 33
  *
  * This ini used for configuring different RTS profiles
  * to firmware.
- * Following are the valid values for the rtsprofile:
- * RTSCTS_DISABLED                           0
- * RTSCTS_ENABLED_4_SECOND_RATESERIES        17
- * CTS2SELF_ENABLED_4_SECOND_RATESERIES      18
- * RTSCTS_ENABLED_4_SWRETRIES                33
- * CTS2SELF_ENABLED_4_SWRETRIES              34
+ * Following are the valid values for the rts profile:
+ * RTSCTS_DISABLED				0
+ * NOT_ALLOWED					1
+ * NOT_ALLOWED					2
+ * RTSCTS_DISABLED				16
+ * RTSCTS_ENABLED_4_SECOND_RATESERIES		17
+ * CTS2SELF_ENABLED_4_SECOND_RATESERIES		18
+ * RTSCTS_DISABLED				32
+ * RTSCTS_ENABLED_4_SWRETRIES			33
+ * CTS2SELF_ENABLED_4_SWRETRIES			34
+ * NOT_ALLOWED					48
+ * NOT_ALLOWED					49
+ * NOT_ALLOWED					50
+ * RTSCTS_DISABLED				64
+ * RTSCTS_ENABLED_4_ALL_RATESERIES		65
+ * CTS2SELF_ENABLED_4_ALL_RATESERIES		66
  *
  * Related: None
  *
@@ -5495,7 +5558,7 @@ enum hdd_link_speed_rpt_type {
 
 #define CFG_ENABLE_FW_RTS_PROFILE              "gEnableRTSProfiles"
 #define CFG_ENABLE_FW_RTS_PROFILE_MIN          (0)
-#define CFG_ENABLE_FW_RTS_PROFILE_MAX          (34)
+#define CFG_ENABLE_FW_RTS_PROFILE_MAX          (66)
 #define CFG_ENABLE_FW_RTS_PROFILE_DEFAULT      (33)
 
 #ifdef FEATURE_GREEN_AP
@@ -8857,6 +8920,18 @@ enum dot11p_mode {
 #define TSF_GPIO_PIN_INVALID                       (255)
 #define CFG_SET_TSF_GPIO_PIN_DEFAULT               (TSF_GPIO_PIN_INVALID)
 
+#ifdef WLAN_FEATURE_TSF_PLUS
+/* PTP options */
+#define CFG_SET_TSF_PTP_OPT_NAME                  "gtsf_ptp_options"
+#define CFG_SET_TSF_PTP_OPT_MIN                   (0)
+#define CFG_SET_TSF_PTP_OPT_MAX                   (0xff)
+#define CFG_SET_TSF_PTP_OPT_RX                    (0x1)
+#define CFG_SET_TSF_PTP_OPT_TX                    (0x2)
+#define CFG_SET_TSF_PTP_OPT_RAW                   (0x4)
+#define CFG_SET_TSF_DBG_FS                        (0x8)
+#define CFG_SET_TSF_PTP_OPT_DEFAULT               (0xf)
+#endif
+
 /*
  * Dense traffic threshold
  * traffic threshold required for dense roam scan
@@ -10846,9 +10921,10 @@ enum hw_filter_mode {
  * @Max: 1
  * @Default: 1
  *
- * This ini is used to enable/disable broadcast probe response
+ * This ini is used to enable/disable broadcast probe response.
+ * This is set only if g_is_fils_enabled is set to 1
  *
- * Related: None
+ * Related: g_is_fils_enabled
  *
  * Supported Feature: FILS
  *
@@ -11983,6 +12059,10 @@ enum hw_filter_mode {
  * selection. If AP supports HT caps, AP will get additional Weightage with
  * this param.
  *
+ * Related: None
+ *
+ * Supported Feature: STA Candidate selection
+ *
  * Usage: External
  *
  * </ini>
@@ -12003,6 +12083,10 @@ enum hw_filter_mode {
  * selection. If AP supports VHT caps, AP will get additional weightage with
  * this param.
  *
+ * Related: None
+ *
+ * Supported Feature: STA Candidate selection
+ *
  * Usage: External
  *
  * </ini>
@@ -12012,25 +12096,30 @@ enum hw_filter_mode {
 #define CFG_VHT_CAPABILITY_WEIGHTAGE_DEFAULT (5)
 #define CFG_VHT_CAPABILITY_WEIGHTAGE_MIN     (0)
 #define CFG_VHT_CAPABILITY_WEIGHTAGE_MAX     (100)
+
 /*
  * <ini>
  * chan_width_weightage - Channel Width Weightage to calculate best candidate
  * @Min: 0
  * @Max: 100
- * @Default: 10
+ * @Default: 5
  *
  * This ini is used to increase/decrease Channel Width weightage in best
  * candidate selection. AP with Higher channel width will get higher weightage.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA Candidate selection
  *
  * Usage: External
  *
  * </ini>
  */
-
 #define CFG_CHAN_WIDTH_WEIGHTAGE_NAME    "chan_width_weightage"
-#define CFG_CHAN_WIDTH_WEIGHTAGE_DEFAULT (10)
+#define CFG_CHAN_WIDTH_WEIGHTAGE_DEFAULT (5)
 #define CFG_CHAN_WIDTH_WEIGHTAGE_MIN     (0)
 #define CFG_CHAN_WIDTH_WEIGHTAGE_MAX     (100)
+
 /*
  * <ini>
  * chan_band_weightage - Channel Band perferance to 5GHZ to
@@ -12043,15 +12132,19 @@ enum hw_filter_mode {
  * in best candidate selection. 5GHZ AP get this additional boost compare
  * to 2GHZ AP.
  *
+ * Related: None
+ *
+ * Supported Feature: STA Candidate selection
+ *
  * Usage: External
  *
  * </ini>
  */
-
 #define CFG_CHAN_BAND_WEIGHTAGE_NAME    "chan_band_weightage"
 #define CFG_CHAN_BAND_WEIGHTAGE_DEFAULT (5)
 #define CFG_CHAN_BAND_WEIGHTAGE_MIN     (0)
 #define CFG_CHAN_BAND_WEIGHTAGE_MAX     (100)
+
 /*
  * <ini>
  * nss_weightage - NSS Weightage to calculate best candidate
@@ -12064,15 +12157,19 @@ enum hw_filter_mode {
  * supports 1x1 and station supports 2X2, first A will get this additional
  * weightage.
  *
+ * Related: None
+ *
+ * Supported Feature: STA Candidate selection
+ *
  * Usage: External
  *
  * </ini>
  */
-
 #define CFG_NSS_WEIGHTAGE_NAME    "nss_weightage"
 #define CFG_NSS_WEIGHTAGE_DEFAULT (5)
 #define CFG_NSS_WEIGHTAGE_MIN     (0)
 #define CFG_NSS_WEIGHTAGE_MAX     (100)
+
 /*
  * <ini>
  * beamforming_cap_weightage - Beam Forming Weightage to
@@ -12085,15 +12182,19 @@ enum hw_filter_mode {
  * some AP support Beam forming or not. If AP suppoets Beam forming,
  * that AP will get additional boost of this weightage
  *
+ * Related: None
+ *
+ * Supported Feature: STA Candidate selection
+ *
  * Usage: External
  *
  * </ini>
  */
-
 #define CFG_BEAMFORMING_CAP_WEIGHTAGE_NAME "beamforming_cap_weightage"
 #define CFG_BEAMFORMING_CAP_WEIGHTAGE_DEFAULT (2)
 #define CFG_BEAMFORMING_CAP_WEIGHTAGE_MIN     (0)
 #define CFG_BEAMFORMING_CAP_WEIGHTAGE_MAX     (100)
+
 /*
  * <ini>
  * pcl_weightage - PCL Weightage to calculate best candidate
@@ -12105,15 +12206,19 @@ enum hw_filter_mode {
  * selection. If some APs are in PCL list, those AP will get addition
  * weightage.
  *
+ * Related: None
+ *
+ * Supported Feature: STA Candidate selection
+ *
  * Usage: External
  *
  * </ini>
  */
-
 #define CFG_PCL_WEIGHT_WEIGHTAGE_NAME "pcl_weightage"
 #define CFG_PCL_WEIGHT_DEFAULT        (10)
 #define CFG_PCL_WEIGHT_MIN            (0)
 #define CFG_PCL_WEIGHT_MAX            (100)
+
 /*
  * <ini>
  * channel_congestion_weightage - channel Congestion Weightage to
@@ -12126,15 +12231,497 @@ enum hw_filter_mode {
  * in candidate selection. Congestion is mesaured with the help of ESP/QBSS.
  * selection.
  *
+ * Related: None
+ *
+ * Supported Feature: STA Candidate selection
+ *
  * Usage: External
  *
  * </ini>
  */
-
 #define CFG_CHANNEL_CONGESTION_WEIGHTAGE_NAME "channel_congestion_weightage"
 #define CFG_CHANNEL_CONGESTION_WEIGHTAGE_DEFAULT (5)
 #define CFG_CHANNEL_CONGESTION_WEIGHTAGE_MIN     (0)
 #define CFG_CHANNEL_CONGESTION_WEIGHTAGE_MAX     (100)
+
+/*
+ * <ini>
+ * best_rssi_threshold - Best Rssi for score calculation
+ * @Min: 0
+ * @Max: 127
+ * @Default: 55
+ *
+ * This ini tells limit for best RSSI. RSSI better than this limit
+ * are considered as best RSSI.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_BEST_RSSI_THRESHOLD_NAME         "best_rssi_threshold"
+#define CFG_BEST_RSSI_THRESHOLD_DEFAULT      (55)
+#define CFG_BEST_RSSI_THRESHOLD_MIN          (0)
+#define CFG_BEST_RSSI_THRESHOLD_MAX          (127)
+
+/*
+ * <ini>
+ * good_rssi_threshold - Good Rssi for score calculation
+ * @Min: 0
+ * @Max: 127
+ * @Default: 70
+ *
+ * This ini tells limit for good RSSI. RSSI better than this limit
+ * and less than best_rssi_threshold are considered as good rssi.
+ *
+ * Related: rssi_weightage
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_GOOD_RSSI_THRESHOLD_NAME          "good_rssi_threshold"
+#define CFG_GOOD_RSSI_THRESHOLD_DEFAULT       (70)
+#define CFG_GOOD_RSSI_THRESHOLD_MIN           (0)
+#define CFG_GOOD_RSSI_THRESHOLD_MAX           (127)
+
+/*
+ * <ini>
+ * bad_rssi_threshold - Bad Rssi for score calculation
+ * @Min: 0
+ * @Max: 127
+ * @Default: 80
+ *
+ * This ini tells limit for Bad RSSI. RSSI greater then bad_rssi_threshold
+ * are considered as bad rssi.
+ *
+ * Related: rssi_weightage
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_BAD_RSSI_THRESHOLD_NAME            "bad_rssi_threshold"
+#define CFG_BAD_RSSI_THRESHOLD_DEFAULT         (80)
+#define CFG_BAD_RSSI_THRESHOLD_MIN             (0)
+#define CFG_BAD_RSSI_THRESHOLD_MAX             (127)
+
+/*
+ * <ini>
+ * good_rssi_pcnt - Percent Score to Good RSSI out of total RSSI score.
+ * @Min: 0
+ * @Max: 100
+ * @Default: 80
+ *
+ * This ini tells about how much percent should be given to good RSSI
+ * out of RSSI weightage.
+ *
+ * Related: rssi_weightage
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_GOOD_RSSI_PCNT_NAME            "good_rssi_pcnt"
+#define CFG_GOOD_RSSI_PCNT_DEFAULT         (80)
+#define CFG_GOOD_RSSI_PCNT_MIN             (0)
+#define CFG_GOOD_RSSI_PCNT_MAX             (100)
+
+/*
+ * <ini>
+ * bad_rssi_pcnt - Percent Score to BAD RSSI out of total RSSI score.
+ * @Min: 0
+ * @Max: 100
+ * @Default: 25
+ *
+ * This ini tells about how much percent should be given to bad RSSI
+ * out of RSSI weightage.
+ *
+ * Related: rssi_weightage
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_BAD_RSSI_PCNT_NAME            "bad_rssi_pcnt"
+#define CFG_BAD_RSSI_PCNT_DEFAULT         (25)
+#define CFG_BAD_RSSI_PCNT_MIN             (0)
+#define CFG_BAD_RSSI_PCNT_MAX             (100)
+
+/*
+ * <ini>
+ * good_rssi_bucket_size - Bucket size between best and good RSSI to score.
+ * @Min: 1
+ * @Max: 100
+ * @Default: 5
+ *
+ * This ini tells about bucket size for scoring between best and good RSSI.
+ * Below Best RSSI, 100% score will be given. Between best and good rssi, rssi
+ * is divided in buckets and score will be assigned bucket wise.
+ *
+ * Related: rssi_weightage
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_GOOD_RSSI_BUCKET_SIZE_NAME            "good_rssi_bucket_size"
+#define CFG_GOOD_RSSI_BUCKET_SIZE_DEFAULT         (5)
+#define CFG_GOOD_RSSI_BUCKET_SIZE_MIN             (1)
+#define CFG_GOOD_RSSI_BUCKET_SIZE_MAX             (100)
+
+/*
+ * <ini>
+ * bad_rssi_bucket_size - Bucket size between good and bad RSSI to score.
+ * @Min: 1
+ * @Max: 5
+ * @Default: 100
+ *
+ * This ini tells about bucket size for scoring between good and bad RSSI.
+ * Between good and bad rssi, rssi is divided in buckets and score will
+ * be assigned bucket wise.
+ *
+ * Related: rssi_weightage
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_BAD_RSSI_BUCKET_SIZE_NAME            "bad_rssi_bucket_size"
+#define CFG_BAD_RSSI_BUCKET_SIZE_DEFAULT         (5)
+#define CFG_BAD_RSSI_BUCKET_SIZE_MIN             (1)
+#define CFG_BAD_RSSI_BUCKET_SIZE_MAX             (100)
+
+/*
+ * <ini>
+ * rssi_pref_5g_rssi_thresh - A RSSI threshold above which 5 GHz is not favored
+ * @Min: 0
+ * @Max: 127
+ * @Default: 76
+ *
+ * 5G AP are given chan_band_weightage. This ini tells about RSSI threshold
+ * above which 5GHZ is not favored.
+ *
+ * Related: rssi_weightage
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_RSSI_PERF_5G_THRESHOLD_NAME    "rssi_pref_5g_rssi_thresh"
+#define CFG_RSSI_PERF_5G_THRESHOLD_DEFAULT (76)
+#define CFG_RSSI_PERF_5G_THRESHOLD_MIN     (0)
+#define CFG_RSSI_PERF_5G_THRESHOLD_MAX     (127)
+
+/*
+ * <ini>
+ * bandwidth_weight_per_index - Bandwidth weight per index
+ * @Min: 0x00000000
+ * @Max: 0x64646464
+ * @Default: 0x3C322314
+ *
+ * For Bandwidth chan_width_weightage(10) is given. In this weightage
+ * this ini divide individual index weight as per bandwidth.
+ * Indexes are defined in this way.
+ * 0 Index : 20 MHz - Def 20%
+ * 1 Index : 40 MHz - Def 35%
+ * 2 Index : 80 MHX - Def 50%
+ * 3 Index : 160 MHX - Def 60%
+ *
+ * These percentage values are stored in HEX. For any index max weight can be
+ * 100 so Max value for each index will be 64.
+ *
+ * Related: chan_width_weightage
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_BAND_WIDTH_WEIGHT_PER_INDEX_NAME       "bandwidth_weight_per_index"
+#define CFG_BAND_WIDTH_WEIGHT_PER_INDEX_DEFAULT    (0x3C322314)
+#define CFG_BAND_WIDTH_WEIGHT_PER_INDEX_MIN        (0x00000000)
+#define CFG_BAND_WIDTH_WEIGHT_PER_INDEX_MAX        (0x64646464)
+/*
+ * <ini>
+ * nss_weight_per_index - nss weight per index
+ * @Min: 0x00000000
+ * @Max: 0x64646464
+ * @Default: 0x64645046
+ *
+ * For NSS nss_weightage(5) is given. In this weightage
+ * this ini divide individual index weight as per NSS supported.
+ * Indexes are defined in this way.
+ * 0 Index : 1X1 - Def 70%
+ * 1 Index : 2X2 - Def 80%
+ * 2 Index : 3X3 - Def 100%
+ * 3 Index : 4X4 - Def 100%
+ *
+ * These percentage values are stored in HEX. For any index max weight can be
+ * 100 so Max value for each index will be 64.
+ *
+ * Related: nss_weightage
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_NSS_WEIGHT_PER_INDEX_NAME       "nss_weight_per_index"
+#define CFG_NSS_WEIGHT_PER_INDEX_DEFAULT    (0x64645046)
+#define CFG_NSS_WEIGHT_PER_INDEX_MIN        (0x00000000)
+#define CFG_NSS_WEIGHT_PER_INDEX_MAX        (0x64646464)
+
+/*
+ * <ini>
+ * band_weight_per_index - Band weight per index
+ * @Min: 0x00000000
+ * @Max: 0x64646464
+ * @Default: 0x0000644B
+ *
+ * For Band chan_band_weightage(5) is given. In this weightage
+ * this ini divide individual index weight as per Band supported.
+ * Indexes are defined in this way.
+ * 0 Index : 2.4GHz - Def 75%
+ * 1 Index : 5GHz - - Def 100%
+ * 2 Index : Reserved
+ * 3 Index : Reserved
+ *
+ * These percentage values are stored in HEX. For any index max weight can be
+ * 100 so Max value for each index will be 64.
+ *
+ * Related: chan_band_weightage, rssi_pref_5g_rssi_thresh
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_BAND_WEIGHT_PER_INDEX_NAME      "band_weight_per_index"
+#define CFG_BAND_WEIGHT_PER_INDEX_DEFAULT   (0x0000644B)
+#define CFG_BAND_WEIGHT_PER_INDEX_MIN       (0x00000000)
+#define CFG_BAND_WEIGHT_PER_INDEX_MAX       (0x64646464)
+
+/*
+ * <ini>
+ * num_esp_qbss_slots - number of slots in which the esp/qbss load will
+ * be divided
+ * @Min: 1
+ * @Max: 15
+ * @Default: 4
+ *
+ * number of slots in which the esp/qbss load will be divided.
+ * Max 15. index 0 is used for 'not_present. Num_slot will
+ * equally divide 100. e.g, if num_slot = 4 slot 1 = 0-25%, slot
+ * 2 = 26-50% slot 3 = 51-75%, slot 4 = 76-100%
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ESP_QBSS_SLOTS_NAME      "num_esp_qbss_slots"
+#define CFG_ESP_QBSS_SLOTS_DEFAULT   (4)
+#define CFG_ESP_QBSS_SLOTS_MIN       (1)
+#define CFG_ESP_QBSS_SLOTS_MAX       (15)
+
+/*
+ * <ini>
+ * esp_qbss_score_idx3_to_0 - esp/qbss load score for slots 0-3
+ * @Min: 0x00000000
+ * @Max: 0x64646464
+ * @Default: 0x19326432
+ *
+ * For esp/qbss load score weightage(5) is given. In this weightage
+ * this ini divide individual index weight as num_esp_qbss_slots.
+ * Indexes are defined in this way.
+ * BITS 0-7 : the scoring when ESP QBSS not present
+ * BITS 8-15 : SLOT_1
+ * BITS 16-23 : SLOT_2
+ * BITS 24-31 : SLOT_3
+ *
+ * These percentage values are stored in HEX. For any slot max weight can be
+ * 100 so Max value for each slot will be 0x64.
+ *
+ * Related: channel_congestion_weightage
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ESP_QBSS_SCORE_IDX3_TO_0_NAME      "esp_qbss_score_idx3_to_0"
+#define CFG_ESP_QBSS_SCORE_IDX3_TO_0_DEFAULT   (0x19326432)
+#define CFG_ESP_QBSS_SCORE_IDX3_TO_0_MIN       (0x00000000)
+#define CFG_ESP_QBSS_SCORE_IDX3_TO_0_MAX       (0x64646464)
+
+/*
+ * <ini>
+ * esp_qbss_score_idx7_to_4 - esp/qbss load score for slots 4-7
+ * @Min: 0x00000000
+ * @Max: 0x64646464
+ * @Default: 0x00000019
+ *
+ * For esp/qbss load score weightage(5) is given. In this weightage
+ * this ini divide individual index weight as num_esp_qbss_slots.
+ * Indexes are defined in this way.
+ * BITS 0-7 : SLOT_4
+ * BITS 8-15 : SLOT_5
+ * BITS 16-23 : SLOT_6
+ * BITS 24-31 : SLOT_7
+ *
+ * These percentage values are stored in HEX. For any slot max weight can be
+ * 100 so Max value for each slot will be 0x64.
+ *
+ * Related: num_esp_qbss_slots, channel_congestion_weightage
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ESP_QBSS_SCORE_IDX7_TO_4_NAME      "esp_qbss_score_idx7_to_4"
+#define CFG_ESP_QBSS_SCORE_IDX7_TO_4_DEFAULT   (0x00000019)
+#define CFG_ESP_QBSS_SCORE_IDX7_TO_4_MIN       (0x00000000)
+#define CFG_ESP_QBSS_SCORE_IDX7_TO_4_MAX       (0x64646464)
+
+
+/*
+ * <ini>
+ * esp_qbss_score_idx11_to_8 - esp/qbss score for index 8-11
+ * @Min: 0x00000000
+ * @Max: 0x64646464
+ * @Default: 0x00000000
+ *
+ * For esp/qbss load score weightage(5) is given. In this weightage
+ * this ini divide individual index weight as num_esp_qbss_slots.
+ * Indexes are defined in this way.
+ * BITS 0-7 : SLOT_8
+ * BITS 8-15 : SLOT_9
+ * BITS 16-23 : SLOT_10
+ * BITS 24-31 : SLOT_11
+ *
+ * These percentage values are stored in HEX. For any slot max weight can be
+ * 100 so Max value for each slot will be 0x64.
+ *
+ * Related: num_esp_qbss_slots, channel_congestion_weightage
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ESP_QBSS_SCORE_IDX11_TO_8_NAME      "esp_qbss_score_idx11_to_8"
+#define CFG_ESP_QBSS_SCORE_IDX11_TO_8_DEFAULT   (0x00000000)
+#define CFG_ESP_QBSS_SCORE_IDX11_TO_8_MIN       (0x00000000)
+#define CFG_ESP_QBSS_SCORE_IDX11_TO_8_MAX       (0x64646464)
+
+
+/*
+ * <ini>
+ * esp_qbss_score_idx15_to_12 - esp/qbss score for index 12-15
+ * @Min: 0x00000000
+ * @Max: 0x64646464
+ * @Default: 0x00000000
+ *
+ * For esp/qbss load score weightage(5) is given. In this weightage
+ * this ini divide individual index weight as num_esp_qbss_slots.
+ * Indexes are defined in this way.
+ * BITS 0-7 : SLOT_12
+ * BITS 8-15 : SLOT_13
+ * BITS 16-23 : SLOT_14
+ * BITS 24-31 : SLOT_15
+ *
+ * These percentage values are stored in HEX. For any slot max weight can be
+ * 100 so Max value for each slot will be 0x64.
+ *
+ * Related: num_esp_qbss_slots, channel_congestion_weightage
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ESP_QBSS_SCORE_IDX15_TO_12_NAME      "esp_qbss_score_idx15_to_12"
+#define CFG_ESP_QBSS_SCORE_IDX15_TO_12_DEFAULT   (0x00000000)
+#define CFG_ESP_QBSS_SCORE_IDX15_TO_12_MIN       (0x00000000)
+#define CFG_ESP_QBSS_SCORE_IDX15_TO_12_MAX       (0x64646464)
+
+/*
+ * <ini>
+ * enable_scoring_for_roam - enable/disable scoring logic in FW for candidate
+ * selection during roaming
+ *
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable scoring logic in FW for candidate
+ * selection during roaming.
+ *
+ * Supported Feature: STA Candidate selection by FW during roaming based on
+ * scoring logic.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_SCORING_FOR_ROAM_NAME     "enable_scoring_for_roam"
+#define CFG_ENABLE_SCORING_FOR_ROAM_DEFAULT  (0)
+#define CFG_ENABLE_SCORING_FOR_ROAM_MIN      (0)
+#define CFG_ENABLE_SCORING_FOR_ROAM_MAX      (1)
+
+/*
+ * <ini>
+ * gChanSwitchHostapdRateEnabled - Enable/disable hostapd rate when doing SAP
+ * channel switch
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to set supported rates calculated from hostapd.conf file
+ * or not when doing SAP channel switch. It must set it to 0 when cross-band
+ * channel switch happens such as from 2G to 5G or 5G to 2G.
+ *
+ * Related: When doing SAP channel switch, if gChanSwitchHostapdRateEnabled is
+ * set to 1, supported rates will be calculated from hostapd.conf file,
+ * if gChanSwitchHostapdRateEnabled is set to 0, supported rates will be
+ * calculated from driver default rates.
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_CHAN_SWITCH_HOSTAPD_RATE_ENABLED_NAME \
+	"gChanSwitchHostapdRateEnabled"
+#define CFG_CHAN_SWITCH_HOSTAPD_RATE_ENABLED_MIN     (0)
+#define CFG_CHAN_SWITCH_HOSTAPD_RATE_ENABLED_MAX     (1)
+#define CFG_CHAN_SWITCH_HOSTAPD_RATE_ENABLED_DEFAULT (0)
 
 
 /*---------------------------------------------------------------------------
@@ -12292,6 +12879,7 @@ struct hdd_config {
 #endif
 	bool isFastTransitionEnabled;
 	uint8_t RoamRssiDiff;
+	int32_t rssi_abs_thresh;
 	bool isWESModeEnabled;
 	uint32_t pmkid_modes;
 	bool isRoamOffloadScanEnabled;
@@ -12790,12 +13378,17 @@ struct hdd_config {
 	uint8_t inform_bss_rssi_raw;
 #ifdef WLAN_FEATURE_TSF
 	uint32_t tsf_gpio_pin;
+
+#ifdef WLAN_FEATURE_TSF_PLUS
+	uint8_t tsf_ptp_options;
+#endif /* WLAN_FEATURE_TSF_PLUS */
 #endif
 	uint32_t roam_dense_traffic_thresh;
 	uint32_t roam_dense_rssi_thresh_offset;
 	bool ignore_peer_ht_opmode;
 	uint32_t roam_dense_min_aps;
 	int8_t roam_bg_scan_bad_rssi_thresh;
+	uint8_t roam_bad_rssi_thresh_offset_2g;
 	uint32_t roam_bg_scan_client_bitmap;
 	bool enable_edca_params;
 	uint32_t edca_vo_cwmin;
@@ -12961,6 +13554,24 @@ struct hdd_config {
 	uint8_t beamforming_cap_weightage;
 	uint8_t pcl_weightage;
 	uint8_t channel_congestion_weightage;
+	uint32_t bandwidth_weight_per_index;
+	uint32_t nss_weight_per_index;
+	uint32_t band_weight_per_index;
+	uint32_t best_rssi_threshold;
+	uint32_t good_rssi_threshold;
+	uint32_t bad_rssi_threshold;
+	uint32_t good_rssi_pcnt;
+	uint32_t bad_rssi_pcnt;
+	uint32_t good_rssi_bucket_size;
+	uint32_t bad_rssi_bucket_size;
+	uint32_t rssi_pref_5g_rssi_thresh;
+	uint8_t num_esp_qbss_slots;
+	uint32_t esp_qbss_score_slots3_to_0;
+	uint32_t esp_qbss_score_slots7_to_4;
+	uint32_t esp_qbss_score_slots11_to_8;
+	uint32_t esp_qbss_score_slots15_to_12;
+	bool enable_scoring_for_roam;
+	bool chan_switch_hostapd_rate_enabled;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))

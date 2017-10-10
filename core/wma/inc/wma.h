@@ -88,6 +88,8 @@
 #endif
 #define WMA_MAX_SUPPORTED_BSS     5
 
+#define WMA_MAX_MGMT_MPDU_LEN 2000
+
 #define FRAGMENT_SIZE 3072
 
 #define MAX_PRINT_FAILURE_CNT 50
@@ -117,6 +119,9 @@
 	QDF_TRACE(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_ERROR, ## args)
 #define WMA_LOGP(args ...) \
 	QDF_TRACE(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_FATAL, ## args)
+#define wma_log_rate_limit_err(rate, args...) \
+	QDF_TRACE_RATE_LIMITED(rate, QDF_MODULE_ID_WMA,\
+			QDF_TRACE_LEVEL_ERROR, ## args)
 
 #define WMA_DEBUG_ALWAYS
 
@@ -187,6 +192,21 @@
 #define WMA_IPV6_PROTO_GET_MIN_LEN        21
 #define WMA_IPV6_PKT_INFO_GET_MIN_LEN     62
 #define WMA_ICMPV6_SUBTYPE_GET_MIN_LEN    55
+
+/* beacon tx rate */
+#define WMA_BEACON_TX_RATE_1_M            10
+#define WMA_BEACON_TX_RATE_2_M            20
+#define WMA_BEACON_TX_RATE_5_5_M          55
+#define WMA_BEACON_TX_RATE_11_M           110
+#define WMA_BEACON_TX_RATE_6_M            60
+#define WMA_BEACON_TX_RATE_9_M            90
+#define WMA_BEACON_TX_RATE_12_M           120
+#define WMA_BEACON_TX_RATE_18_M           180
+#define WMA_BEACON_TX_RATE_24_M           240
+#define WMA_BEACON_TX_RATE_36_M           360
+#define WMA_BEACON_TX_RATE_48_M           480
+#define WMA_BEACON_TX_RATE_54_M           540
+
 /**
  * ds_mode: distribution system mode
  * @IEEE80211_NO_DS: NO DS at either side
@@ -273,6 +293,7 @@ enum ds_mode {
 #define WMA_VDEV_START_REQUEST_TIMEOUT (6000)   /* 6 seconds */
 #define WMA_VDEV_STOP_REQUEST_TIMEOUT  (6000)   /* 6 seconds */
 #define WMA_VDEV_HW_MODE_REQUEST_TIMEOUT (5000) /* 5 seconds */
+#define WMA_VDEV_PLCY_MGR_CMD_TIMEOUT (3000)    /* 3 seconds */
 
 #define WMA_TGT_INVALID_SNR (0)
 
@@ -1086,6 +1107,7 @@ struct wma_txrx_node {
 	tAniGetPEStatsRsp *stats_rsp;
 	uint8_t fw_stats_set;
 	void *del_staself_req;
+	bool is_del_sta_defered;
 	qdf_atomic_t bss_status;
 	uint8_t rate_flags;
 	uint8_t nss;
@@ -1853,6 +1875,7 @@ struct wma_target_req {
  *			number of transmit streams
  * @preferred_rx_streams: policy manager indicates the preferred
  *			number of receive streams
+ * @beacon_tx_rate: beacon tx rate
  */
 struct wma_vdev_start_req {
 	uint32_t beacon_intval;
@@ -1876,7 +1899,7 @@ struct wma_vdev_start_req {
 	bool is_quarter_rate;
 	uint32_t preferred_tx_streams;
 	uint32_t preferred_rx_streams;
-	uint8_t beacon_tx_rate;
+	uint16_t beacon_tx_rate;
 	bool ldpc_rx_enabled;
 };
 
@@ -2348,8 +2371,6 @@ QDF_STATUS wma_send_pdev_set_dual_mac_config(tp_wma_handle wma_handle,
 		struct sir_dual_mac_config *msg);
 QDF_STATUS wma_send_pdev_set_antenna_mode(tp_wma_handle wma_handle,
 		struct sir_antenna_mode_param *msg);
-QDF_STATUS wma_crash_inject(tp_wma_handle wma_handle, uint32_t type,
-			uint32_t delay_time_ms);
 
 struct wma_target_req *wma_fill_vdev_req(tp_wma_handle wma,
 					 uint8_t vdev_id,

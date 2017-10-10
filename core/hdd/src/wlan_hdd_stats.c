@@ -1065,7 +1065,7 @@ void wlan_hdd_cfg80211_link_layer_stats_callback(void *ctx,
 	switch (indType) {
 	case SIR_HAL_LL_STATS_RESULTS_RSP:
 	{
-		hdd_debug("LL_STATS RESP paramID = 0x%x, ifaceId = %u, respId= %u , moreResultToFollow = %u, num radio = %u result = %p",
+		hdd_debug("LL_STATS RESP paramID = 0x%x, ifaceId = %u, respId= %u , moreResultToFollow = %u, num radio = %u result = %pK",
 			linkLayerStatsResults->paramId,
 			linkLayerStatsResults->ifaceId,
 			linkLayerStatsResults->rspId,
@@ -1215,9 +1215,9 @@ __wlan_hdd_cfg80211_ll_stats_set(struct wiphy *wiphy,
 	if (0 != status)
 		return -EINVAL;
 
-	if (nla_parse(tb_vendor, QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_MAX,
-		      (struct nlattr *)data,
-		      data_len, qca_wlan_vendor_ll_set_policy)) {
+	if (hdd_nla_parse(tb_vendor, QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_MAX,
+			  (struct nlattr *)data, data_len,
+			  qca_wlan_vendor_ll_set_policy)) {
 		hdd_err("maximum attribute not present");
 		return -EINVAL;
 	}
@@ -1427,9 +1427,9 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 		return -EBUSY;
 	}
 
-	if (nla_parse(tb_vendor, QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_MAX,
-		      (struct nlattr *)data,
-		      data_len, qca_wlan_vendor_ll_get_policy)) {
+	if (hdd_nla_parse(tb_vendor, QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_MAX,
+			  (struct nlattr *)data, data_len,
+			  qca_wlan_vendor_ll_get_policy)) {
 		hdd_err("max attribute not present");
 		return -EINVAL;
 	}
@@ -1543,9 +1543,9 @@ __wlan_hdd_cfg80211_ll_stats_clear(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (nla_parse(tb_vendor, QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_MAX,
-		      (struct nlattr *)data,
-		      data_len, qca_wlan_vendor_ll_clr_policy)) {
+	if (hdd_nla_parse(tb_vendor, QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_MAX,
+			  (struct nlattr *)data, data_len,
+			  qca_wlan_vendor_ll_clr_policy)) {
 		hdd_err("STATS_CLR_MAX is not present");
 		return -EINVAL;
 	}
@@ -2266,7 +2266,7 @@ void wlan_hdd_cfg80211_link_layer_stats_ext_callback(tHddHandle ctx,
 
 	results = linkLayer_stats_results->results;
 	param_id = linkLayer_stats_results->paramId;
-	hdd_info("LL_STATS RESP paramID = 0x%x, ifaceId = %u, result = %p",
+	hdd_info("LL_STATS RESP paramID = 0x%x, ifaceId = %u, result = %pK",
 		 linkLayer_stats_results->paramId,
 		 linkLayer_stats_results->ifaceId,
 		 linkLayer_stats_results->results);
@@ -2466,10 +2466,10 @@ static int __wlan_hdd_cfg80211_ll_stats_ext_set_param(struct wiphy *wiphy,
 	if (0 != status)
 		return -EPERM;
 
-	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_MAX,
-		      (struct nlattr *)data, data_len,
-		      qca_wlan_vendor_ll_ext_policy)) {
-		hdd_err(FL("maximum attribute not present"));
+	if (hdd_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_MAX,
+			  (struct nlattr *)data, data_len,
+			  qca_wlan_vendor_ll_ext_policy)) {
+		hdd_err("maximum attribute not present");
 		return -EPERM;
 	}
 
@@ -3811,7 +3811,7 @@ static void wlan_hdd_get_peer_info_cb(struct sir_peer_info_ext_resp *sta_info,
 	hdd_ap_ctx_t *ap_ctx;
 
 	if ((sta_info == NULL) || (context == NULL)) {
-		hdd_err("Bad param, sta_info [%p] context [%p]",
+		hdd_err("Bad param, sta_info [%pK] context [%pK]",
 			sta_info, context);
 		return;
 	}

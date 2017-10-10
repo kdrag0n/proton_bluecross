@@ -1222,25 +1222,16 @@ lim_send_assoc_rsp_mgmt_frame(tpAniSirGlobal mac_ctx,
 			populate_dot11f_vht_operation(mac_ctx, pe_session,
 					&frm.VHTOperation);
 			is_vht = true;
-		} else {
-			/*
-			 * 2G-AS platform: SAP associates with HT (11n)clients
-			 * as 2x1 in 2G and 2X2 in 5G
-			 * Non-2G-AS platform: SAP associates with HT (11n)
-			 * clients as 2X2 in 2G and 5G
-			 * 5G-AS: Don’t care
-			 */
-			if (frm.HTCaps.present && mac_ctx->hw_dbs_capable &&
-				mac_ctx->lteCoexAntShare &&
-				IS_24G_CH(pe_session->currentOperChannel))
-				frm.HTCaps.supportedMCSSet[1] = 0;
 		}
+
 		if (pe_session->vhtCapability &&
 		    pe_session->vendor_vht_sap &&
 		    (assoc_req != NULL) &&
 		    assoc_req->vendor_vht_ie.VHTCaps.present) {
 			pe_debug("Populate Vendor VHT IEs in Assoc Rsponse");
 			frm.vendor_vht_ie.present = 1;
+			frm.vendor_vht_ie.sub_type =
+				pe_session->vendor_specific_vht_ie_sub_type;
 			frm.vendor_vht_ie.VHTCaps.present = 1;
 			populate_dot11f_vht_caps(mac_ctx, pe_session,
 				&frm.vendor_vht_ie.VHTCaps);
@@ -1830,6 +1821,8 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 			pe_session->is_vendor_specific_vhtcaps) {
 		pe_debug("Populate Vendor VHT IEs in Assoc Request");
 		frm->vendor_vht_ie.present = 1;
+		frm->vendor_vht_ie.sub_type =
+			pe_session->vendor_specific_vht_ie_sub_type;
 		frm->vendor_vht_ie.VHTCaps.present = 1;
 		populate_dot11f_vht_caps(mac_ctx, pe_session,
 				&frm->vendor_vht_ie.VHTCaps);
@@ -2073,7 +2066,8 @@ static QDF_STATUS lim_auth_tx_complete_cnf(tpAniSirGlobal mac_ctx,
 	uint16_t auth_ack_status;
 	uint16_t reason_code;
 
-	pe_debug("tx_complete= %d", tx_complete);
+	pe_debug("tx_complete = %d %s", tx_complete,
+		(tx_complete ? "success":"fail"));
 	if (tx_complete) {
 		mac_ctx->auth_ack_status = LIM_AUTH_ACK_RCD_SUCCESS;
 		auth_ack_status = ACKED;
@@ -2305,7 +2299,14 @@ alloc_packet:
 
 		if (challenge_req) {
 			if (body_len < SIR_MAC_AUTH_CHALLENGE_BODY_LEN) {
-				qdf_mem_copy(body, (uint8_t *)&auth_frame->type,
+				/* copy challenge IE id, len, challenge text */
+				*body = auth_frame->type;
+				body++;
+				body_len -= sizeof(uint8_t);
+				*body = auth_frame->length;
+				body++;
+				body_len -= sizeof(uint8_t);
+				qdf_mem_copy(body, auth_frame->challengeText,
 					     body_len);
 				pe_err("Incomplete challenge info: length: %d, expected: %d",
 				       body_len,
@@ -2457,7 +2458,7 @@ QDF_STATUS lim_send_deauth_cnf(tpAniSirGlobal pMac)
 #endif
 				 (psessionEntry->isFastRoamIniFeatureEnabled) ||
 				 (psessionEntry->is11Rconnection))) {
-			pe_debug("FT Preauth (%p,%d) Deauth rc %d src = %d",
+			pe_debug("FT Preauth (%pK,%d) Deauth rc %d src = %d",
 					psessionEntry,
 					psessionEntry->peSessionId,
 					pMlmDeauthReq->reasonCode,
@@ -2554,7 +2555,7 @@ QDF_STATUS lim_send_disassoc_cnf(tpAniSirGlobal mac_ctx)
 		if (LIM_IS_STA_ROLE(pe_session) &&
 			(disassoc_req->reasonCode !=
 				eSIR_MAC_DISASSOC_DUE_TO_FTHANDOFF_REASON)) {
-			pe_debug("FT Preauth Session (%p,%d) Clean up"
+			pe_debug("FT Preauth Session (%pK,%d) Clean up"
 #ifdef FEATURE_WLAN_ESE
 				" isESE %d"
 #endif

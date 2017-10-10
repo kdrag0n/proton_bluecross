@@ -1308,7 +1308,7 @@ int dbglog_vap_log_enable(wmi_unified_t wmi_handle, A_UINT16 vap_id,
 	return 0;
 }
 
-int dbglog_set_log_lvl(wmi_unified_t wmi_handle, enum DBGLOG_LOG_LVL log_lvl)
+int dbglog_set_log_lvl(wmi_unified_t wmi_handle, DBGLOG_LOG_LVL log_lvl)
 {
 	A_UINT32 val = 0;
 
@@ -4184,7 +4184,7 @@ static void cnss_diag_cmd_handler(const void *data, int data_len,
 	 * audit note: it is ok to pass a NULL policy here since a
 	 * length check on the data is added later already
 	 */
-	if (nla_parse(tb, CLD80211_ATTR_MAX, data, data_len, NULL)) {
+	if (hdd_nla_parse(tb, CLD80211_ATTR_MAX, data, data_len, NULL)) {
 		AR_DEBUG_PRINTF(ATH_DEBUG_ERR, ("%s: nla parse fails\n",
 							__func__));
 		return;

@@ -103,6 +103,12 @@ static void wma_send_bcn_buf_ll(tp_wma_handle wma,
 		WMA_LOGE("%s: Invalid beacon buffer", __func__);
 		return;
 	}
+	if (WMI_UNIFIED_NOA_ATTR_NUM_DESC_GET(p2p_noa_info) >
+			WMI_P2P_MAX_NOA_DESCRIPTORS) {
+		WMA_LOGE("%s: Too many descriptors %d", __func__,
+			WMI_UNIFIED_NOA_ATTR_NUM_DESC_GET(p2p_noa_info));
+		return;
+	}
 
 	qdf_spin_lock_bh(&bcn->lock);
 
@@ -2585,7 +2591,7 @@ void wma_send_beacon(tp_wma_handle wma, tpSendbeaconParams bcn_info)
 
 		if (bcn_info->p2pIeOffset) {
 			p2p_ie = bcn_info->beacon + bcn_info->p2pIeOffset;
-			WMA_LOGD("%s: p2pIe is present - vdev_id %hu, p2p_ie = %p, p2p ie len = %hu",
+			WMA_LOGD("%s: p2pIe is present - vdev_id %hu, p2p_ie = %pK, p2p ie len = %hu",
 				__func__, vdev_id, p2p_ie, p2p_ie[1]);
 			if (wma_p2p_go_set_beacon_ie(wma, vdev_id,
 							 p2p_ie) < 0) {
@@ -2673,6 +2679,25 @@ void wma_beacon_miss_handler(tp_wma_handle wma, uint32_t vdev_id, int32_t rssi)
 }
 
 /**
+ * wma_get_status_str() - get string of tx status from firmware
+ * @status: tx status
+ *
+ * Return: converted string of tx status
+ */
+static const char *wma_get_status_str(uint32_t status)
+{
+	switch (status) {
+	default:
+		return "unknown";
+	CASE_RETURN_STRING(WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK);
+	CASE_RETURN_STRING(WMI_MGMT_TX_COMP_TYPE_DISCARD);
+	CASE_RETURN_STRING(WMI_MGMT_TX_COMP_TYPE_INSPECT);
+	CASE_RETURN_STRING(WMI_MGMT_TX_COMP_TYPE_COMPLETE_NO_ACK);
+	CASE_RETURN_STRING(WMI_MGMT_TX_COMP_TYPE_MAX);
+	}
+}
+
+/**
  * wma_process_mgmt_tx_completion() - process mgmt completion
  * @wma_handle: wma handle
  * @desc_id: descriptor id
@@ -2692,7 +2717,8 @@ static int wma_process_mgmt_tx_completion(tp_wma_handle wma_handle,
 		return -EINVAL;
 	}
 
-	WMA_LOGD("%s: status: %d wmi_desc_id: %d", __func__, status, desc_id);
+	WMA_LOGD("%s: status: %s wmi_desc_id: %d", __func__,
+		wma_get_status_str(status), desc_id);
 
 	wmi_desc = (struct wmi_desc_t *)
 			(&wma_handle->wmi_desc_pool.array[desc_id]);
@@ -3489,6 +3515,16 @@ static int wma_mgmt_rx_process(void *handle, uint8_t *data,
 					 rx_pkt->pkt_meta.mpdu_hdr_len;
 
 	rx_pkt->pkt_meta.roamCandidateInd = 0;
+
+	/*
+	 * If the mpdu_data_len is greater than Max (2k), drop the frame
+	 */
+	if (rx_pkt->pkt_meta.mpdu_data_len > WMA_MAX_MGMT_MPDU_LEN) {
+		WMA_LOGE("Data Len %d greater than max, dropping frame",
+			 rx_pkt->pkt_meta.mpdu_data_len);
+		qdf_mem_free(rx_pkt);
+		return -EINVAL;
+	}
 
 	/* Why not just use rx_event->hdr.buf_len? */
 	wbuf = qdf_nbuf_alloc(NULL, roundup(hdr->buf_len, 4), 0, 4, false);

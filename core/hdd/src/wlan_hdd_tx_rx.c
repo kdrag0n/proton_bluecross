@@ -158,7 +158,34 @@ hdd_tx_resume_false(hdd_adapter_t *pAdapter, bool tx_resume)
 static inline struct sk_buff *hdd_skb_orphan(hdd_adapter_t *pAdapter,
 		struct sk_buff *skb)
 {
-	if (pAdapter->tx_flow_low_watermark > 0)
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(3, 19, 0))
+	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
+#endif
+	int need_orphan = 0;
+
+	if (pAdapter->tx_flow_low_watermark > 0) {
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0))
+		/*
+		 * The TCP TX throttling logic is changed a little after
+		 * 3.19-rc1 kernel, the TCP sending limit will be smaller,
+		 * which will throttle the TCP packets to the host driver.
+		 * The TCP UP LINK throughput will drop heavily. In order to
+		 * fix this issue, need to orphan the socket buffer asap, which
+		 * will call skb's destructor to notify the TCP stack that the
+		 * SKB buffer is unowned. And then the TCP stack will pump more
+		 * packets to host driver.
+		 *
+		 * The TX packets might be dropped for UDP case in the iperf
+		 * testing. So need to be protected by follow control.
+		 */
+		need_orphan = 1;
+#else
+		if (hdd_ctx->config->tx_orphan_enable)
+			need_orphan = 1;
+#endif
+	}
+
+	if (need_orphan)
 		skb_orphan(skb);
 	else
 		skb = skb_unshare(skb, GFP_ATOMIC);
@@ -172,7 +199,7 @@ bool hdd_tx_flow_control_is_pause(void *adapter_context)
 
 	if ((NULL == pAdapter) || (WLAN_HDD_ADAPTER_MAGIC != pAdapter->magic)) {
 		/* INVALID ARG */
-		hdd_err("invalid adapter %p", pAdapter);
+		hdd_err("invalid adapter %pK", pAdapter);
 		return false;
 	}
 
@@ -293,11 +320,14 @@ static inline struct sk_buff *hdd_skb_orphan(hdd_adapter_t *pAdapter,
 		struct sk_buff *skb) {
 
 	struct sk_buff *nskb;
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0))
 	hdd_context_t *hdd_ctx = pAdapter->pHddCtx;
+#endif
 
 	hdd_skb_fill_gso_size(pAdapter->dev, skb);
 
 	nskb = skb_unshare(skb, GFP_ATOMIC);
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0))
 	if (unlikely(hdd_ctx->config->tx_orphan_enable) && (nskb == skb)) {
 		/*
 		 * For UDP packets we want to orphan the packet to allow the app
@@ -307,6 +337,7 @@ static inline struct sk_buff *hdd_skb_orphan(hdd_adapter_t *pAdapter,
 		++pAdapter->hdd_stats.hddTxRxStats.txXmitOrphaned;
 		skb_orphan(skb);
 	}
+#endif
 	return nskb;
 }
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
@@ -543,26 +574,7 @@ static int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	ac = hdd_qdisc_ac_to_tl_ac[skb->queue_mapping];
 
 	if (!qdf_nbuf_ipa_owned_get(skb)) {
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0))
-		/*
-		 * The TCP TX throttling logic is changed a little after
-		 * 3.19-rc1 kernel, the TCP sending limit will be smaller,
-		 * which will throttle the TCP packets to the host driver.
-		 * The TCP UP LINK throughput will drop heavily. In order to
-		 * fix this issue, need to orphan the socket buffer asap, which
-		 * will call skb's destructor to notify the TCP stack that the
-		 * SKB buffer is unowned. And then the TCP stack will pump more
-		 * packets to host driver.
-		 *
-		 * The TX packets might be dropped for UDP case in the iperf
-		 * testing. So need to be protected by follow control.
-		 */
 		skb = hdd_skb_orphan(pAdapter, skb);
-#else
-		/* Check if the buffer has enough header room */
-		skb = skb_unshare(skb, GFP_ATOMIC);
-#endif
-
 		if (!skb)
 			goto drop_pkt_accounting;
 	}
@@ -974,7 +986,7 @@ static QDF_STATUS hdd_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
 	adapter = (hdd_adapter_t *)context;
 	if ((NULL == adapter) || (WLAN_HDD_ADAPTER_MAGIC != adapter->magic)) {
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
-			  "invalid adapter %p", adapter);
+			  "invalid adapter %pK", adapter);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1183,6 +1195,24 @@ static bool hdd_is_rx_wake_lock_needed(struct sk_buff *skb)
 	return false;
 }
 
+#ifdef WLAN_FEATURE_TSF_PLUS
+static inline void hdd_tsf_timestamp_rx(hdd_context_t *hdd_ctx,
+					qdf_nbuf_t netbuf,
+					uint64_t target_time)
+{
+	if (!HDD_TSF_IS_RX_SET(hdd_ctx))
+		return;
+
+	hdd_rx_timestamp(netbuf, target_time);
+}
+#else
+static inline void hdd_tsf_timestamp_rx(hdd_context_t *hdd_ctx,
+					qdf_nbuf_t netbuf,
+					uint64_t target_time)
+{
+}
+#endif
+
 /**
  * hdd_resolve_rx_ol_mode() - Resolve Rx offload method, LRO or GRO
  * @hdd_ctx: pointer to HDD Station Context
@@ -1252,8 +1282,10 @@ static inline void hdd_register_rx_ol(void)
 {
 	hdd_context_t *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
-	if  (!hdd_ctx)
+	if  (!hdd_ctx) {
 		hdd_err("HDD context is NULL");
+		return;
+	}
 
 	if (hdd_ctx->ol_enable == CFG_LRO_ENABLED) {
 		/* Register the flush callback */
@@ -1529,7 +1561,7 @@ QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 	 */
 	qdf_net_buf_debug_release_skb(rxBuf);
 
-	hdd_rx_timestamp(skb, ktime_to_us(skb->tstamp));
+	hdd_tsf_timestamp_rx(pHddCtx, skb, ktime_to_us(skb->tstamp));
 
 	if (hdd_can_handle_receive_offload(pHddCtx, skb) &&
 	    pHddCtx->receive_offload_cb)

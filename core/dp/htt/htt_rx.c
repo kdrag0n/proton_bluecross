@@ -120,7 +120,32 @@
 #define RX_HASH_LOG(x)          /* no-op */
 #endif
 
+#if HTT_PADDR64
+#define NEXT_FIELD_OFFSET_IN32 2
+#else /* ! HTT_PADDR64 */
+#define NEXT_FIELD_OFFSET_IN32 1
+#endif /* HTT_PADDR64 */
+
 #ifndef CONFIG_HL_SUPPORT
+
+/**
+ * htt_get_first_packet_after_wow_wakeup() - get first packet after wow wakeup
+ * @msg_word: pointer to rx indication message word
+ * @buf: pointer to buffer
+ *
+ * Return: None
+ */
+static void
+htt_get_first_packet_after_wow_wakeup(uint32_t *msg_word, qdf_nbuf_t buf)
+{
+	if (HTT_RX_IN_ORD_PADDR_IND_MSDU_INFO_GET(*msg_word) &
+			FW_MSDU_INFO_FIRST_WAKEUP_M) {
+		qdf_nbuf_mark_wakeup_frame(buf);
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+			  "%s: First packet after WOW Wakeup rcvd", __func__);
+	}
+}
+
 /* De -initialization function of the rx buffer hash table. This function will
  *   free up the hash table which includes freeing all the pending rx buffers
  */
@@ -427,7 +452,7 @@ htt_rx_paddr_unmark_high_bits(qdf_dma_addr_t paddr)
 		 */
 		if ((markings & 0xFFFF0000) != RX_PADDR_MAGIC_PATTERN) {
 			QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_ERROR,
-				  "%s: paddr not marked correctly: 0x%p!",
+				  "%s: paddr not marked correctly: 0x%pK!",
 				  __func__, (void *)paddr);
 			HTT_ASSERT_ALWAYS(0);
 		}
@@ -1674,15 +1699,9 @@ htt_rx_offload_paddr_msdu_pop_ll(htt_pdev_handle pdev,
 	qdf_nbuf_unmap(pdev->osdev, buf, QDF_DMA_FROM_DEVICE);
 #endif
 
-	if (pdev->cfg.is_first_wakeup_packet) {
-		if (HTT_RX_IN_ORD_PADDR_IND_MSDU_INFO_GET(*(curr_msdu + 1)) &
-			   FW_MSDU_INFO_FIRST_WAKEUP_M) {
-			qdf_nbuf_mark_wakeup_frame(buf);
-			QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
-				  "%s: First packet after WOW Wakeup rcvd",
-				  __func__);
-		}
-	}
+	if (pdev->cfg.is_first_wakeup_packet)
+		htt_get_first_packet_after_wow_wakeup(
+			msg_word + NEXT_FIELD_OFFSET_IN32, buf);
 
 	msdu_hdr = (uint32_t *) qdf_nbuf_data(buf);
 
@@ -1703,11 +1722,6 @@ htt_rx_offload_paddr_msdu_pop_ll(htt_pdev_handle pdev,
 #endif
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
-#if HTT_PADDR64
-#define NEXT_FIELD_OFFSET_IN32 2
-#else /* ! HTT_PADDR64 */
-#define NEXT_FIELD_OFFSET_IN32 1
-#endif /* HTT_PADDR64 */
 
 #ifndef CONFIG_HL_SUPPORT
 /**
@@ -2281,7 +2295,6 @@ static int htt_rx_mon_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 		last_frag = ((struct htt_rx_in_ord_paddr_ind_msdu_t *)
 			     msg_word)->msdu_info;
 
-#undef NEXT_FIELD_OFFSET_IN32
 		/* Handle amsdu packet */
 		if (!last_frag) {
 			/*
@@ -2420,6 +2433,7 @@ htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 		qdf_print("%s: netbuf pop failed!\n", __func__);
 		*tail_msdu = NULL;
 		ret = 0;
+		pdev->rx_ring.pop_fail_cnt++;
 		goto free_mem_map_table;
 	}
 
@@ -2467,11 +2481,6 @@ htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 			qdf_nbuf_data_addr(msdu),
 			sizeof(qdf_nbuf_data(msdu)), QDF_RX));
 
-#if HTT_PADDR64
-#define NEXT_FIELD_OFFSET_IN32 2
-#else /* ! HTT_PADDR64 */
-#define NEXT_FIELD_OFFSET_IN32 1
-#endif /* HTT_PADDR64 */
 		qdf_nbuf_trim_tail(msdu,
 				   HTT_RX_BUF_SIZE -
 				   (RX_STD_DESC_SIZE +
@@ -2483,7 +2492,6 @@ htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 		*((uint8_t *) &rx_desc->fw_desc.u.val) =
 			HTT_RX_IN_ORD_PADDR_IND_FW_DESC_GET(*(msg_word +
 						NEXT_FIELD_OFFSET_IN32));
-#undef NEXT_FIELD_OFFSET_IN32
 
 		msdu_count--;
 
@@ -2494,6 +2502,11 @@ htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 				status = RX_PKT_FATE_FW_DROP_INVALID;
 			pdev->rx_pkt_dump_cb(msdu, peer_id, status);
 		}
+
+		if (pdev->cfg.is_first_wakeup_packet)
+			htt_get_first_packet_after_wow_wakeup(
+				msg_word + NEXT_FIELD_OFFSET_IN32, msdu);
+
 		/* if discard flag is set (SA is self MAC), then
 		 * don't check mic failure.
 		 */
@@ -2527,6 +2540,7 @@ htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 								 __func__);
 					*tail_msdu = NULL;
 					ret = 0;
+					pdev->rx_ring.pop_fail_cnt++;
 					goto free_mem_map_table;
 				}
 
@@ -2558,6 +2572,7 @@ htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 				qdf_print("%s: netbuf pop failed!\n",
 					  __func__);
 				*tail_msdu = NULL;
+				pdev->rx_ring.pop_fail_cnt++;
 				ret = 0;
 				goto free_mem_map_table;
 			}
@@ -3323,6 +3338,7 @@ int htt_rx_msdu_buff_in_order_replenish(htt_pdev_handle pdev, uint32_t num)
 		qdf_spin_lock_bh(&(pdev->rx_ring.refill_lock));
 	}
 	pdev->rx_buff_fill_n_invoked++;
+
 	filled = htt_rx_ring_fill_n(pdev, num);
 
 	if (filled > num) {
@@ -3470,7 +3486,7 @@ htt_rx_hash_list_insert(struct htt_pdev_t *pdev,
 	htt_list_add_tail(&pdev->rx_ring.hash_table[i]->listhead,
 			  &hash_element->listnode);
 
-	RX_HASH_LOG(qdf_print("rx hash: %s: paddr 0x%x netbuf %p bucket %d\n",
+	RX_HASH_LOG(qdf_print("rx hash: %s: paddr 0x%x netbuf %pK bucket %d\n",
 			      __func__, paddr, netbuf, (int)i));
 
 	HTT_RX_HASH_COUNT_INCR(pdev->rx_ring.hash_table[i]);
@@ -3535,14 +3551,14 @@ qdf_nbuf_t htt_rx_hash_list_lookup(struct htt_pdev_t *pdev,
 		}
 	}
 
-	RX_HASH_LOG(qdf_print("rx hash: %s: paddr 0x%x, netbuf %p, bucket %d\n",
+	RX_HASH_LOG(qdf_print("rx hash: %s: paddr 0x%x, netbuf %pK, bucket %d\n",
 			      __func__, paddr, netbuf, (int)i));
 	HTT_RX_HASH_COUNT_PRINT(pdev->rx_ring.hash_table[i]);
 
 	qdf_spin_unlock_bh(&(pdev->rx_ring.rx_hash_lock));
 
 	if (netbuf == NULL) {
-		qdf_print("rx hash: %s: no entry found for %p!\n",
+		qdf_print("rx hash: %s: no entry found for %pK!\n",
 			  __func__, (void *)paddr);
 		if (cds_is_self_recovery_enabled())
 			cds_trigger_recovery(CDS_RX_HASH_NO_ENTRY_FOUND);
@@ -3770,6 +3786,7 @@ int htt_rx_attach(struct htt_pdev_t *pdev)
 		 QDF_TIMER_TYPE_SW);
 
 	pdev->rx_ring.fill_cnt = 0;
+	pdev->rx_ring.pop_fail_cnt = 0;
 #ifdef DEBUG_DMA_DONE
 	pdev->rx_ring.dbg_ring_idx = 0;
 	pdev->rx_ring.dbg_refill_cnt = 0;

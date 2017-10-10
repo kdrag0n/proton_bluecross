@@ -866,7 +866,7 @@ static QDF_STATUS wlan_hdd_scan_request_dequeue(hdd_context_t *hdd_ctx,
 				*timestamp = hdd_scan_req->timestamp;
 				qdf_mem_free(hdd_scan_req);
 				qdf_spin_unlock(&hdd_ctx->hdd_scan_req_q_lock);
-				hdd_debug("removed Scan id: %d, req = %p, pending scans %d",
+				hdd_debug("removed Scan id: %d, req = %pK, pending scans %d",
 				      scan_id, req,
 				      qdf_list_size(&hdd_ctx->hdd_scan_req_q));
 				return QDF_STATUS_SUCCESS;
@@ -915,7 +915,7 @@ hdd_scan_request_callback(tHalHandle halHandle, void *pContext,
 	uint32_t timestamp;
 
 	ENTER();
-	hdd_debug("called with halHandle = %p, pContext = %p, scanID = %d, returned status = %d",
+	hdd_debug("called with halHandle = %pK, pContext = %pK, scanID = %d, returned status = %d",
 		 halHandle, pContext, (int)scanId, (int)status);
 
 	/* if there is a scan request pending when the wlan driver is unloaded
@@ -924,7 +924,7 @@ hdd_scan_request_callback(tHalHandle halHandle, void *pContext,
 	 * do some quick sanity before proceeding
 	 */
 	if (pAdapter->dev != dev) {
-		hdd_debug("device mismatch %p vs %p", pAdapter->dev, dev);
+		hdd_debug("device mismatch %pK vs %pK", pAdapter->dev, dev);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -1440,7 +1440,7 @@ static QDF_STATUS hdd_cfg80211_scan_done_callback(tHalHandle halHandle,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	hdd_debug("called with hal = %p, pContext = %p, ID = %d, status = %d",
+	hdd_debug("called with hal = %pK, pContext = %pK, ID = %d, status = %d",
 		   halHandle, pContext, (int)scanId, (int)status);
 
 	pScanInfo->mScanPendingCounter = 0;
@@ -1941,9 +1941,13 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	 * IBSS connection. If IBSS vdev need to support scan,
 	 * Firmware need to make the change to add self peer
 	 * per mac for IBSS vdev.
+	 * NDI does not need scan from userspace to establish connection
+	 * and it does not support scan request either.
 	 */
-	if (QDF_IBSS_MODE == pAdapter->device_mode) {
-		hdd_err("Scan not supported for IBSS");
+	if (QDF_IBSS_MODE == pAdapter->device_mode ||
+	    QDF_NDI_MODE == pAdapter->device_mode) {
+		hdd_err("Scan not supported for %s",
+			hdd_device_mode_to_string(pAdapter->device_mode));
 		return -EINVAL;
 	}
 
@@ -2316,8 +2320,9 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 		sme_scan_flush_result(WLAN_HDD_GET_HAL_CTX(pAdapter));
 	}
 #endif
-	wlan_hdd_update_scan_rand_attrs((void *)&scan_req, (void *)request,
-					WLAN_HDD_HOST_SCAN);
+	if (cfg_param->enable_mac_spoofing)
+		wlan_hdd_update_scan_rand_attrs((void *)&scan_req,
+				(void *)request, WLAN_HDD_HOST_SCAN);
 
 	status = wlan_hdd_populate_ie_whitelist(pAdapter, pHddCtx,
 						&scan_req, is_p2p_scan);
@@ -2621,8 +2626,8 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 	if (0 != ret)
 		return ret;
 
-	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_SCAN_MAX, data,
-		      data_len, scan_policy)) {
+	if (hdd_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_SCAN_MAX, data, data_len,
+			  scan_policy)) {
 		hdd_err("Invalid ATTR");
 		return -EINVAL;
 	}
@@ -2887,9 +2892,9 @@ static int wlan_hdd_get_scanid(hdd_context_t *hdd_ctx,
  *
  * Return: zero for success and non zero for failure
  */
-static int __wlan_hdd_vendor_abort_scan(
-		struct wiphy *wiphy, const void *data,
-		int data_len)
+static int __wlan_hdd_vendor_abort_scan(struct wiphy *wiphy,
+					const void *data,
+					int data_len)
 {
 	hdd_context_t *hdd_ctx = wiphy_priv(wiphy);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_SCAN_MAX + 1];
@@ -2903,31 +2908,28 @@ static int __wlan_hdd_vendor_abort_scan(
 	}
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != ret)
+	if (ret)
 		return ret;
 
-	ret = -EINVAL;
-	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_SCAN_MAX, data,
-		      data_len, scan_policy)) {
+	ret = hdd_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_SCAN_MAX, data,
+			    data_len, scan_policy);
+	if (ret) {
 		hdd_err("Invalid ATTR");
 		return ret;
 	}
 
-	if (tb[QCA_WLAN_VENDOR_ATTR_SCAN_COOKIE]) {
-		cookie = nla_get_u64(
-			    tb[QCA_WLAN_VENDOR_ATTR_SCAN_COOKIE]);
-		ret = wlan_hdd_get_scanid(hdd_ctx,
-					  &scan_id,
-					  cookie);
-		if (ret != 0)
-			return ret;
-		hdd_abort_mac_scan(hdd_ctx,
-				   HDD_SESSION_ID_INVALID,
-				   scan_id,
-				   eCSR_SCAN_ABORT_DEFAULT);
-	}
+	if (!tb[QCA_WLAN_VENDOR_ATTR_SCAN_COOKIE])
+		return -EINVAL;
 
-	return ret;
+	cookie = nla_get_u64(tb[QCA_WLAN_VENDOR_ATTR_SCAN_COOKIE]);
+	ret = wlan_hdd_get_scanid(hdd_ctx, &scan_id, cookie);
+	if (ret)
+		return ret;
+
+	hdd_abort_mac_scan(hdd_ctx, HDD_SESSION_ID_INVALID,
+			   scan_id, eCSR_SCAN_ABORT_DEFAULT);
+
+	return 0;
 }
 
 
@@ -3185,11 +3187,22 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
+	if (QDF_NDI_MODE == pAdapter->device_mode) {
+		hdd_err("Command not allowed for NDI interface");
+		return -EINVAL;
+	}
+
 	pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 	ret = wlan_hdd_validate_context(pHddCtx);
 
 	if (0 != ret)
 		return ret;
+
+	if (pAdapter->device_mode != QDF_STA_MODE) {
+		hdd_info("Sched scan not supported for device mode:%d",
+			 pAdapter->device_mode);
+		return -EINVAL;
+	}
 
 	if ((eConnectionState_Associated ==
 				WLAN_HDD_GET_STATION_CTX_PTR(pAdapter)->
@@ -3213,7 +3226,7 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
 	if ((QDF_STA_MODE == pAdapter->device_mode) &&
 	    (eConnectionState_Connecting ==
 	     (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.connState)) {
-		hdd_err("%p(%d) Connection in progress: sched_scan_start denied (EBUSY)",
+		hdd_err("%pK(%d) Connection in progress: sched_scan_start denied (EBUSY)",
 		       WLAN_HDD_GET_STATION_CTX_PTR(pAdapter),
 		       pAdapter->sessionId);
 		return -EBUSY;
@@ -3426,8 +3439,11 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
 	hdd_debug("SessionId %d, enable %d, modePNO %d",
 		pAdapter->sessionId, pPnoRequest->enable, pPnoRequest->modePNO);
 
-	wlan_hdd_update_scan_rand_attrs((void *)pPnoRequest, (void *)request,
-					WLAN_HDD_PNO_SCAN);
+	if (pHddCtx->config->enable_mac_spoofing)
+		wlan_hdd_update_scan_rand_attrs((void *)pPnoRequest,
+				(void *)request, WLAN_HDD_PNO_SCAN);
+	else
+		pPnoRequest->enable_pno_scan_randomization = false;
 
 	if (!hdd_conn_is_connected(station_ctx))
 		wlan_hdd_fill_whitelist_ie_attrs(&pPnoRequest->ie_whitelist,
@@ -3507,6 +3523,12 @@ int wlan_hdd_sched_scan_stop(struct net_device *dev)
 		hdd_err("HDD context is Null");
 		ret = -ENODEV;
 		goto exit;
+	}
+
+	if (adapter->device_mode != QDF_STA_MODE) {
+		hdd_info("Sched scan not supported for device mode:%d",
+			 adapter->device_mode);
+		return -EINVAL;
 	}
 
 	hHal = WLAN_HDD_GET_HAL_CTX(adapter);
@@ -3694,6 +3716,8 @@ void hdd_cleanup_scan_queue(hdd_context_t *hdd_ctx)
 	hdd_adapter_t *adapter;
 	uint8_t source;
 	bool aborted = true;
+	QDF_STATUS status;
+	hdd_adapter_list_node_t *adapter_node = NULL, *next_node = NULL;
 
 	if (NULL == hdd_ctx) {
 		hdd_err("HDD context is Null");
@@ -3728,7 +3752,7 @@ void hdd_cleanup_scan_queue(hdd_context_t *hdd_ctx)
 				hdd_cfg80211_scan_done(adapter, req, aborted);
 			else
 				hdd_vendor_scan_callback(adapter, req, aborted);
-			hdd_debug("removed Scan id: %d, req = %p",
+			hdd_debug("removed Scan id: %d, req = %pK",
 					hdd_scan_req->scan_id, req);
 		}
 		qdf_mem_free(hdd_scan_req);
@@ -3736,6 +3760,17 @@ void hdd_cleanup_scan_queue(hdd_context_t *hdd_ctx)
 	}
 	qdf_spin_unlock(&hdd_ctx->hdd_scan_req_q_lock);
 
+	status = hdd_get_front_adapter(hdd_ctx, &adapter_node);
+	while (NULL != adapter_node && QDF_IS_STATUS_SUCCESS(status)) {
+		adapter = adapter_node->pAdapter;
+		if (adapter->scan_info.mScanPending) {
+			adapter->scan_info.mScanPending = false;
+			complete(&adapter->scan_info.abortscan_event_var);
+		}
+		status = hdd_get_next_adapter(hdd_ctx, adapter_node,
+					      &next_node);
+		adapter_node = next_node;
+	}
 }
 
 /**

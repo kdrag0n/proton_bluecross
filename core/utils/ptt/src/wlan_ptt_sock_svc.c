@@ -38,6 +38,7 @@
 #include <wlan_ptt_sock_svc.h>
 #include <qdf_types.h>
 #include <qdf_trace.h>
+#include "wlan_hdd_main.h"
 
 #ifdef CNSS_GENL
 #include <net/cnss_nl.h>
@@ -63,7 +64,7 @@ static void ptt_sock_dump_buf(const unsigned char *pbuf, int cnt)
 	for (i = 0; i < cnt; i++) {
 		if ((i % 16) == 0)
 			QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
-				  "\n%p:", pbuf);
+				  "\n%pK:", pbuf);
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO, " %02X",
 			  *pbuf);
 		pbuf++;
@@ -276,7 +277,7 @@ static void ptt_cmd_handler(const void *data, int data_len, void *ctx, int pid)
 	 * audit note: it is ok to pass a NULL policy here since a
 	 * length check on the data is added later already
 	 */
-	if (nla_parse(tb, CLD80211_ATTR_MAX, data, data_len, NULL)) {
+	if (hdd_nla_parse(tb, CLD80211_ATTR_MAX, data, data_len, NULL)) {
 		PTT_TRACE(QDF_TRACE_LEVEL_ERROR, "Invalid ATTR");
 		return;
 	}

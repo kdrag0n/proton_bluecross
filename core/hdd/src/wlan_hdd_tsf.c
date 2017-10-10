@@ -586,13 +586,15 @@ static inline int32_t hdd_get_targettime_from_hosttime(
 
 	if (host_time < adapter->last_host_time)
 		ret = hdd_uint64_minus(adapter->last_target_time,
-				       (adapter->last_host_time - host_time) /
-					HOST_TO_TARGET_TIME_RATIO,
+				       qdf_do_div(adapter->last_host_time -
+						  host_time,
+						  HOST_TO_TARGET_TIME_RATIO),
 				       target_time);
 	else
 		ret = hdd_uint64_plus(adapter->last_target_time,
-				      (host_time - adapter->last_host_time) /
-					HOST_TO_TARGET_TIME_RATIO,
+				      qdf_do_div(host_time -
+						 adapter->last_host_time,
+						 HOST_TO_TARGET_TIME_RATIO),
 				      target_time);
 
 	if (in_cap_state)
@@ -601,12 +603,10 @@ static inline int32_t hdd_get_targettime_from_hosttime(
 	return ret;
 }
 
-static inline uint64_t hdd_get_monotonic_host_time(void)
+static inline uint64_t hdd_get_monotonic_host_time(hdd_context_t *hdd_ctx)
 {
-	struct timespec ts;
-
-	getrawmonotonic(&ts);
-	return timespec_to_ns(&ts);
+	return HDD_TSF_IS_RAW_SET(hdd_ctx) ?
+		ktime_get_ns() : ktime_get_real_ns();
 }
 
 static ssize_t __hdd_wlan_tsf_show(struct device *dev,
@@ -614,6 +614,7 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 {
 	hdd_station_ctx_t *hdd_sta_ctx;
 	hdd_adapter_t *adapter;
+	hdd_context_t *hdd_ctx;
 	ssize_t size;
 	uint64_t host_time, target_time;
 
@@ -631,7 +632,11 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 	if (eConnectionState_Associated != hdd_sta_ctx->conn_info.connState)
 		return scnprintf(buf, PAGE_SIZE, "NOT connected\n");
 
-	host_time = hdd_get_monotonic_host_time();
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx)
+		return scnprintf(buf, PAGE_SIZE, "Invalid HDD context\n");
+
+	host_time = hdd_get_monotonic_host_time(hdd_ctx);
 	if (hdd_get_targettime_from_hosttime(adapter, host_time,
 					     &target_time))
 		size = scnprintf(buf, PAGE_SIZE, "Invalid timestamp\n");
@@ -678,9 +683,8 @@ static irqreturn_t hdd_tsf_captured_irq_handler(int irq, void *arg)
 	if (!arg)
 		return IRQ_NONE;
 
-	host_time = hdd_get_monotonic_host_time();
-
 	hdd_ctx = (hdd_context_t *)arg;
+	host_time = hdd_get_monotonic_host_time(hdd_ctx);
 
 	adapter = hdd_ctx->cap_tsf_context;
 	if (!adapter)
@@ -740,8 +744,8 @@ static enum hdd_tsf_op_result hdd_tsf_sync_init(hdd_adapter_t *adapter)
 	}
 
 	net_dev = adapter->dev;
-		if (net_dev)
-			device_create_file(&net_dev->dev, &dev_attr_tsf);
+	if (net_dev && HDD_TSF_IS_DBG_FS_SET(hddctx))
+		device_create_file(&net_dev->dev, &dev_attr_tsf);
 	hdd_set_th_sync_status(adapter, true);
 
 	return HDD_TSF_OP_SUCC;
@@ -766,13 +770,6 @@ static enum hdd_tsf_op_result hdd_tsf_sync_deinit(hdd_adapter_t *adapter)
 
 	hdd_set_th_sync_status(adapter, false);
 
-	net_dev = adapter->dev;
-	if (net_dev) {
-		struct device *dev = &net_dev->dev;
-
-		device_remove_file(dev, &dev_attr_tsf);
-	}
-
 	ret = qdf_mc_timer_destroy(&adapter->host_target_sync_timer);
 	if (ret != QDF_STATUS_SUCCESS)
 		hdd_err("Failed to destroy timer, ret: %d", ret);
@@ -792,6 +789,13 @@ static enum hdd_tsf_op_result hdd_tsf_sync_deinit(hdd_adapter_t *adapter)
 	}
 
 	hdd_reset_timestamps(adapter);
+
+	net_dev = adapter->dev;
+	if (net_dev && HDD_TSF_IS_DBG_FS_SET(hddctx)) {
+		struct device *dev = &net_dev->dev;
+
+		device_remove_file(dev, &dev_attr_tsf);
+	}
 	return HDD_TSF_OP_SUCC;
 }
 
@@ -951,6 +955,11 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_init(hdd_context_t *hdd_ctx)
 {
 	int ret;
 
+	if (!HDD_TSF_IS_PTP_ENABLED(hdd_ctx)) {
+		hdd_info("To enable TSF_PLUS, set gtsf_ptp_options in ini");
+		return HDD_TSF_OP_FAIL;
+	}
+
 	ret = cnss_common_register_tsf_captured_handler(
 			hdd_ctx->parent_dev,
 			hdd_tsf_captured_irq_handler,
@@ -960,7 +969,8 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_init(hdd_context_t *hdd_ctx)
 		return HDD_TSF_OP_FAIL;
 	}
 
-	ol_register_timestamp_callback(hdd_tx_timestamp);
+	if (HDD_TSF_IS_TX_SET(hdd_ctx))
+		ol_register_timestamp_callback(hdd_tx_timestamp);
 	return HDD_TSF_OP_SUCC;
 }
 
@@ -969,7 +979,12 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_deinit(hdd_context_t *hdd_ctx)
 {
 	int ret;
 
-	ol_deregister_timestamp_callback();
+	if (!HDD_TSF_IS_PTP_ENABLED(hdd_ctx))
+		return HDD_TSF_OP_SUCC;
+
+	if (HDD_TSF_IS_TX_SET(hdd_ctx))
+		ol_deregister_timestamp_callback();
+
 	ret = cnss_common_unregister_tsf_captured_handler(
 				hdd_ctx->parent_dev,
 				(void *)hdd_ctx);
@@ -1128,8 +1143,8 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 	if (0 != status)
 		return -EINVAL;
 
-	if (nla_parse(tb_vendor, QCA_WLAN_VENDOR_ATTR_TSF_MAX, data,
-		      data_len, tsf_policy)) {
+	if (hdd_nla_parse(tb_vendor, QCA_WLAN_VENDOR_ATTR_TSF_MAX, data,
+			  data_len, tsf_policy)) {
 		hdd_err("Invalid TSF cmd");
 		return -EINVAL;
 	}

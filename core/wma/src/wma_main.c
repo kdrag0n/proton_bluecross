@@ -976,7 +976,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 	struct qpower_params *qparams = &intr[vid].config.qpower_params;
 	struct pdev_params pdev_param;
 
-	WMA_LOGD("wmihandle %p", wma->wmi_handle);
+	WMA_LOGD("wmihandle %pK", wma->wmi_handle);
 
 	if (NULL == pMac) {
 		WMA_LOGE("%s: Failed to get pMac", __func__);
@@ -2428,6 +2428,13 @@ QDF_STATUS wma_open(void *cds_context,
 						cfg_ctx,
 				      (uint8_t)cds_is_packet_log_enabled());
 
+	/* adjust the ptp rx option default value based on CFG INI setting */
+	ol_set_cfg_ptp_rx_opt_enabled((ol_pdev_handle)
+					  ((p_cds_contextType)cds_context)->
+					  cfg_ctx,
+					  (uint8_t)
+					  cds_is_ptp_rx_opt_enabled());
+
 	/* Allocate dfs_ic and initialize DFS */
 	wma_handle->dfs_ic = wma_dfs_attach(wma_handle->dfs_ic);
 	if (wma_handle->dfs_ic == NULL) {
@@ -3284,7 +3291,7 @@ static int wma_pdev_set_dual_mode_config_resp_evt_handler(void *handle,
 		 */
 		return QDF_STATUS_E_NULL_VALUE;
 	}
-
+	wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
 	dual_mac_cfg_resp = qdf_mem_malloc(sizeof(*dual_mac_cfg_resp));
 	if (!dual_mac_cfg_resp) {
 		WMA_LOGE("%s: Memory allocation failed", __func__);
@@ -4214,6 +4221,11 @@ static inline void wma_update_target_services(tp_wma_handle wh,
 			wh->wmi_service_ext_bitmap,
 			WMI_SERVICE_FILS_SUPPORT))
 		cfg->is_fils_roaming_supported = true;
+
+	if (WMI_SERVICE_EXT_IS_ENABLED(wh->wmi_service_bitmap,
+			wh->wmi_service_ext_bitmap,
+			WMI_SERVICE_MAWC_SUPPORT))
+		cfg->is_fw_mawc_capable = true;
 }
 
 /**
@@ -8242,12 +8254,19 @@ QDF_STATUS wma_send_pdev_set_dual_mac_config(tp_wma_handle wma_handle,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
+	/*
+	 * aquire the wake lock here and release it in response handler function
+	 * In error condition, release the wake lock right away
+	 */
+	wma_acquire_wakelock(&wma_handle->wmi_cmd_rsp_wake_lock,
+			     WMA_VDEV_PLCY_MGR_CMD_TIMEOUT);
 	status = wmi_unified_pdev_set_dual_mac_config_cmd(
 				wma_handle->wmi_handle,
 				(struct wmi_dual_mac_config *)msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		WMA_LOGE("%s: Failed to send WMI_PDEV_SET_DUAL_MAC_CONFIG_CMDID: %d",
 				__func__, status);
+		wma_release_wakelock(&wma_handle->wmi_cmd_rsp_wake_lock);
 		return status;
 	}
 	wma_handle->dual_mac_cfg.req_scan_config = msg->scan_config;
@@ -8346,14 +8365,15 @@ resp:
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
-QDF_STATUS wma_crash_inject(tp_wma_handle wma_handle, uint32_t type,
-			uint32_t delay_time_ms)
+QDF_STATUS wma_crash_inject(WMA_HANDLE wma_handle, uint32_t type,
+			    uint32_t delay_time_ms)
 {
 	struct crash_inject param;
+	tp_wma_handle wma = (tp_wma_handle)wma_handle;
 
 	param.type = type;
 	param.delay_time_ms = delay_time_ms;
-	return wmi_crash_inject(wma_handle->wmi_handle, &param);
+	return wmi_crash_inject(wma->wmi_handle, &param);
 }
 
 /**

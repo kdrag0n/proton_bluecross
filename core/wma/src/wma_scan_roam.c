@@ -1014,6 +1014,10 @@ QDF_STATUS wma_roam_scan_offload_rssi_thresh(tp_wma_handle wma_handle,
 	params.bg_scan_bad_rssi_thresh = roam_params->bg_scan_bad_rssi_thresh -
 		WMA_NOISE_FLOOR_DBM_DEFAULT;
 	params.bg_scan_client_bitmap = roam_params->bg_scan_client_bitmap;
+	params.roam_bad_rssi_thresh_offset_2g =
+				roam_params->roam_bad_rssi_thresh_offset_2g;
+	if (params.roam_bad_rssi_thresh_offset_2g)
+		params.flags |= WMI_ROAM_BG_SCAN_FLAGS_2G_TO_5G_ONLY;
 
 	/*
 	 * The current Noise floor in firmware is -96dBm. Penalty/Boost
@@ -1087,9 +1091,10 @@ QDF_STATUS wma_roam_scan_offload_rssi_thresh(tp_wma_handle wma_handle,
 			roam_params->dense_min_aps_cnt,
 			roam_params->traffic_threshold,
 			roam_params->initial_dense_status);
-	WMA_LOGD(FL("BG Scan Bad RSSI:%d, bitmap:0x%x"),
+	WMA_LOGD(FL("BG Scan Bad RSSI:%d, bitmap:0x%x Offset for 2G to 5G Roam:%d"),
 			roam_params->bg_scan_bad_rssi_thresh,
-			roam_params->bg_scan_client_bitmap);
+			roam_params->bg_scan_client_bitmap,
+			roam_params->roam_bad_rssi_thresh_offset_2g);
 	return status;
 }
 
@@ -1318,60 +1323,60 @@ static uint32_t wma_roam_scan_get_cckm_mode(tSirRoamOffloadScanReq *roam_req,
 #endif
 /**
  * wma_roam_scan_fill_ap_profile() - fill ap_profile
- * @wma_handle: wma handle
- * @pMac: Mac ptr
  * @roam_req: roam offload scan request
- * @ap_profile_p: ap profile
+ * @profile: ap profile
  *
  * Fill ap_profile structure from configured parameters
  *
  * Return: none
  */
-void wma_roam_scan_fill_ap_profile(tp_wma_handle wma_handle,
-				   tpAniSirGlobal pMac,
-				   tSirRoamOffloadScanReq *roam_req,
-				   wmi_ap_profile *ap_profile_p)
+static void wma_roam_scan_fill_ap_profile(tSirRoamOffloadScanReq *roam_req,
+				   struct ap_profile *profile)
 {
 	uint32_t rsn_authmode;
 
-	qdf_mem_zero(ap_profile_p, sizeof(wmi_ap_profile));
+	qdf_mem_zero(profile, sizeof(*profile));
 	if (roam_req == NULL) {
-		ap_profile_p->ssid.ssid_len = 0;
-		ap_profile_p->ssid.ssid[0] = 0;
-		ap_profile_p->rsn_authmode = WMI_AUTH_NONE;
-		ap_profile_p->rsn_ucastcipherset = WMI_CIPHER_NONE;
-		ap_profile_p->rsn_mcastcipherset = WMI_CIPHER_NONE;
-		ap_profile_p->rsn_mcastmgmtcipherset = WMI_CIPHER_NONE;
-		ap_profile_p->rssi_threshold = WMA_ROAM_RSSI_DIFF_DEFAULT;
+		profile->ssid.length = 0;
+		profile->ssid.mac_ssid[0] = 0;
+		profile->rsn_authmode = WMI_AUTH_NONE;
+		profile->rsn_ucastcipherset = WMI_CIPHER_NONE;
+		profile->rsn_mcastcipherset = WMI_CIPHER_NONE;
+		profile->rsn_mcastmgmtcipherset = WMI_CIPHER_NONE;
+		profile->rssi_threshold = WMA_ROAM_RSSI_DIFF_DEFAULT;
 	} else {
-		ap_profile_p->ssid.ssid_len =
+		profile->ssid.length =
 			roam_req->ConnectedNetwork.ssId.length;
-		qdf_mem_copy(ap_profile_p->ssid.ssid,
+		qdf_mem_copy(profile->ssid.mac_ssid,
 			     roam_req->ConnectedNetwork.ssId.ssId,
-			     ap_profile_p->ssid.ssid_len);
-		ap_profile_p->rsn_authmode =
+			     profile->ssid.length);
+		profile->rsn_authmode =
 			e_csr_auth_type_to_rsn_authmode(
 				roam_req->ConnectedNetwork.authentication,
 				roam_req->ConnectedNetwork.encryption);
-		rsn_authmode = ap_profile_p->rsn_authmode;
+		rsn_authmode = profile->rsn_authmode;
 
 		if ((rsn_authmode == WMI_AUTH_CCKM_WPA) ||
 			(rsn_authmode == WMI_AUTH_CCKM_RSNA))
-			ap_profile_p->rsn_authmode =
+			profile->rsn_authmode =
 				wma_roam_scan_get_cckm_mode(
 						roam_req, rsn_authmode);
-		ap_profile_p->rsn_ucastcipherset =
+		profile->rsn_ucastcipherset =
 			e_csr_encryption_type_to_rsn_cipherset(
 					roam_req->ConnectedNetwork.encryption);
-		ap_profile_p->rsn_mcastcipherset =
+		profile->rsn_mcastcipherset =
 			e_csr_encryption_type_to_rsn_cipherset(
 				roam_req->ConnectedNetwork.mcencryption);
-		ap_profile_p->rsn_mcastmgmtcipherset =
-			ap_profile_p->rsn_mcastcipherset;
-		ap_profile_p->rssi_threshold = roam_req->RoamRssiDiff;
+		profile->rsn_mcastmgmtcipherset =
+			profile->rsn_mcastcipherset;
+		profile->rssi_threshold = roam_req->RoamRssiDiff;
+		if (roam_req->rssi_abs_thresh)
+			profile->rssi_abs_thresh =
+				roam_req->rssi_abs_thresh -
+						WMA_NOISE_FLOOR_DBM_DEFAULT;
 #ifdef WLAN_FEATURE_11W
 		if (roam_req->ConnectedNetwork.mfp_enabled)
-			ap_profile_p->flags |= WMI_AP_PROFILE_FLAG_PMF;
+			profile->flags |= WMI_AP_PROFILE_FLAG_PMF;
 #endif
 	}
 }
@@ -1693,19 +1698,23 @@ void wma_roam_scan_fill_scan_params(tp_wma_handle wma_handle,
 /**
  * wma_roam_scan_offload_ap_profile() - set roam ap profile in fw
  * @wma_handle: wma handle
- * @ap_profile_p: ap profile
- * @vdev_id: vdev id
+ * @mac_ctx: Mac ptr
+ * @roam_req: Request which contains the ap profile
  *
  * Send WMI_ROAM_AP_PROFILE to firmware
  *
  * Return: QDF status
  */
-QDF_STATUS wma_roam_scan_offload_ap_profile(tp_wma_handle wma_handle,
-					    wmi_ap_profile *ap_profile_p,
-					    uint32_t vdev_id)
+static QDF_STATUS wma_roam_scan_offload_ap_profile(tp_wma_handle wma_handle,
+					    tSirRoamOffloadScanReq *roam_req)
 {
+	struct ap_profile_params ap_profile;
+
+	ap_profile.vdev_id = roam_req->sessionId;
+	wma_roam_scan_fill_ap_profile(roam_req, &ap_profile.profile);
+	ap_profile.param = roam_req->score_params;
 	return wmi_unified_send_roam_scan_offload_ap_cmd(wma_handle->wmi_handle,
-			  ap_profile_p, vdev_id);
+							 &ap_profile);
 }
 
 /**
@@ -1902,7 +1911,6 @@ QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
 {
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	wmi_start_scan_cmd_fixed_param scan_params;
-	wmi_ap_profile ap_profile;
 	tpAniSirGlobal pMac = cds_get_context(QDF_MODULE_ID_PE);
 	uint32_t mode = 0;
 	struct wma_txrx_node *intr = NULL;
@@ -1987,11 +1995,8 @@ QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
 		if (qdf_status != QDF_STATUS_SUCCESS)
 			break;
 
-		wma_roam_scan_fill_ap_profile(wma_handle, pMac, roam_req,
-					      &ap_profile);
-
 		qdf_status = wma_roam_scan_offload_ap_profile(wma_handle,
-					      &ap_profile, roam_req->sessionId);
+							      roam_req);
 		if (qdf_status != QDF_STATUS_SUCCESS)
 			break;
 
@@ -2013,10 +2018,17 @@ QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
 						   roam_req->sessionId);
 		if (qdf_status != QDF_STATUS_SUCCESS)
 			break;
-		qdf_status = wma_roam_scan_mawc_params(wma_handle, roam_req);
-		if (qdf_status != QDF_STATUS_SUCCESS) {
-			WMA_LOGE("Sending roaming MAWC params failed");
-			break;
+		if (WMI_SERVICE_EXT_IS_ENABLED(wma_handle->wmi_service_bitmap,
+				wma_handle->wmi_service_ext_bitmap,
+				WMI_SERVICE_MAWC_SUPPORT)) {
+			qdf_status =
+				wma_roam_scan_mawc_params(wma_handle, roam_req);
+			if (qdf_status != QDF_STATUS_SUCCESS) {
+				WMA_LOGE("Sending roaming MAWC params failed");
+				break;
+			}
+		} else {
+			WMA_LOGD("MAWC roaming not supported by firmware");
 		}
 		qdf_status = wma_roam_scan_filter(wma_handle, roam_req);
 		if (qdf_status != QDF_STATUS_SUCCESS) {
@@ -2229,10 +2241,8 @@ QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
 		if (qdf_status != QDF_STATUS_SUCCESS)
 			break;
 
-		wma_roam_scan_fill_ap_profile(wma_handle, pMac, roam_req,
-					      &ap_profile);
 		qdf_status = wma_roam_scan_offload_ap_profile(wma_handle,
-					&ap_profile, roam_req->sessionId);
+							      roam_req);
 		if (qdf_status != QDF_STATUS_SUCCESS)
 			break;
 
@@ -3505,6 +3515,12 @@ QDF_STATUS wma_pno_start(tp_wma_handle wma, tpSirPNOScanReq pno)
 		WMA_LOGD("PNO start request sent successfully for vdev %d",
 			 pno->sessionId);
 	}
+	if (!WMI_SERVICE_EXT_IS_ENABLED(wma->wmi_service_bitmap,
+				wma->wmi_service_ext_bitmap,
+				WMI_SERVICE_MAWC_SUPPORT)) {
+		WMA_LOGD("PNO MAWC not supported by firmware");
+		goto exit_pno_start;
+	}
 	mawc_params = qdf_mem_malloc(sizeof(*mawc_params));
 	if (mawc_params == NULL) {
 		WMA_LOGE("%s : MAWC Memory allocation failed", __func__);
@@ -3882,6 +3898,12 @@ int wma_nlo_match_evt_handler(void *handle, uint8_t *event,
 
 	nlo_event = param_buf->fixed_param;
 	WMA_LOGD("PNO match event received for vdev %d", nlo_event->vdev_id);
+
+	if (nlo_event->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("Invalid vdev id in the NLO event %d",
+				nlo_event->vdev_id);
+		return -EINVAL;
+	}
 
 	node = &wma->interfaces[nlo_event->vdev_id];
 	if (node)

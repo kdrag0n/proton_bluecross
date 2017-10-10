@@ -323,6 +323,19 @@
 #define WLAN_NUD_STATS_ARP_PKT_TYPE 1
 
 /*
+ * @eHDD_DRV_OP_PROBE: Refers to .probe operation
+ * @eHDD_DRV_OP_REMOVE: Refers to .remove operation
+ * @eHDD_DRV_OP_SHUTDOWN: Refers to .shutdown operation
+ * @eHDD_DRV_OP_REINIT: Refers to .reinit operation
+ */
+enum {
+	eHDD_DRV_OP_PROBE = 0,
+	eHDD_DRV_OP_REMOVE,
+	eHDD_DRV_OP_SHUTDOWN,
+	eHDD_DRV_OP_REINIT
+};
+
+/*
  * @eHDD_SCAN_REJECT_DEFAULT: default value
  * @eHDD_CONNECTION_IN_PROGRESS: connection is in progress
  * @eHDD_REASSOC_IN_PROGRESS: reassociation is in progress
@@ -1269,6 +1282,7 @@ struct hdd_adapter_s {
 	uint8_t snr;
 
 	struct work_struct monTxWorkQueue;
+	struct work_struct  sap_stop_bss_work;
 	struct sk_buff *skb_to_tx;
 
 	union {
@@ -1684,7 +1698,10 @@ enum hdd_sta_smps_param {
 	HDD_STA_SMPS_PARAM_DTIM_1CHRX_ENABLE = 5
 };
 
-/** Adapter structure definition */
+/**
+ * struct hdd_context_s
+ * @adapter_nodes: an array of adapter nodes for keeping track of hdd adapters
+ */
 struct hdd_context_s {
 	/** Global CDS context  */
 	v_CONTEXT_t pcds_context;
@@ -1696,6 +1713,7 @@ struct hdd_context_s {
 	/* TODO Remove this from here. */
 
 	qdf_spinlock_t hdd_adapter_lock;
+	hdd_adapter_list_node_t adapter_nodes[CSR_ROAM_SESSION_MAX];
 	qdf_list_t hddAdapters; /* List of adapters */
 
 	/* One per STA: 1 for BCMC_STA_ID, 1 for each SAP_SELF_STA_ID,
@@ -1940,8 +1958,8 @@ struct hdd_context_s {
 #endif
 	/* Present state of driver cds modules */
 	enum driver_modules_status driver_status;
-	/* MC timer interface change */
-	qdf_mc_timer_t iface_change_timer;
+	/* interface idle work */
+	qdf_delayed_work_t iface_idle_work;
 	/* Interface change lock */
 	struct mutex iface_change_lock;
 	bool rps;
@@ -2032,7 +2050,7 @@ hdd_adapter_t *hdd_open_adapter(hdd_context_t *pHddCtx, uint8_t session_type,
 QDF_STATUS hdd_close_adapter(hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
 			     bool rtnl_held);
 QDF_STATUS hdd_close_all_adapters(hdd_context_t *pHddCtx, bool rtnl_held);
-QDF_STATUS hdd_stop_all_adapters(hdd_context_t *pHddCtx);
+QDF_STATUS hdd_stop_all_adapters(hdd_context_t *pHddCtx, bool close_session);
 void hdd_deinit_all_adapters(hdd_context_t *hdd_ctx, bool rtnl_held);
 QDF_STATUS hdd_reset_all_adapters(hdd_context_t *pHddCtx);
 QDF_STATUS hdd_start_all_adapters(hdd_context_t *pHddCtx);
@@ -2367,8 +2385,7 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 		struct cfg80211_beacon_data *params,
 		const u8 *ssid, size_t ssid_len,
 		enum nl80211_hidden_ssid hidden_ssid,
-		bool check_for_concurrency,
-		bool update_beacon);
+		bool check_for_concurrency);
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 QDF_STATUS hdd_register_for_sap_restart_with_channel_switch(void);
 #else
@@ -2749,10 +2766,76 @@ static inline void hdd_update_hlp_info(struct net_device *dev,
 {}
 #endif
 
+#undef nla_parse
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+static inline void hdd_dev_setup_destructor(struct net_device *dev)
+{
+	dev->destructor = free_netdev;
+}
+
+static inline int
+hdd_nla_parse(struct nlattr **tb, int maxtype, const struct nlattr *head,
+	      int len, const struct nla_policy *policy)
+{
+	return nla_parse(tb, maxtype, head, len, policy);
+}
+
+static inline int
+hdd_nla_parse_nested(struct nlattr *tb[], int maxtype, const struct nlattr *nla,
+		     const struct nla_policy *policy)
+{
+	return nla_parse_nested(tb, maxtype, nla, policy);
+}
+#else
+static inline void hdd_dev_setup_destructor(struct net_device *dev)
+{
+	dev->needs_free_netdev = true;
+}
+
+static inline int
+hdd_nla_parse(struct nlattr **tb, int maxtype, const struct nlattr *head,
+	      int len, const struct nla_policy *policy)
+{
+	return nla_parse(tb, maxtype, head, len, policy, NULL);
+}
+
+static inline int
+hdd_nla_parse_nested(struct nlattr *tb[], int maxtype, const struct nlattr *nla,
+		     const struct nla_policy *policy)
+{
+	return nla_parse_nested(tb, maxtype, nla, policy, NULL);
+}
+#endif /* KERNEL_VERSION(4, 12, 0) */
+#define nla_parse(...) (obsolete, use wlan_cfg80211_nla_parse or hdd_nla_parse)
+
 /**
  * hdd_pld_ipa_uc_shutdown_pipes() - Disconnect IPA WDI pipes during PDR
  *
  * Return: None
  */
 void hdd_pld_ipa_uc_shutdown_pipes(void);
+
+/**
+ * hdd_drv_ops_inactivity_handler() - Timeout handler for driver ops
+ * inactivity timer
+ *
+ * Return: None
+ */
+void hdd_drv_ops_inactivity_handler(void);
+
+/**
+ * hdd_start_driver_ops_timer() - Starts driver ops inactivity timer
+ * @drv_op: Enum indicating driver op
+ *
+ * Return: none
+ */
+void hdd_start_driver_ops_timer(int drv_op);
+
+/**
+ * hdd_stop_driver_ops_timer() - Stops driver ops inactivity timer
+ *
+ * Return: none
+ */
+void hdd_stop_driver_ops_timer(void);
+
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

@@ -423,6 +423,9 @@ htt_pdev_alloc(ol_txrx_pdev_handle txrx_pdev,
 	 * since htt_rx_attach involves sending a rx ring configure
 	 * message to the target.
 	 */
+	HTT_TX_MUTEX_INIT(&pdev->htt_tx_mutex);
+	HTT_TX_NBUF_QUEUE_MUTEX_INIT(pdev);
+	HTT_TX_MUTEX_INIT(&pdev->credit_mutex);
 	if (htt_htc_attach_all(pdev))
 		goto htt_htc_attach_fail;
 	if (hif_ce_fastpath_cb_register(osc, htt_t2h_msg_handler_fast, pdev))
@@ -463,9 +466,6 @@ htt_attach(struct htt_pdev_t *pdev, int desc_pool_size)
 	ret = htt_rx_attach(pdev);
 	if (ret)
 		goto fail2;
-
-	HTT_TX_MUTEX_INIT(&pdev->htt_tx_mutex);
-	HTT_TX_NBUF_QUEUE_MUTEX_INIT(pdev);
 
 	/* pre-allocate some HTC_PACKET objects */
 	for (i = 0; i < HTT_HTC_PKT_POOL_INIT_SIZE; i++) {
@@ -665,6 +665,7 @@ void htt_detach(htt_pdev_handle pdev)
 #ifdef ATH_11AC_TXCOMPACT
 	htt_htc_misc_pkt_pool_free(pdev);
 #endif
+	HTT_TX_MUTEX_DESTROY(&pdev->credit_mutex);
 	HTT_TX_MUTEX_DESTROY(&pdev->htt_tx_mutex);
 	HTT_TX_NBUF_QUEUE_MUTEX_DESTROY(pdev);
 	htt_rx_dbg_rxbuf_deinit(pdev);
@@ -791,12 +792,12 @@ void htt_display(htt_pdev_handle pdev, int indent)
 	qdf_print("%*srx ring: space for %d elems, filled with %d buffers\n",
 		  indent + 4, " ",
 		  pdev->rx_ring.size, pdev->rx_ring.fill_level);
-	qdf_print("%*sat %p (%llx paddr)\n", indent + 8, " ",
+	qdf_print("%*sat %pK (%llx paddr)\n", indent + 8, " ",
 		  pdev->rx_ring.buf.paddrs_ring,
 		  (unsigned long long)pdev->rx_ring.base_paddr);
-	qdf_print("%*snetbuf ring @ %p\n", indent + 8, " ",
+	qdf_print("%*snetbuf ring @ %pK\n", indent + 8, " ",
 		  pdev->rx_ring.buf.netbufs_ring);
-	qdf_print("%*sFW_IDX shadow register: vaddr = %p, paddr = %llx\n",
+	qdf_print("%*sFW_IDX shadow register: vaddr = %pK, paddr = %llx\n",
 		  indent + 8, " ",
 		  pdev->rx_ring.alloc_idx.vaddr,
 		  (unsigned long long)pdev->rx_ring.alloc_idx.paddr);

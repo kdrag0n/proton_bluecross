@@ -445,7 +445,7 @@ static void wma_vdev_detach_callback(void *ctx)
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
 
 	if (!wma || !iface->del_staself_req) {
-		WMA_LOGE("%s: wma %p iface %p", __func__, wma,
+		WMA_LOGE("%s: wma %pK iface %pK", __func__, wma,
 			 iface->del_staself_req);
 		return;
 	}
@@ -567,7 +567,7 @@ static QDF_STATUS wma_handle_vdev_detach(tp_wma_handle wma_handle,
 		goto out;
 	}
 
-	WMA_LOGD("vdev_id:%hu vdev_hdl:%p", vdev_id, iface->handle);
+	WMA_LOGD("vdev_id:%hu vdev_hdl:%pK", vdev_id, iface->handle);
 	if (!generate_rsp) {
 		WMA_LOGE("Call txrx detach w/o callback for vdev %d", vdev_id);
 		ol_txrx_vdev_detach(iface->handle, NULL, NULL);
@@ -647,8 +647,10 @@ QDF_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
 		WMA_LOGA("BSS is not yet stopped. Defering vdev(vdev id %x) deletion",
 			vdev_id);
 		iface->del_staself_req = pdel_sta_self_req_param;
+		iface->is_del_sta_defered = true;
 		return status;
 	}
+	iface->is_del_sta_defered = false;
 
 	if (!iface->handle) {
 		WMA_LOGE("handle of vdev_id %d is NULL vdev is already freed",
@@ -752,7 +754,7 @@ static void wma_vdev_start_rsp(tp_wma_handle wma,
 			 __func__, wma->interfaces[resp_event->vdev_id].type,
 			 wma->interfaces[resp_event->vdev_id].sub_type);
 
-		WMA_LOGD("%s: Allocated beacon struct %p, template memory %p",
+		WMA_LOGD("%s: Allocated beacon struct %pK, template memory %pK",
 			 __func__, bcn, bcn->buf);
 	}
 	add_bss->status = QDF_STATUS_SUCCESS;
@@ -1268,7 +1270,7 @@ void wma_remove_peer(tp_wma_handle wma, uint8_t *bssid,
 	}
 
 peer_detach:
-	WMA_LOGD("%s: Remove peer %p with peer_addr %pM vdevid %d peer_count %d",
+	WMA_LOGD("%s: Remove peer %pK with peer_addr %pM vdevid %d peer_count %d",
 		 __func__, peer, bssid, vdev_id,
 		 wma->interfaces[vdev_id].peer_count);
 
@@ -1364,7 +1366,7 @@ QDF_STATUS wma_create_peer(tp_wma_handle wma, ol_txrx_pdev_handle pdev,
 	}
 
 	if (roam_synch_in_progress) {
-		WMA_LOGD("%s: LFR3: Created peer %p with peer_addr %pM vdev_id %d, peer_count - %d",
+		WMA_LOGD("%s: LFR3: Created peer %pK with peer_addr %pM vdev_id %d, peer_count - %d",
 			 __func__, peer, peer_addr, vdev_id,
 			 wma->interfaces[vdev_id].peer_count);
 		return QDF_STATUS_SUCCESS;
@@ -1378,7 +1380,7 @@ QDF_STATUS wma_create_peer(tp_wma_handle wma, ol_txrx_pdev_handle pdev,
 		ol_txrx_peer_detach(peer, false);
 		goto err;
 	}
-	WMA_LOGD("%s: Created peer %p ref_cnt %d with peer_addr %pM vdev_id %d, peer_count - %d",
+	WMA_LOGD("%s: Created peer %pK ref_cnt %d with peer_addr %pM vdev_id %d, peer_count - %d",
 		  __func__, peer, qdf_atomic_read(&peer->ref_cnt),
 		  peer_addr, vdev_id,
 		  wma->interfaces[vdev_id].peer_count);
@@ -1696,7 +1698,7 @@ wma_send_del_bss_response(tp_wma_handle wma, struct wma_target_req *req,
 		struct ol_txrx_pdev_t *pdev;
 
 		pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-		WMA_LOGD("%s: Freeing beacon struct %p, template memory %p",
+		WMA_LOGD("%s: Freeing beacon struct %pK, template memory %pK",
 			__func__, bcn, bcn->buf);
 		if (bcn->dma_mapped && pdev)
 			qdf_nbuf_unmap_single(pdev->osdev, bcn->buf,
@@ -1722,7 +1724,8 @@ wma_send_del_bss_response(tp_wma_handle wma, struct wma_target_req *req,
 			WMA_DELETE_BSS_RSP, (void *)params, 0);
 	}
 
-	if (iface->del_staself_req != NULL) {
+	if (iface->del_staself_req && iface->is_del_sta_defered) {
+		iface->is_del_sta_defered = false;
 		WMA_LOGA("scheduling defered deletion (vdev id %x)",
 		 vdev_id);
 		wma_vdev_detach(wma, iface->del_staself_req, 1);
@@ -1994,7 +1997,7 @@ ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 					       txrx_vdev_type);
 	wma_handle->interfaces[self_sta_req->session_id].pause_bitmap = 0;
 
-	WMA_LOGD("vdev_id %hu, txrx_vdev_handle = %p", self_sta_req->session_id,
+	WMA_LOGD("vdev_id %hu, txrx_vdev_handle = %pK", self_sta_req->session_id,
 		 txrx_vdev_handle);
 
 	if (NULL == txrx_vdev_handle) {
@@ -2261,6 +2264,39 @@ end:
 	return txrx_vdev_handle;
 }
 
+uint32_t wma_get_bcn_rate_code(uint16_t rate)
+{
+	/* rate in multiples of 100 Kbps */
+	switch (rate) {
+	case WMA_BEACON_TX_RATE_1_M:
+		return WMI_BCN_TX_RATE_CODE_1_M;
+	case WMA_BEACON_TX_RATE_2_M:
+		return WMI_BCN_TX_RATE_CODE_2_M;
+	case WMA_BEACON_TX_RATE_5_5_M:
+		return WMI_BCN_TX_RATE_CODE_5_5_M;
+	case WMA_BEACON_TX_RATE_11_M:
+		return WMI_BCN_TX_RATE_CODE_11M;
+	case WMA_BEACON_TX_RATE_6_M:
+		return WMI_BCN_TX_RATE_CODE_6_M;
+	case WMA_BEACON_TX_RATE_9_M:
+		return WMI_BCN_TX_RATE_CODE_9_M;
+	case WMA_BEACON_TX_RATE_12_M:
+		return WMI_BCN_TX_RATE_CODE_12_M;
+	case WMA_BEACON_TX_RATE_18_M:
+		return WMI_BCN_TX_RATE_CODE_18_M;
+	case WMA_BEACON_TX_RATE_24_M:
+		return WMI_BCN_TX_RATE_CODE_24_M;
+	case WMA_BEACON_TX_RATE_36_M:
+		return WMI_BCN_TX_RATE_CODE_36_M;
+	case WMA_BEACON_TX_RATE_48_M:
+		return WMI_BCN_TX_RATE_CODE_48_M;
+	case WMA_BEACON_TX_RATE_54_M:
+		return WMI_BCN_TX_RATE_CODE_54_M;
+	default:
+		return WMI_BCN_TX_RATE_CODE_1_M;
+	}
+}
+
 /**
  * wma_vdev_start() - send vdev start request to fw
  * @wma: wma handle
@@ -2419,6 +2455,19 @@ QDF_STATUS wma_vdev_start(tp_wma_handle wma,
 
 	params.beacon_intval = req->beacon_intval;
 	params.dtim_period = req->dtim_period;
+
+	if (req->beacon_tx_rate) {
+		WMA_LOGD("%s: beacon tx rate [%hu * 100 Kbps]",
+				__func__, req->beacon_tx_rate);
+		temp_flags |= WMI_UNIFIED_VDEV_START_BCN_TX_RATE_PRESENT;
+		/*
+		 * beacon_tx_rate is in multiples of 100 Kbps.
+		 * Convert the data rate to hw rate code.
+		 */
+		params.bcn_tx_rate_code =
+			wma_get_bcn_rate_code(req->beacon_tx_rate);
+	}
+
 	/* FIXME: Find out min, max and regulatory power levels */
 	params.max_txpow = req->max_txpow;
 	temp_reg_info_1 &= 0xff00ffff;
@@ -3084,7 +3133,7 @@ void wma_vdev_resp_timer(void *data)
 		bcn = wma->interfaces[tgt_req->vdev_id].beacon;
 
 		if (bcn) {
-			WMA_LOGD("%s: Freeing beacon struct %p, template memory %p",
+			WMA_LOGD("%s: Freeing beacon struct %pK, template memory %pK",
 				 __func__, bcn, bcn->buf);
 			if (bcn->dma_mapped)
 				qdf_nbuf_unmap_single(pdev->osdev, bcn->buf,
@@ -3097,7 +3146,8 @@ void wma_vdev_resp_timer(void *data)
 		WMA_LOGA("%s: WMA_DELETE_BSS_REQ timedout", __func__);
 		wma_send_msg_high_priority(wma, WMA_DELETE_BSS_RSP,
 				    (void *)params, 0);
-		if (iface->del_staself_req) {
+		if (iface->del_staself_req && iface->is_del_sta_defered) {
+			iface->is_del_sta_defered = false;
 			WMA_LOGA("scheduling defered deletion(vdev id %x)",
 				 tgt_req->vdev_id);
 			wma_vdev_detach(wma, iface->del_staself_req, 1);
@@ -3429,6 +3479,7 @@ static void wma_add_bss_ap_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 
 	req.beacon_intval = add_bss->beaconInterval;
 	req.dtim_period = add_bss->dtimPeriod;
+	req.beacon_tx_rate = add_bss->beacon_tx_rate;
 	req.hidden_ssid = add_bss->bHiddenSSIDEn;
 	req.is_dfs = add_bss->bSpectrumMgtEnabled;
 	req.oper_mode = BSS_OPERATIONAL_MODE_AP;
@@ -4976,7 +5027,7 @@ void wma_delete_bss_ho_fail(tp_wma_handle wma, tpDeleteBssParams params)
 	if (peer)
 		ol_txrx_peer_detach(peer, true);
 	iface->peer_count--;
-	WMA_LOGD("%s: Removed peer %p with peer_addr %pM vdevid %d peer_count %d",
+	WMA_LOGD("%s: Removed peer %pK with peer_addr %pM vdevid %d peer_count %d",
 		 __func__, peer, params->bssid,  params->smesessionId,
 		 iface->peer_count);
 fail_del_bss_ho_fail:
@@ -5006,6 +5057,11 @@ static void wma_wait_tx_complete(tp_wma_handle wma,
 	}
 
 	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	if (pdev == NULL) {
+		WMA_LOGE("%s: pdev is not valid: %d",
+			 __func__, session_id);
+		return;
+	}
 	max_wait_iterations =
 		wma->interfaces[session_id].delay_before_vdev_stop /
 		WMA_TX_Q_RECHECK_TIMER_WAIT;

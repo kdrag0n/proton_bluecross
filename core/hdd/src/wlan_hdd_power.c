@@ -238,7 +238,7 @@ static int __wlan_hdd_ipv6_changed(struct notifier_block *nb,
 	ENTER_DEV(ndev);
 
 	if ((pAdapter == NULL) || (WLAN_HDD_ADAPTER_MAGIC != pAdapter->magic)) {
-		hdd_err("Adapter context is invalid %p", pAdapter);
+		hdd_err("Adapter context is invalid %pK", pAdapter);
 		return NOTIFY_DONE;
 	}
 
@@ -913,7 +913,7 @@ static int __wlan_hdd_ipv4_changed(struct notifier_block *nb,
 	ENTER_DEV(ndev);
 
 	if ((pAdapter == NULL) || (WLAN_HDD_ADAPTER_MAGIC != pAdapter->magic)) {
-		hdd_err("Adapter context is invalid %p", pAdapter);
+		hdd_err("Adapter context is invalid %pK", pAdapter);
 		return NOTIFY_DONE;
 	}
 
@@ -1433,7 +1433,6 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	v_CONTEXT_t p_cds_context = NULL;
 	hdd_context_t *pHddCtx;
 	p_cds_sched_context cds_sched_context = NULL;
-	QDF_STATUS qdf_status;
 
 	hdd_info("WLAN driver shutting down!");
 
@@ -1471,6 +1470,7 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	if (true == pHddCtx->isMcThreadSuspended) {
 		complete(&cds_sched_context->ResumeMcEvent);
 		pHddCtx->isMcThreadSuspended = false;
+		pHddCtx->isWiphySuspended = false;
 	}
 #ifdef QCA_CONFIG_SMP
 	if (true == pHddCtx->is_ol_rx_thread_suspended) {
@@ -1479,11 +1479,6 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	}
 #endif
 
-	qdf_status = cds_sched_close(p_cds_context);
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		hdd_err("Failed to close CDS Scheduler");
-		QDF_ASSERT(false);
-	}
 	hdd_ipa_uc_ssr_deinit();
 
 	qdf_mc_timer_stop(&pHddCtx->tdls_source_timer);

@@ -990,6 +990,7 @@ typedef struct tagCsrRoamProfile {
 	bool ApUapsdEnable;
 	bool protEnabled;
 	bool obssProtEnabled;
+	bool chan_switch_hostapd_rate_enabled;
 	uint16_t cfg_protection;
 	uint8_t wps_state;
 	tCsrMobilityDomainInfo MDID;
@@ -998,7 +999,7 @@ typedef struct tagCsrRoamProfile {
 	/* addIe params */
 	tSirAddIeParams addIeParams;
 	uint8_t sap_dot11mc;
-	uint8_t beacon_tx_rate;
+	uint16_t beacon_tx_rate;
 	tSirMacRateSet  supported_rates;
 	tSirMacRateSet  extended_rates;
 	struct qdf_mac_addr bssid_hint;
@@ -1129,31 +1130,6 @@ struct csr_sta_roam_policy_params {
 	uint8_t sap_operating_band;
 };
 
-/**
- * struct best_candidate_wt_cfg_param - weight params to
- * calculate best candidate
- * @rssi_weightage: RSSI weightage
- * @ht_caps_weightage: HT caps weightage
- * @vht_caps_weightage: VHT caps weightage
- * @chan_width_weightage: Channel width weightage
- * @chan_band_weightage: Channel band weightage
- * @nss_weightage: NSS weightage
- * @beamforming_cap_weightage: Beamforming caps weightage
- * @pcl_weightage: PCL weightage
- * @channel_congestion_weightage: channel congestion weightage
- */
-struct  best_candidate_wt_cfg_param {
-	uint8_t rssi_weightage;
-	uint8_t ht_caps_weightage;
-	uint8_t vht_caps_weightage;
-	uint8_t chan_width_weightage;
-	uint8_t chan_band_weightage;
-	uint8_t nss_weightage;
-	uint8_t beamforming_cap_weightage;
-	uint8_t pcl_weightage;
-	uint8_t channel_congestion_weightage;
-};
-
 typedef struct tagCsrConfigParam {
 	uint32_t FragmentationThreshold;
 	/* keep this uint32_t. This gets converted to ePhyChannelBondState */
@@ -1238,6 +1214,7 @@ typedef struct tagCsrConfigParam {
 	struct mawc_params csr_mawc_config;
 	uint8_t isFastTransitionEnabled;
 	uint8_t RoamRssiDiff;
+	int32_t rssi_abs_thresh;
 	bool isWESModeEnabled;
 	tCsrNeighborRoamConfigParams neighborRoamConfig;
 	/*
@@ -1347,6 +1324,7 @@ typedef struct tagCsrConfigParam {
 	uint32_t roam_dense_rssi_thresh_offset;
 	uint32_t roam_dense_min_aps;
 	int8_t roam_bg_scan_bad_rssi_thresh;
+	uint8_t roam_bad_rssi_thresh_offset_2g;
 	uint32_t roam_bg_scan_client_bitmap;
 	uint32_t obss_width_interval;
 	uint32_t obss_active_dwelltime;
@@ -1385,7 +1363,7 @@ typedef struct tagCsrConfigParam {
 	uint32_t num_disallowed_aps;
 	uint32_t scan_probe_repeat_time;
 	uint32_t scan_num_probes;
-	struct  best_candidate_wt_cfg_param best_candidate_weight_config;
+	struct sir_score_config bss_score_params;
 } tCsrConfigParam;
 
 /* Tush */
