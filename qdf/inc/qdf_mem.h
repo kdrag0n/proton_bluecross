@@ -86,14 +86,71 @@ void qdf_mem_init(void);
  */
 void qdf_mem_exit(void);
 
+/**
+ * struct qdf_mem_domain - memory domains for tracking memory allocations
+ * @QDF_MEM_DOMAIN_INIT: The default memory domain
+ * @QDF_MEM_DOMAIN_ACTIVE: The network interface active memory domain
+ * @QDF_MEM_DOMAIN_MAX_COUNT: The number of memory domains for iterating, etc.
+ */
+enum qdf_mem_domain {
+	QDF_MEM_DOMAIN_INIT,
+	QDF_MEM_DOMAIN_ACTIVE,
+	QDF_MEM_DOMAIN_MAX_COUNT,
+};
+
 #ifdef MEMORY_DEBUG
 #define qdf_mem_malloc(size) \
 	qdf_mem_malloc_debug(size, __FILE__, __LINE__)
 void *qdf_mem_malloc_debug(size_t size, char *file_name, uint32_t line_num);
+
+/**
+ * qdf_mem_set_domain() - Set the current memory domain
+ * @domain: the domain to change to
+ *
+ * This function changes the memory domain associated with future memory
+ * allocations. This can be used to check for memory leaks when combined with
+ * qdf_mem_check_for_leaks().
+ *
+ * Return: None
+ */
+void qdf_mem_set_domain(enum qdf_mem_domain domain);
+
+/**
+ * qdf_mem_check_for_leaks() - Assert that the current memory domain is empty
+ *
+ * Call this to ensure there are no active memory allocations being tracked
+ * against the current memory domain. For example, one should call this function
+ * immediately before a call to qdf_mem_set_domain() as a memory leak detection
+ * mechanism.
+ *
+ * e.g.
+ *	qdf_mem_set_domain(QDF_MEM_DOMAIN_ACTIVE);
+ *
+ *	...
+ *
+ *	// memory is allocated and freed
+ *
+ *	...
+ *
+ *	// before transitioning back to inactive state,
+ *	// make sure all active memory has been freed
+ *	qdf_mem_check_for_leaks();
+ *	qdf_mem_set_domain(QDF_MEM_DOMAIN_INIT);
+ *
+ *	...
+ *
+ *	// before program exit, make sure init time memory is freed
+ *	qdf_mem_check_for_leaks();
+ *	exit();
+ *
+ * Return: None
+ */
+void qdf_mem_check_for_leaks(void);
 #else
-void *
-qdf_mem_malloc(qdf_size_t size);
-#endif
+void *qdf_mem_malloc(qdf_size_t size);
+static inline void qdf_mem_set_domain(enum qdf_mem_domain domain) { }
+static inline void qdf_mem_check_for_leaks(void) { }
+#endif /* MEMORY_DEBUG */
 
 void *qdf_mem_alloc_outline(qdf_device_t osdev, qdf_size_t size);
 
@@ -380,20 +437,32 @@ static inline qdf_dma_addr_t qdf_mem_paddr_from_dmaaddr(qdf_device_t osdev,
 }
 
 /**
- * qdf_os_mem_dma_get_sgtable() - Returns DMA memory scatter gather table
+ * qdf_mem_dma_get_sgtable() - Returns DMA memory scatter gather table
  * @dev: device instace
  * @sgt: scatter gather table pointer
  * @cpu_addr: HLOS virtual address
  * @dma_addr: dma address
  * @size: allocated memory size
  *
- * @Return: physical address
+ * @Return: status
  */
 static inline int
 qdf_mem_dma_get_sgtable(struct device *dev, void *sgt, void *cpu_addr,
 			qdf_dma_addr_t dma_addr, size_t size)
 {
 	return __qdf_os_mem_dma_get_sgtable(dev, sgt, cpu_addr, dma_addr, size);
+}
+
+/**
+ * qdf_dma_get_sgtable_dma_addr() - Assigns DMA address to scatterlist elements
+ * @sgt: scatter gather table pointer
+ *
+ * @Return: None
+ */
+static inline void
+qdf_dma_get_sgtable_dma_addr(struct sg_table *sgt)
+{
+	return __qdf_dma_get_sgtable_dma_addr(sgt);
 }
 
 /**
@@ -472,7 +541,7 @@ static inline qdf_shared_mem_t *qdf_mem_shared_mem_alloc(qdf_device_t osdev,
 						     &shared_mem->mem_info),
 				shared_mem->mem_info.size);
 
-	shared_mem->sgtable.sgl->dma_address = shared_mem->mem_info.pa;
+	qdf_dma_get_sgtable_dma_addr(&shared_mem->sgtable);
 
 	return shared_mem;
 }
