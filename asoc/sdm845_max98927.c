@@ -21,22 +21,22 @@
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/of_device.h>
-#include <linux/mfd/msm-cdc-pinctrl.h>
+#include "codecs/msm-cdc-pinctrl.h"
 #include <sound/core.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/pcm.h>
 #include <sound/jack.h>
-#include <sound/q6afe-v2.h>
-#include <sound/q6core.h>
+#include <dsp/q6afe-v2.h>
+#include <dsp/q6core.h>
 #include <sound/pcm_params.h>
 #include <sound/info.h>
 #include "device_event.h"
-#include <linux/qdsp6v2/audio_notifier.h>
-#include "qdsp6v2/msm-pcm-routing-v2.h"
-#include "../codecs/wcd934x/wcd934x.h"
-#include "../codecs/wcd934x/wcd934x-mbhc.h"
-#include "../codecs/wsa881x.h"
+#include <dsp/audio_notifier.h>
+#include "msm-pcm-routing-v2.h"
+#include "codecs/wcd934x/wcd934x.h"
+#include "codecs/wcd934x/wcd934x-mbhc.h"
+#include "codecs/wsa881x.h"
 
 #define DRV_NAME "sdm845-asoc-snd-max9827"
 
