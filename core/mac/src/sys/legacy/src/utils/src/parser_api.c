@@ -852,6 +852,7 @@ static void lim_log_operating_mode(tpAniSirGlobal pMac,
 static void lim_log_qos_map_set(tpAniSirGlobal pMac, tSirQosMapSet *pQosMapSet)
 {
 	uint8_t i;
+
 	if (pQosMapSet->num_dscp_exceptions > QOS_MAP_MAX_EX)
 		pQosMapSet->num_dscp_exceptions = QOS_MAP_MAX_EX;
 	pe_debug("num of dscp exceptions: %d",
@@ -1355,6 +1356,7 @@ populate_dot11f_ibss_params(tpAniSirGlobal pMac,
 			    tpPESession psessionEntry)
 {
 	uint32_t val = 0;
+
 	if (LIM_IS_IBSS_ROLE(psessionEntry)) {
 		if (wlan_cfg_get_int(pMac,
 				     WNI_CFG_IBSS_ATIM_WIN_SIZE,
@@ -2607,8 +2609,6 @@ tSirRetStatus sir_convert_probe_frame2_struct(tpAniSirGlobal pMac,
 	if (pr->WMMParams.present) {
 		pProbeResp->wmeEdcaPresent = 1;
 		convert_wmm_params(pMac, &pProbeResp->edcaParams, &pr->WMMParams);
-		pe_debug("WMM Parameter present in Probe Response Frame!");
-		       __print_wmm_params(pMac, &pr->WMMParams);
 	}
 
 	if (pr->WMMInfoAp.present) {
@@ -2704,6 +2704,11 @@ tSirRetStatus sir_convert_probe_frame2_struct(tpAniSirGlobal pMac,
 			pProbeResp->assoc_disallowed = true;
 			pProbeResp->assoc_disallowed_reason =
 				pr->MBO_IE.assoc_disallowed.reason_code;
+		}
+		if (pr->MBO_IE.reduced_wan_metrics.present) {
+			pProbeResp->oce_wan_present = true;
+			pProbeResp->oce_wan_downlink_av_cap =
+				pr->MBO_IE.reduced_wan_metrics.downlink_av_cap;
 		}
 	}
 
@@ -2894,6 +2899,7 @@ sir_convert_assoc_req_frame2_struct(tpAniSirGlobal pMac,
 	}
 	if (ar->ExtCap.present) {
 		struct s_ext_cap *ext_cap;
+
 		qdf_mem_copy(&pAssocReq->ExtCap, &ar->ExtCap,
 			    sizeof(tDot11fIEExtCap));
 		ext_cap = (struct s_ext_cap *)&pAssocReq->ExtCap.bytes;
@@ -3196,6 +3202,7 @@ sir_convert_assoc_resp_frame2_struct(tpAniSirGlobal pMac,
 
 	if (ar->ExtCap.present) {
 		struct s_ext_cap *ext_cap;
+
 		qdf_mem_copy(&pAssocRsp->ExtCap, &ar->ExtCap,
 				sizeof(tDot11fIEExtCap));
 		ext_cap = (struct s_ext_cap *)&pAssocRsp->ExtCap.bytes;
@@ -3403,6 +3410,7 @@ sir_convert_reassoc_req_frame2_struct(tpAniSirGlobal pMac,
 	}
 	if (ar.ExtCap.present) {
 		struct s_ext_cap *ext_cap;
+
 		qdf_mem_copy(&pAssocReq->ExtCap, &ar.ExtCap,
 			     sizeof(tDot11fIEExtCap));
 		ext_cap = (struct s_ext_cap *)&pAssocReq->ExtCap.bytes;
@@ -4255,8 +4263,6 @@ sir_convert_beacon_frame2_struct(tpAniSirGlobal pMac,
 		pBeaconStruct->wmeEdcaPresent = 1;
 		convert_wmm_params(pMac, &pBeaconStruct->edcaParams,
 				   &pBeacon->WMMParams);
-		pe_debug("WMM Parameter present in Beacon Frame!");
-		       __print_wmm_params(pMac, &pBeacon->WMMParams);
 	}
 
 	if (pBeacon->WMMInfoAp.present) {
@@ -4393,6 +4399,12 @@ sir_convert_beacon_frame2_struct(tpAniSirGlobal pMac,
 			pBeaconStruct->assoc_disallowed = true;
 			pBeaconStruct->assoc_disallowed_reason =
 				pBeacon->MBO_IE.assoc_disallowed.reason_code;
+		}
+		if (pBeacon->MBO_IE.reduced_wan_metrics.present) {
+			pBeaconStruct->oce_wan_present = true;
+			pBeaconStruct->oce_wan_downlink_av_cap =
+				pBeacon->MBO_IE.
+					reduced_wan_metrics.downlink_av_cap;
 		}
 	}
 
@@ -4890,6 +4902,7 @@ sir_convert_qos_map_configure_frame2_struct(tpAniSirGlobal pMac,
 {
 	tDot11fQosMapConfigure mapConfigure;
 	uint32_t status;
+
 	status =
 		dot11f_unpack_qos_map_configure(pMac, pFrame, nFrame,
 						&mapConfigure, false);
@@ -4918,6 +4931,7 @@ sir_convert_tpc_req_frame2_struct(tpAniSirGlobal pMac,
 {
 	tDot11fTPCRequest req;
 	uint32_t status;
+
 	qdf_mem_set((uint8_t *) pTpcReqFrame, sizeof(tSirMacTpcReqActionFrame),
 		    0);
 	status = dot11f_unpack_tpc_request(pMac, pFrame, nFrame, &req, false);
@@ -5110,6 +5124,7 @@ tSirRetStatus populate_dot11f_ese_cckm_opaque(tpAniSirGlobal pMac,
 					      tDot11fIEESECckmOpaque *pDot11f)
 {
 	int idx;
+
 	if (pCCKMie->length) {
 		idx = find_ie_location(pMac, (tpSirRSNie) pCCKMie,
 						 DOT11F_EID_ESECCKMOPAQUE);

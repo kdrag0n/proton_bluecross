@@ -822,7 +822,8 @@ typedef struct sSirBssDescription {
 #endif
 	uint8_t air_time_fraction;
 	uint8_t nss;
-	uint16_t reservedPadding3;
+	uint8_t oce_wan_present;
+	uint8_t oce_wan_down_cap;
 	/* Please keep the structure 4 bytes aligned above the ieFields */
 	uint32_t ieFields[1];
 
@@ -3373,19 +3374,17 @@ struct roam_ext_params {
 	uint32_t bg_scan_client_bitmap;
 };
 
-
-#define RSSI_WEIGHTAGE 30
-#define HT_CAPABILITY_WEIGHTAGE 7
-#define VHT_CAP_WEIGHTAGE 5
-#define HE_CAP_WEIGHTAGE 2
-#define CHAN_WIDTH_WEIGHTAGE 5
-#define CHAN_BAND_WEIGHTAGE 5
-#define NSS_WEIGHTAGE 5
+#define RSSI_WEIGHTAGE 20
+#define HT_CAPABILITY_WEIGHTAGE 2
+#define VHT_CAP_WEIGHTAGE 1
+#define CHAN_WIDTH_WEIGHTAGE 17
+#define CHAN_BAND_WEIGHTAGE 2
+#define NSS_WEIGHTAGE 16
 #define BEAMFORMING_CAP_WEIGHTAGE 2
 #define PCL_WEIGHT 10
 #define CHANNEL_CONGESTION_WEIGHTAGE 5
-#define OCE_WAN_WEIGHTAGE 2
-#define RESERVED_WEIGHT 22
+#define OCE_WAN_WEIGHTAGE 0
+
 #define BEST_CANDIDATE_MAX_WEIGHT 100
 #define MAX_INDEX_SCORE 100
 #define MAX_INDEX_PER_INI 4
@@ -3514,7 +3513,7 @@ struct pmkid_mode_bits {
  * @num_disallowed_aps: Maximum number of AP's in LCA list
  *
  */
-struct lca_disallow_config_params{
+struct lca_disallow_config_params {
     uint32_t disallow_duration;
     uint32_t rssi_channel_penalization;
     uint32_t num_disallowed_aps;

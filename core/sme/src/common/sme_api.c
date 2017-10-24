@@ -1977,7 +1977,7 @@ QDF_STATUS sme_set_plm_request(tHalHandle hHal, tpSirPlmReq pPlmReq)
 	QDF_STATUS status;
 	bool ret = false;
 	tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
-	uint8_t ch_list[WNI_CFG_VALID_CHANNEL_LIST] = { 0 };
+	uint8_t ch_list[WNI_CFG_VALID_CHANNEL_LIST_LEN] = { 0 };
 	uint8_t count, valid_count = 0;
 	cds_msg_t msg;
 	tCsrRoamSession *pSession = CSR_GET_SESSION(pMac, pPlmReq->sessionId);
@@ -7738,6 +7738,39 @@ sme_handle_generic_change_country_code(tpAniSirGlobal mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * sme_update_channel_list() - Update configured channel list to fwr
+ * This is a synchronous API.
+ *
+ * @mac_ctx - The handle returned by mac_open.
+ *
+ * Return QDF_STATUS  SUCCESS.
+ * FAILURE or RESOURCES  The API finished and failed.
+ */
+QDF_STATUS
+sme_update_channel_list(tpAniSirGlobal mac_ctx)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	status = sme_acquire_global_lock(&mac_ctx->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		/* Update umac channel (enable/disable) from cds channels */
+		status = csr_get_channel_and_power_list(mac_ctx);
+		if (status != QDF_STATUS_SUCCESS) {
+			sme_err("fail to get Channels");
+			sme_release_global_lock(&mac_ctx->sme);
+			return status;
+		}
+
+		csr_apply_channel_power_info_wrapper(mac_ctx);
+		csr_scan_filter_results(mac_ctx);
+		sme_disconnect_connected_sessions(mac_ctx);
+		sme_release_global_lock(&mac_ctx->sme);
+	}
+
+	return status;
+}
+
 static bool
 sme_search_in_base_ch_lst(tpAniSirGlobal mac_ctx, uint8_t curr_ch)
 {
@@ -8249,6 +8282,24 @@ QDF_STATUS sme_set_tx_power(tHalHandle hHal, uint8_t sessionId,
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS sme_update_fils_setting(tHalHandle hal, uint8_t session_id,
+				   uint8_t param_val)
+{
+	QDF_STATUS status;
+	tpAniSirGlobal pMac = PMAC_STRUCT(hal);
+
+	pMac->roam.configParam.is_fils_enabled = !param_val;
+
+	pMac->roam.configParam.enable_bcast_probe_rsp = !param_val;
+	status = wma_cli_set_command((int)session_id,
+			(int)WMI_VDEV_PARAM_ENABLE_BCAST_PROBE_RESPONSE,
+			!param_val, VDEV_CMD);
+	if (status)
+		hdd_err("Failed to set enable bcast probe setting");
+
+	return status;
 }
 
 QDF_STATUS sme_update_session_param(tHalHandle hal, uint8_t session_id,
@@ -12290,26 +12341,37 @@ QDF_STATUS sme_set_ht2040_mode(tHalHandle hHal, uint8_t sessionId,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
 	ePhyChanBondState cbMode;
+	tCsrRoamSession *session = CSR_GET_SESSION(pMac, sessionId);
 
-	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
-		  "%s: Update HT operation beacon IE, channel_type=%d",
-		  __func__, channel_type);
+	if (!CSR_IS_SESSION_VALID(pMac, sessionId)) {
+		sme_err("Session not valid for session id %d", sessionId);
+		return QDF_STATUS_E_INVAL;
+	}
+	session = CSR_GET_SESSION(pMac, sessionId);
+	sme_debug("Update HT operation beacon IE, channel_type=%d cur cbmode %d",
+		channel_type, session->bssParams.cbMode);
 
 	switch (channel_type) {
 	case eHT_CHAN_HT20:
+		if (!session->bssParams.cbMode)
+			return QDF_STATUS_SUCCESS;
 		cbMode = PHY_SINGLE_CHANNEL_CENTERED;
 		break;
 	case eHT_CHAN_HT40MINUS:
+		if (session->bssParams.cbMode)
+			return QDF_STATUS_SUCCESS;
 		cbMode = PHY_DOUBLE_CHANNEL_HIGH_PRIMARY;
 		break;
 	case eHT_CHAN_HT40PLUS:
+		if (session->bssParams.cbMode)
+			return QDF_STATUS_SUCCESS;
 		cbMode = PHY_DOUBLE_CHANNEL_LOW_PRIMARY;
 		break;
 	default:
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-			  "%s:Error!!! Invalid HT20/40 mode !", __func__);
+		sme_err("Error!!! Invalid HT20/40 mode !");
 		return QDF_STATUS_E_FAILURE;
 	}
+	session->bssParams.cbMode = cbMode;
 	status = sme_acquire_global_lock(&pMac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		status = csr_set_ht2040_mode(pMac, sessionId,
@@ -18478,6 +18540,33 @@ void sme_set_chan_info_callback(tHalHandle hal_handle,
 }
 
 /**
+ * sme_set_vc_mode_config() - Set voltage corner config to FW
+ * @bitmap:	Bitmap that referes to voltage corner config with
+ * different phymode and bw configuration
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_vc_mode_config(uint32_t vc_bitmap)
+{
+	void *wma_handle;
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma_handle) {
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+				"wma_handle is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+	if (QDF_STATUS_SUCCESS !=
+		wma_set_vc_mode_config(wma_handle, vc_bitmap)) {
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+			"%s: Failed to set Voltage Control config to FW",
+			__func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * sme_set_bmiss_bcnt() - set bmiss config parameters
  * @vdev_id: virtual device for the command
  * @first_cnt: bmiss first value
@@ -18525,4 +18614,37 @@ void sme_display_disconnect_stats(tHalHandle hal, uint8_t session_id)
 
 	sme_debug("No. of Disconnections due to Peer Kickout: %d",
 		  session->disconnect_stats.peer_kickout);
+}
+
+QDF_STATUS sme_send_limit_off_channel_params(tHalHandle hal, uint8_t vdev_id,
+		bool is_tos_active, uint32_t max_off_chan_time,
+		uint32_t rest_time, bool skip_dfs_chan)
+{
+	struct sir_limit_off_chan *cmd;
+	cds_msg_t msg;
+
+	cmd = qdf_mem_malloc(sizeof(*cmd));
+	if (!cmd) {
+		sme_err("qdf_mem_malloc failed for limit off channel");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	cmd->vdev_id = vdev_id;
+	cmd->is_tos_active = is_tos_active;
+	cmd->max_off_chan_time = max_off_chan_time;
+	cmd->rest_time = rest_time;
+	cmd->skip_dfs_chans = skip_dfs_chan;
+
+	msg.type = WMA_SET_LIMIT_OFF_CHAN;
+	msg.reserved = 0;
+	msg.bodyptr = (void *) cmd;
+
+	if (QDF_STATUS_SUCCESS !=
+			cds_mq_post_message(QDF_MODULE_ID_WMA, &msg)) {
+		sme_err("Failed to post WMA_SET_LIMIT_OFF_CHAN to WMA");
+		qdf_mem_free(cmd);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
 }

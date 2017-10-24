@@ -60,6 +60,7 @@ rrm_get_min_of_max_tx_power(tpAniSirGlobal pMac,
 {
 	uint8_t maxTxPower = 0;
 	uint8_t txPower = QDF_MIN(regMax, (apTxPower));
+
 	if ((txPower >= RRM_MIN_TX_PWR_CAP) && (txPower <= RRM_MAX_TX_PWR_CAP))
 		maxTxPower = txPower;
 	else if (txPower < RRM_MIN_TX_PWR_CAP)
@@ -638,6 +639,7 @@ rrm_process_beacon_report_req(tpAniSirGlobal pMac,
 		uint8_t *ch_lst = pSmeBcnReportReq->channelList.channelNumber;
 		uint8_t len;
 		uint16_t ch_ctr = 0;
+
 		for (num_APChanReport = 0;
 		     num_APChanReport <
 		     pBeaconReq->measurement_request.Beacon.num_APChannelReport;
@@ -692,7 +694,7 @@ rrm_fill_beacon_ies(tpAniSirGlobal pMac,
 		    uint8_t *eids, uint8_t numEids, tpSirBssDescription pBssDesc)
 {
 	uint8_t len, *pBcnIes, count = 0, i;
-	uint8_t BcnNumIes;
+	uint16_t BcnNumIes;
 
 	if ((pIes == NULL) || (pNumIes == NULL) || (pBssDesc == NULL)) {
 		pe_err("Invalid parameters");
@@ -702,7 +704,7 @@ rrm_fill_beacon_ies(tpAniSirGlobal pMac,
 	numEids = (eids == NULL) ? 0 : numEids;
 
 	pBcnIes = (uint8_t *) &pBssDesc->ieFields[0];
-	BcnNumIes = (uint8_t) GET_IE_LEN_IN_BSS(pBssDesc->length);
+	BcnNumIes = GET_IE_LEN_IN_BSS(pBssDesc->length);
 
 	*pNumIes = 0;
 

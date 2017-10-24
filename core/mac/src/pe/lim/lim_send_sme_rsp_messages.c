@@ -2384,6 +2384,7 @@ void lim_handle_delete_bss_rsp(tpAniSirGlobal pMac, tpSirMsgQ MsgQ)
 		qdf_mem_free(MsgQ->bodyptr);
 		return;
 	}
+
 	/*
 	 * During DEL BSS handling, the PE Session will be deleted, but it is
 	 * better to clear this flag if the session is hanging around due
@@ -2473,6 +2474,7 @@ void
 lim_send_sme_dfs_event_notify(tpAniSirGlobal pMac, uint16_t msgType, void *event)
 {
 	tSirMsgQ mmhMsg;
+
 	mmhMsg.type = eWNI_SME_DFS_RADAR_FOUND;
 	mmhMsg.bodyptr = event;
 	mmhMsg.bodyval = 0;

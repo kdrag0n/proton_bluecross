@@ -2312,7 +2312,7 @@ static int hdd_get_dwell_time(struct hdd_config *pCfg, uint8_t *command,
 				 (int)pCfg->nPassiveMinChnTime);
 		return 0;
 	} else if (strncmp(command, "GETDWELLTIME", 12) == 0) {
-		*len = scnprintf(extra, n, "GETDWELLTIME %u \n",
+		*len = scnprintf(extra, n, "GETDWELLTIME %u\n",
 				 (int)pCfg->nActiveMaxChnTime);
 		return 0;
 	}
@@ -4482,7 +4482,7 @@ static int drv_cmd_fast_reassoc(hdd_adapter_t *adapter,
 	uint8_t *value = command;
 	uint8_t channel = 0;
 	tSirMacAddr targetApBssid;
-	uint32_t roamId = 0;
+	uint32_t roamId = INVALID_ROAM_ID;
 	tCsrRoamModifyProfileFields modProfileFields;
 	tCsrHandoffRequest handoffInfo;
 	hdd_station_ctx_t *pHddStaCtx;

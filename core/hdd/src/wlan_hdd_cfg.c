@@ -616,6 +616,15 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_ENABLE_LTE_COEX_DEFAULT,
 		     CFG_ENABLE_LTE_COEX_MIN,
 		     CFG_ENABLE_LTE_COEX_MAX),
+
+	REG_VARIABLE(CFG_VC_MODE_BITMAP, WLAN_PARAM_HexInteger,
+		     struct hdd_config, vc_mode_cfg_bitmap,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_VC_MODE_BITMAP_DEFAULT,
+		     CFG_VC_MODE_BITMAP_MIN,
+		     CFG_VC_MODE_BITMAP_MAX),
+
+
 /*
  * <ini>
  * gApAutoChannelSelection - Force ACS from ini
@@ -2656,6 +2665,13 @@ struct reg_table_entry g_registry_table[] = {
 			     CFG_ENABLE_SSR_MAX,
 			     cb_notify_set_enable_ssr, 0),
 
+	REG_VARIABLE(CFG_ENABLE_DATA_STALL_DETECTION, WLAN_PARAM_Integer,
+		     struct hdd_config, enable_data_stall_det,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_ENABLE_DATA_STALL_DETECTION_DEFAULT,
+		     CFG_ENABLE_DATA_STALL_DETECTION_MIN,
+		     CFG_ENABLE_DATA_STALL_DETECTION_MAX),
+
 	REG_VARIABLE(CFG_MAX_MEDIUM_TIME, WLAN_PARAM_Integer,
 		     struct hdd_config, cfgMaxMediumTime,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -3266,6 +3282,12 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_TCP_TX_HIGH_TPUT_THRESHOLD_DEFAULT,
 		     CFG_TCP_TX_HIGH_TPUT_THRESHOLD_MIN,
 		     CFG_TCP_TX_HIGH_TPUT_THRESHOLD_MAX),
+	REG_VARIABLE(CFG_PERIODIC_STATS_DISPLAY_TIME_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, periodic_stats_disp_time,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_PERIODIC_STATS_DISPLAY_TIME_DEFAULT,
+		     CFG_PERIODIC_STATS_DISPLAY_TIME_MIN,
+		     CFG_PERIODIC_STATS_DISPLAY_TIME_MAX),
 #endif
 
 	REG_VARIABLE(CFG_ENABLE_FW_LOG_TYPE, WLAN_PARAM_Integer,
@@ -3853,6 +3875,14 @@ struct reg_table_entry g_registry_table[] = {
 		     VAR_FLAGS_OPTIONAL,
 		     (void *)CFG_DBS_SCAN_SELECTION_DEFAULT),
 
+	REG_VARIABLE(CFG_STA_SAP_SCC_ON_DFS_CHAN, WLAN_PARAM_HexInteger,
+		     struct hdd_config, sta_sap_scc_on_dfs_chan,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_STA_SAP_SCC_ON_DFS_CHAN_DEFAULT,
+		     CFG_STA_SAP_SCC_ON_DFS_CHAN_MIN,
+		     CFG_STA_SAP_SCC_ON_DFS_CHAN_MAX),
+
+
 #ifdef FEATURE_WLAN_SCAN_PNO
 	REG_VARIABLE(CFG_PNO_CHANNEL_PREDICTION_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, pno_channel_prediction,
@@ -4346,6 +4376,14 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_INDOOR_CHANNEL_SUPPORT_DEFAULT,
 		     CFG_INDOOR_CHANNEL_SUPPORT_MIN,
 		     CFG_INDOOR_CHANNEL_SUPPORT_MAX),
+
+	REG_VARIABLE(CFG_MARK_INDOOR_AS_DISABLE_NAME,
+		     WLAN_PARAM_Integer,
+		     struct hdd_config, disable_indoor_channel,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_MARK_INDOOR_AS_DISABLE_DEFAULT,
+		     CFG_MARK_INDOOR_AS_DISABLE_MIN,
+		     CFG_MARK_INDOOR_AS_DISABLE_MAX),
 
 	REG_VARIABLE(CFG_SAP_TX_LEAKAGE_THRESHOLD_NAME,
 		WLAN_PARAM_Integer,
@@ -5042,6 +5080,13 @@ struct reg_table_entry g_registry_table[] = {
 		CFG_CHANNEL_CONGESTION_WEIGHTAGE_MIN,
 		CFG_CHANNEL_CONGESTION_WEIGHTAGE_MAX),
 
+	REG_VARIABLE(CFG_OCE_WAN_WEIGHTAGE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, oce_wan_weightage,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_OCE_WAN_WEIGHTAGE_DEFAULT,
+		CFG_OCE_WAN_WEIGHTAGE_MIN,
+		CFG_OCE_WAN_WEIGHTAGE_MAX),
+
 	REG_VARIABLE(CFG_BEST_RSSI_THRESHOLD_NAME, WLAN_PARAM_Integer,
 		struct hdd_config, best_rssi_threshold,
 		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -5155,6 +5200,41 @@ struct reg_table_entry g_registry_table[] = {
 		CFG_ESP_QBSS_SCORE_IDX15_TO_12_MIN,
 		CFG_ESP_QBSS_SCORE_IDX15_TO_12_MAX),
 
+	REG_VARIABLE(CFG_OCE_WAN_SLOTS_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, num_oce_wan_slots,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_OCE_WAN_SLOTS_DEFAULT,
+		CFG_OCE_WAN_SLOTS_MIN,
+		CFG_OCE_WAN_SLOTS_MAX),
+
+	REG_VARIABLE(CFG_OCE_WAN_SCORE_IDX3_TO_0_NAME, WLAN_PARAM_HexInteger,
+		struct hdd_config, oce_wan_score_slots3_to_0,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_OCE_WAN_SCORE_IDX3_TO_0_DEFAULT,
+		CFG_OCE_WAN_SCORE_IDX3_TO_0_MIN,
+		CFG_OCE_WAN_SCORE_IDX3_TO_0_MAX),
+
+	REG_VARIABLE(CFG_OCE_WAN_SCORE_IDX7_TO_4_NAME, WLAN_PARAM_HexInteger,
+		struct hdd_config, oce_wan_score_slots7_to_4,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_OCE_WAN_SCORE_IDX7_TO_4_DEFAULT,
+		CFG_OCE_WAN_SCORE_IDX7_TO_4_MIN,
+		CFG_OCE_WAN_SCORE_IDX7_TO_4_MAX),
+
+	REG_VARIABLE(CFG_OCE_WAN_SCORE_IDX11_TO_8_NAME, WLAN_PARAM_HexInteger,
+		struct hdd_config, oce_wan_score_slots11_to_8,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_OCE_WAN_SCORE_IDX11_TO_8_DEFAULT,
+		CFG_OCE_WAN_SCORE_IDX11_TO_8_MIN,
+		CFG_OCE_WAN_SCORE_IDX11_TO_8_MAX),
+
+	REG_VARIABLE(CFG_OCE_WAN_SCORE_IDX15_TO_12_NAME, WLAN_PARAM_HexInteger,
+		struct hdd_config, oce_wan_score_slots15_to_12,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_OCE_WAN_SCORE_IDX15_TO_12_DEFAULT,
+		CFG_OCE_WAN_SCORE_IDX15_TO_12_MIN,
+		CFG_OCE_WAN_SCORE_IDX15_TO_12_MAX),
+
 	REG_VARIABLE(CFG_ENABLE_SCORING_FOR_ROAM_NAME, WLAN_PARAM_Integer,
 		struct hdd_config, enable_scoring_for_roam,
 		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -5169,6 +5249,56 @@ struct reg_table_entry g_registry_table[] = {
 		CFG_CHAN_SWITCH_HOSTAPD_RATE_ENABLED_DEFAULT,
 		CFG_CHAN_SWITCH_HOSTAPD_RATE_ENABLED_MIN,
 		CFG_CHAN_SWITCH_HOSTAPD_RATE_ENABLED_MAX),
+
+	REG_VARIABLE(CFG_OCE_ENABLE_RSSI_BASED_ASSOC_REJECT_NAME,
+		     WLAN_PARAM_Integer,
+		     struct hdd_config, rssi_assoc_reject_enabled,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_OCE_ENABLE_RSSI_BASED_ASSOC_REJECT_DEFAULT,
+		     CFG_OCE_ENABLE_RSSI_BASED_ASSOC_REJECT_MIN,
+		     CFG_OCE_ENABLE_RSSI_BASED_ASSOC_REJECT_MAX),
+
+	REG_VARIABLE(CFG_OCE_PROBE_REQ_RATE_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, oce_probe_req_rate_enabled,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_OCE_PROBE_REQ_RATE_DEFAULT,
+		     CFG_OCE_PROBE_REQ_RATE_MIN,
+		     CFG_OCE_PROBE_REQ_RATE_MAX),
+
+	REG_VARIABLE(CFG_OCE_PROBE_RSP_RATE_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, oce_probe_resp_rate_enabled,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_OCE_PROBE_RSP_RATE_DEFAULT,
+		     CFG_OCE_PROBE_RSP_RATE_MIN,
+		     CFG_OCE_PROBE_RSP_RATE_MAX),
+
+	REG_VARIABLE(CFG_OCE_BEACON_RATE_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, oce_beacon_rate_enabled,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_OCE_BEACON_RATE_DEFAULT,
+		     CFG_OCE_BEACON_RATE_MIN,
+		     CFG_OCE_BEACON_RATE_MAX),
+
+	REG_VARIABLE(CFG_ENABLE_PROBE_REQ_DEFERRAL_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, probe_req_deferral_enabled,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_ENABLE_PROBE_REQ_DEFERRAL_DEFAULT,
+		     CFG_ENABLE_PROBE_REQ_DEFERRAL_MIN,
+		     CFG_ENABLE_PROBE_REQ_DEFERRAL_MAX),
+
+	REG_VARIABLE(CFG_ENABLE_FILS_DISCOVERY_SAP_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, fils_discovery_sap_enabled,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_ENABLE_FILS_DISCOVERY_SAP_DEFAULT,
+		     CFG_ENABLE_FILS_DISCOVERY_SAP_MIN,
+		     CFG_ENABLE_FILS_DISCOVERY_SAP_MAX),
+
+	REG_VARIABLE(CFG_ENABLE_ESP_FEATURE_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, esp_for_roam_enabled,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_ENABLE_ESP_FEATURE_DEFAULT,
+		     CFG_ENABLE_ESP_FEATURE_MIN,
+		     CFG_ENABLE_ESP_FEATURE_MAX),
 
 };
 
@@ -6078,7 +6208,8 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 
 	hdd_debug("Name = [gApEnableUapsd] value = [%u]",
 		  pHddCtx->config->apUapsdEnabled);
-
+	hdd_debug("Name = [g_mark_indoor_as_disable] Value = [%u]",
+		 pHddCtx->config->disable_indoor_channel);
 	hdd_debug("Name = [gEnableApProt] value = [%u]",
 		  pHddCtx->config->apProtEnabled);
 	hdd_debug("Name = [gAPAutoShutOff] Value = [%u]",
@@ -6343,6 +6474,8 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 		  pHddCtx->config->enableLpwrImgTransition);
 	hdd_debug("Name = [gEnableSSR] Value = [%u] ",
 		  pHddCtx->config->enableSSR);
+	hdd_debug("Name = [gEnableDataStallDetection] Value = [%u] ",
+		  pHddCtx->config->enable_data_stall_det);
 	hdd_debug("Name = [gEnableVhtFor24GHzBand] Value = [%u] ",
 		  pHddCtx->config->enableVhtFor24GHzBand);
 	hdd_debug("Name = [gEnableIbssHeartBeatOffload] Value = [%u] ",
@@ -6436,7 +6569,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_debug("Name = [%s] Value = [%u] ",
 		  CFG_TCP_TX_HIGH_TPUT_THRESHOLD_NAME,
 		  pHddCtx->config->tcp_tx_high_tput_thres);
-
+	hdd_debug("Name = [%s] Value = [%u] ",
+		CFG_PERIODIC_STATS_DISPLAY_TIME_NAME,
+		pHddCtx->config->periodic_stats_disp_time);
 #endif
 
 	hdd_debug("Name = [gIgnoreCAC] Value = [%u] ",
@@ -6563,6 +6698,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_debug("Name = [%s] Value = [%s]",
 		  CFG_DBS_SCAN_SELECTION_NAME,
 		  pHddCtx->config->dbs_scan_selection);
+	hdd_debug("Name = [%s] value = [%u]",
+		  CFG_STA_SAP_SCC_ON_DFS_CHAN,
+		  pHddCtx->config->sta_sap_scc_on_dfs_chan);
 #ifdef FEATURE_WLAN_SCAN_PNO
 	hdd_debug("Name = [%s] Value = [%u]",
 		   CFG_PNO_CHANNEL_PREDICTION_NAME,
@@ -6873,6 +7011,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 		CFG_CHANNEL_CONGESTION_WEIGHTAGE_NAME,
 		pHddCtx->config->channel_congestion_weightage);
 	hdd_debug("Name = [%s] value = [%u]",
+		CFG_OCE_WAN_WEIGHTAGE_NAME,
+		pHddCtx->config->oce_wan_weightage);
+	hdd_debug("Name = [%s] value = [%u]",
 		CFG_BAND_WIDTH_WEIGHT_PER_INDEX_NAME,
 		pHddCtx->config->bandwidth_weight_per_index);
 	hdd_debug("Name = [%s] value = [%u]",
@@ -6925,12 +7066,29 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 		pHddCtx->config->enable_scoring_for_roam);
 
 	hdd_debug("Name = [%s] value = [%u]",
+			CFG_OCE_WAN_SLOTS_NAME,
+			pHddCtx->config->num_oce_wan_slots);
+	hdd_debug("Name = [%s] value = [%u]",
+			CFG_OCE_WAN_SCORE_IDX3_TO_0_NAME,
+			pHddCtx->config->oce_wan_score_slots3_to_0);
+	hdd_debug("Name = [%s] value = [%u]",
+			CFG_OCE_WAN_SCORE_IDX7_TO_4_NAME,
+			pHddCtx->config->oce_wan_score_slots7_to_4);
+	hdd_debug("Name = [%s] value = [%u]",
+			CFG_OCE_WAN_SCORE_IDX11_TO_8_NAME,
+			pHddCtx->config->oce_wan_score_slots11_to_8);
+	hdd_debug("Name = [%s] value = [%u]",
+			CFG_OCE_WAN_SCORE_IDX15_TO_12_NAME,
+			pHddCtx->config->oce_wan_score_slots15_to_12);
+
+	hdd_debug("Name = [%s] value = [%u]",
 		CFG_DOT11P_MODE_NAME,
 		pHddCtx->config->dot11p_mode);
 	hdd_debug("Name = [%s] value = [%u]",
 		CFG_CHAN_SWITCH_HOSTAPD_RATE_ENABLED_NAME,
 		pHddCtx->config->chan_switch_hostapd_rate_enabled);
-
+	hdd_debug("Name = [%s] value = [0x%x]", CFG_VC_MODE_BITMAP,
+		pHddCtx->config->vc_mode_cfg_bitmap);
 }
 
 /**
@@ -8243,6 +8401,7 @@ static void hdd_update_bss_score_params(struct hdd_config *config,
 	score_params->weight_cfg.pcl_weightage = config->pcl_weightage;
 	score_params->weight_cfg.channel_congestion_weightage =
 			config->channel_congestion_weightage;
+	score_params->weight_cfg.oce_wan_weightage = config->oce_wan_weightage;
 
 	total_weight = score_params->weight_cfg.rssi_weightage +
 		       score_params->weight_cfg.ht_caps_weightage +
@@ -8252,7 +8411,8 @@ static void hdd_update_bss_score_params(struct hdd_config *config,
 		       score_params->weight_cfg.nss_weightage +
 		       score_params->weight_cfg.beamforming_cap_weightage +
 		       score_params->weight_cfg.pcl_weightage +
-		       score_params->weight_cfg.channel_congestion_weightage;
+		       score_params->weight_cfg.channel_congestion_weightage +
+		       score_params->weight_cfg.oce_wan_weightage;
 
 	if (total_weight > BEST_CANDIDATE_MAX_WEIGHT) {
 
@@ -8273,6 +8433,7 @@ static void hdd_update_bss_score_params(struct hdd_config *config,
 		score_params->weight_cfg.pcl_weightage = PCL_WEIGHT;
 		score_params->weight_cfg.channel_congestion_weightage =
 			CHANNEL_CONGESTION_WEIGHTAGE;
+		score_params->weight_cfg.oce_wan_weightage = OCE_WAN_WEIGHTAGE;
 	}
 
 	score_params->bandwidth_weight_per_index =
@@ -8311,6 +8472,20 @@ static void hdd_update_bss_score_params(struct hdd_config *config,
 	score_params->esp_qbss_scoring.score_pcnt15_to_12 =
 		hdd_limit_max_per_index_score(
 			config->esp_qbss_score_slots15_to_12);
+
+	score_params->oce_wan_scoring.num_slot = config->num_oce_wan_slots;
+	score_params->oce_wan_scoring.score_pcnt3_to_0 =
+		hdd_limit_max_per_index_score(
+			config->oce_wan_score_slots3_to_0);
+	score_params->oce_wan_scoring.score_pcnt7_to_4 =
+		hdd_limit_max_per_index_score(
+			config->oce_wan_score_slots7_to_4);
+	score_params->oce_wan_scoring.score_pcnt11_to_8 =
+		hdd_limit_max_per_index_score(
+			config->oce_wan_score_slots11_to_8);
+	score_params->oce_wan_scoring.score_pcnt15_to_12 =
+		hdd_limit_max_per_index_score(
+			config->oce_wan_score_slots15_to_12);
 }
 
 /**
@@ -8325,7 +8500,7 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tSmeConfigParams *smeConfig;
-	uint8_t rrm_capab_len;
+	uint8_t rrm_capab_len, val;
 
 	struct hdd_config *pConfig = pHddCtx->config;
 
@@ -8708,9 +8883,10 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 			pHddCtx->config->tx_aggregation_size;
 	smeConfig->csrConfig.rx_aggregation_size =
 			pHddCtx->config->rx_aggregation_size;
-	if (pHddCtx->config->is_fils_enabled)
-		smeConfig->csrConfig.enable_bcast_probe_rsp =
+	smeConfig->csrConfig.enable_bcast_probe_rsp =
 			pHddCtx->config->enable_bcast_probe_rsp;
+	smeConfig->csrConfig.is_fils_enabled =
+			pHddCtx->config->is_fils_enabled;
 	smeConfig->csrConfig.qcn_ie_support =
 			pHddCtx->config->qcn_ie_support;
 	smeConfig->csrConfig.fils_max_chan_guard_time =
@@ -8732,6 +8908,21 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 			pHddCtx->config->num_11b_tx_chains;
 	smeConfig->csrConfig.num_11ag_tx_chains =
 			pHddCtx->config->num_11ag_tx_chains;
+	val = (pConfig->oce_probe_req_rate_enabled *
+		WMI_VDEV_OCE_PROBE_REQUEST_RATE_FEATURE_BITMAP) +
+		(pConfig->oce_probe_resp_rate_enabled *
+		WMI_VDEV_OCE_PROBE_RESPONSE_RATE_FEATURE_BITMAP) +
+		(pConfig->oce_beacon_rate_enabled *
+		WMI_VDEV_OCE_BEACON_RATE_FEATURE_BITMAP) +
+		(pConfig->probe_req_deferral_enabled *
+		WMI_VDEV_OCE_PROBE_REQUEST_DEFERRAL_FEATURE_BITMAP) +
+		(pConfig->fils_discovery_sap_enabled *
+		WMI_VDEV_OCE_FILS_DISCOVERY_FRAME_FEATURE_BITMAP) +
+		(pConfig->esp_for_roam_enabled *
+		WMI_VDEV_OCE_ESP_FEATURE_BITMAP) +
+		(pConfig->rssi_assoc_reject_enabled *
+		WMI_VDEV_OCE_REASSOC_REJECT_FEATURE_BITMAP);
+	smeConfig->csrConfig.oce_feature_bitmap = val;
 
 	hdd_update_bss_score_params(pHddCtx->config,
 			&smeConfig->csrConfig.bss_score_params);

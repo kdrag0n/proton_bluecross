@@ -63,6 +63,7 @@
 #include "wlan_hdd_misc.h"
 #include <cds_utils.h>
 #include "pld_common.h"
+#include "wlan_hdd_regulatory.h"
 
 #include "wma.h"
 #ifdef WLAN_DEBUG
@@ -730,7 +731,7 @@ static void hdd_issue_stored_joinreq(hdd_adapter_t *sta_adapter,
 		hdd_context_t *hdd_ctx)
 {
 	tHalHandle hal_handle;
-	uint32_t roam_id;
+	uint32_t roam_id = INVALID_ROAM_ID;
 
 	if (NULL == sta_adapter) {
 		hdd_err("Invalid station adapter, ignore issueing join req");
@@ -741,7 +742,7 @@ static void hdd_issue_stored_joinreq(hdd_adapter_t *sta_adapter,
 	if (true ==  cds_is_sta_connection_pending()) {
 		MTRACE(qdf_trace(QDF_MODULE_ID_HDD,
 				TRACE_CODE_HDD_ISSUE_JOIN_REQ,
-				sta_adapter->sessionId, roam_id));
+				sta_adapter->sessionId, 0));
 		if (QDF_STATUS_SUCCESS !=
 			sme_issue_stored_joinreq(hal_handle,
 				&roam_id,
@@ -2760,30 +2761,44 @@ void hdd_sap_restart_with_channel_switch(hdd_adapter_t *ap_adapter,
 }
 #endif
 
-int
-static __iw_softap_set_ini_cfg(struct net_device *dev,
-			       struct iw_request_info *info,
-			       union iwreq_data *wrqu, char *extra)
+static int __iw_softap_set_ini_cfg(struct net_device *dev,
+				   struct iw_request_info *info,
+				   union iwreq_data *wrqu,
+				   char *extra)
 {
-	QDF_STATUS vstatus;
-	int ret = 0;            /* success */
-	hdd_adapter_t *pAdapter = (netdev_priv(dev));
-	hdd_context_t *pHddCtx;
+	QDF_STATUS status;
+	int errno;
+	hdd_adapter_t *adapter;
+	hdd_context_t *hdd_ctx;
+	char *value;
+	size_t len;
 
 	ENTER_DEV(dev);
 
-	pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
-	ret = wlan_hdd_validate_context(pHddCtx);
-	if (ret)
-		return ret;
+	adapter = netdev_priv(dev);
+	errno = hdd_validate_adapter(adapter);
+	if (errno)
+		return errno;
 
-	hdd_debug("Received data %s", extra);
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
 
-	vstatus = hdd_execute_global_config_command(pHddCtx, extra);
-	if (QDF_STATUS_SUCCESS != vstatus)
-		ret = -EINVAL;
+	/* ensure null termination */
+	len = min_t(size_t, wrqu->data.length, QCSAP_IOCTL_MAX_STR_LEN);
+	value = qdf_mem_malloc(len + 1);
+	if (!value)
+		return -ENOMEM;
 
-	return ret;
+	qdf_mem_copy(value, extra, len);
+	hdd_debug("Received data %s", value);
+	status = hdd_execute_global_config_command(hdd_ctx, value);
+	qdf_mem_free(value);
+
+	EXIT();
+
+	return qdf_status_to_os_return(status);
 }
 
 int
@@ -7739,6 +7754,18 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	clear_bit(ACS_PENDING, &pHostapdAdapter->event_flags);
 	clear_bit(ACS_IN_PROGRESS, &pHddCtx->g_event_flags);
 
+	/* Mark the indoor channel (passive) to disable */
+	if (iniConfig->disable_indoor_channel) {
+		hdd_update_indoor_channel(pHddCtx, true);
+		if (QDF_IS_STATUS_ERROR(
+		    sme_update_channel_list(pHddCtx->hHal))) {
+			hdd_update_indoor_channel(pHddCtx, false);
+			hdd_err("Can't start BSS: update channel list failed");
+			qdf_mem_free(sme_config);
+			return -EINVAL;
+		}
+	}
+
 	pConfig = &pHostapdAdapter->sessionCtx.ap.sapConfig;
 
 	pBeacon = pHostapdAdapter->sessionCtx.ap.beacon;
@@ -7747,6 +7774,8 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 
 	pConfig->beacon_int = pMgmt_frame->u.beacon.beacon_int;
 
+	pConfig->auto_channel_select_weight =
+			     iniConfig->auto_channel_select_weight;
 	pConfig->disableDFSChSwitch = iniConfig->disableDFSChSwitch;
 	pConfig->sap_chanswitch_beacon_cnt =
 			    iniConfig->sap_chanswitch_beacon_cnt;
@@ -8309,6 +8338,11 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	return 0;
 
 error:
+	/* Revert the indoor to passive marking if START BSS fails */
+	if (iniConfig->disable_indoor_channel) {
+		hdd_update_indoor_channel(pHddCtx, false);
+		sme_update_channel_list(pHddCtx->hHal);
+	}
 	if (sme_config)
 		qdf_mem_free(sme_config);
 	clear_bit(SOFTAP_INIT_DONE, &pHostapdAdapter->event_flags);

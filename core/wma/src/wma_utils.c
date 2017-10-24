@@ -521,6 +521,14 @@ int wma_profile_data_report_event_handler(void *handle, uint8_t *event_buf,
 	buf_ptr = buf_ptr + sizeof(wmi_wlan_profile_ctx_t) + WMI_TLV_HDR_SIZE;
 	profile_data = (wmi_wlan_profile_t *) buf_ptr;
 	entries = profile_ctx->bin_count;
+
+	if (entries > param_buf->num_profile_data) {
+		WMA_LOGE("FW bin count %d more than data %d in TLV hdr",
+			 entries,
+			 param_buf->num_profile_data);
+		return -EINVAL;
+	}
+
 	QDF_TRACE(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_ERROR,
 				"Profile data stats\n");
 	QDF_TRACE(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_ERROR,
@@ -784,7 +792,6 @@ static tSirLLStatsResults *wma_get_ll_stats_ext_buf(uint32_t *len,
 			 fixed_param->tx_ppdu_delay_array_len,
 			 fixed_param->rx_mpdu_aggr_array_len,
 			 fixed_param->rx_mcs_array_len);
-		QDF_ASSERT(0);
 		return NULL;
 	}
 
@@ -2120,6 +2127,17 @@ int wma_unified_link_iface_stats_event_handler(void *handle,
 	if (!fixed_param || !link_stats || (link_stats->num_ac && !ac_stats) ||
 	    (fixed_param->num_offload_stats && !offload_stats)) {
 		WMA_LOGA("%s: Invalid param_tlvs for Iface Stats", __func__);
+		return -EINVAL;
+	}
+
+	if (link_stats->num_ac > WIFI_AC_MAX) {
+		WMA_LOGE("%s: Excess data received from firmware num_ac %d",
+			 __func__, link_stats->num_ac);
+		return -EINVAL;
+	}
+	if (fixed_param->num_offload_stats > WMI_OFFLOAD_STATS_TYPE_MAX) {
+		WMA_LOGE("%s: Excess num offload stats recvd from fw: %d",
+			__func__, fixed_param->num_offload_stats);
 		return -EINVAL;
 	}
 
@@ -4126,6 +4144,12 @@ wma_process_utf_event(WMA_HANDLE handle, uint8_t *datap, uint32_t dataplen)
 	data = param_buf->data;
 	datalen = param_buf->num_data;
 
+	if (datalen < sizeof(segHdrInfo)) {
+		WMA_LOGE("message size %d is smaller than struct seg_hdr_info",
+			 datalen);
+		return -EINVAL;
+	}
+
 	segHdrInfo = *(struct seg_hdr_info *) &(data[0]);
 
 	wma_handle->utf_event_info.currentSeq = (segHdrInfo.segmentInfo & 0xF);
@@ -5571,6 +5595,11 @@ int wma_rcpi_event_handler(void *handle, uint8_t *cmd_param_info,
 	}
 
 	event = param_buf->fixed_param;
+	if (event->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("%s: received invalid vdev_id %d",
+			 __func__, event->vdev_id);
+		return -EINVAL;
+	}
 	iface = &wma->interfaces[event->vdev_id];
 
 	if (!iface->rcpi_req) {
@@ -5964,6 +5993,42 @@ static inline void wma_get_event_bitmap_idx(WOW_WAKE_EVENT_TYPE event,
 		*bit_idx = event % (wow_bitmap_size * 8);
 	}
 }
+
+/**
+ * wma_set_vc_mode_config() - set voltage corner mode config to FW.
+ * @wma_handle:	pointer to wma handle.
+ * @vc_bitmap:	value needs to set to firmware.
+ *
+ * At the time of driver startup, set operating voltage corner mode
+ * for differenet phymode and bw configurations.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS wma_set_vc_mode_config(void *wma_handle,
+		uint32_t vc_bitmap)
+{
+	int32_t ret;
+	tp_wma_handle wma = (tp_wma_handle)wma_handle;
+	struct pdev_params pdevparam;
+
+	pdevparam.param_id = WMI_PDEV_UPDATE_WDCVS_ALGO;
+	pdevparam.param_value = vc_bitmap;
+
+	ret = wmi_unified_pdev_param_send(wma->wmi_handle,
+			&pdevparam,
+			WMA_WILDCARD_PDEV_ID);
+	if (ret) {
+		WMA_LOGE("Fail to Set Voltage Corner config (0x%x)",
+			vc_bitmap);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	WMA_LOGD("Successfully Set Voltage Corner config (0x%x)",
+		vc_bitmap);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 
 void wma_set_wow_event_bitmap(WOW_WAKE_EVENT_TYPE event,
 			      uint32_t wow_bitmap_size,

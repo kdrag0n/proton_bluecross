@@ -41,6 +41,7 @@
 #include <ol_txrx.h>
 #include <cdp_txrx_peer_ops.h>
 #include <cds_utils.h>
+#include <wlan_hdd_regulatory.h>
 
 #ifdef IPA_OFFLOAD
 #include <wlan_hdd_ipa.h>
@@ -193,9 +194,7 @@ void hdd_softap_tx_resume_cb(void *adapter_context, bool tx_resume)
 static inline struct sk_buff *hdd_skb_orphan(hdd_adapter_t *pAdapter,
 		struct sk_buff *skb)
 {
-#if (LINUX_VERSION_CODE <= KERNEL_VERSION(3, 19, 0))
 	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
-#endif
 	int need_orphan = 0;
 
 	if (pAdapter->tx_flow_low_watermark > 0) {
@@ -218,11 +217,16 @@ static inline struct sk_buff *hdd_skb_orphan(hdd_adapter_t *pAdapter,
 		if (hdd_ctx->config->tx_orphan_enable)
 			need_orphan = 1;
 #endif
+	} else if (hdd_ctx->config->tx_orphan_enable) {
+		if (qdf_nbuf_is_ipv4_tcp_pkt(skb) ||
+		    qdf_nbuf_is_ipv6_tcp_pkt(skb))
+			need_orphan = 1;
 	}
 
-	if (need_orphan)
+	if (need_orphan) {
 		skb_orphan(skb);
-	else
+		++pAdapter->hdd_stats.hddTxRxStats.txXmitOrphaned;
+	} else
 		skb = skb_unshare(skb, GFP_ATOMIC);
 
 	return skb;
@@ -533,7 +537,7 @@ static void __hdd_softap_tx_timeout(struct net_device *dev)
 			  i, netif_tx_queue_stopped(txq), txq->trans_start);
 	}
 
-	wlan_hdd_display_netif_queue_history(hdd_ctx);
+	wlan_hdd_display_netif_queue_history(hdd_ctx, QDF_STATS_VERB_LVL_HIGH);
 	ol_tx_dump_flow_pool_info();
 	QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_DEBUG,
 			"carrier state: %d", netif_carrier_ok(dev));
@@ -546,7 +550,8 @@ static void __hdd_softap_tx_timeout(struct net_device *dev)
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
 			  "Detected data stall due to continuous TX timeouts");
 		adapter->hdd_stats.hddTxRxStats.cont_txtimeout_cnt = 0;
-		ol_txrx_post_data_stall_event(
+		if (hdd_ctx->config->enable_data_stall_det)
+			ol_txrx_post_data_stall_event(
 					DATA_STALL_LOG_INDICATOR_HOST_DRIVER,
 					DATA_STALL_LOG_HOST_SOFTAP_TX_TIMEOUT,
 					0xFF, 0xFF,
@@ -1023,6 +1028,13 @@ QDF_STATUS hdd_softap_stop_bss(hdd_adapter_t *pAdapter)
 			}
 		}
 	}
+
+	/* Mark the indoor channel (passive) to enable */
+	if (pHddCtx->config->disable_indoor_channel) {
+		hdd_update_indoor_channel(pHddCtx, false);
+		sme_update_channel_list(pHddCtx->hHal);
+	}
+
 	return qdf_status;
 }
 

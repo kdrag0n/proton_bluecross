@@ -79,6 +79,7 @@
 #define SME_SESSION_ID_ANY        50
 
 #define SME_INVALID_COUNTRY_CODE "XX"
+#define INVALID_ROAM_ID 0
 
 #define SME_SET_CHANNEL_REG_POWER(reg_info_1, val) do {	\
 	reg_info_1 &= 0xff00ffff;	      \
@@ -475,6 +476,9 @@ QDF_STATUS sme_change_country_code(tHalHandle hHal,
 		bool sendRegHint);
 QDF_STATUS sme_generic_change_country_code(tHalHandle hHal,
 					   uint8_t *pCountry);
+
+QDF_STATUS sme_update_channel_list(tpAniSirGlobal mac_ctx);
+
 QDF_STATUS sme_tx_fail_monitor_start_stop_ind(tHalHandle hHal,
 		uint8_t tx_fail_count,
 		void *txFailIndCallback);
@@ -1376,6 +1380,16 @@ QDF_STATUS sme_set_default_scan_ie(tHalHandle hal, uint16_t session_id,
 QDF_STATUS sme_update_session_param(tHalHandle hal, uint8_t session_id,
 		uint32_t param_type, uint32_t param_val);
 
+/**
+ * sme_update_fils_setting() - API to update PE FILS setting
+ * @hal: HAL handle for device
+ * @session_id: Session ID
+ * @param_val: Param value to be update
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_update_fils_setting(tHalHandle hal, uint8_t session_id,
+				   uint8_t param_val);
 #ifdef WLAN_FEATURE_DISA
 /**
  * sme_encrypt_decrypt_msg_register_callback() - Registers
@@ -1886,4 +1900,31 @@ static inline void sme_free_join_rsp_fils_params(tCsrRoamInfo *roam_info)
  * Return: None
  */
 void sme_display_disconnect_stats(tHalHandle hal, uint8_t session_id);
+
+/**
+ * sme_set_vc_mode_config() - Set voltage corner config to FW.
+ * @bitmap:	Bitmap that refers to voltage corner config with
+ * different phymode and bw configuration
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_vc_mode_config(uint32_t vc_bitmap);
+
+/*
+ * sme_send_limit_off_channel_params() - send limit off channel parameters
+ * @hal: global hal handle
+ * @vdev_id: vdev id
+ * @is_tos_active: tos active or inactive
+ * @max_off_chan_time: max off channel time
+ * @rest_time: rest time
+ * @skip_dfs_chan: skip dfs channel
+ *
+ * This function sends command to WMA for setting limit off channel command
+ * parameters.
+ *
+ * Return: QDF_STATUS enumeration.
+ */
+QDF_STATUS sme_send_limit_off_channel_params(tHalHandle hal, uint8_t vdev_id,
+		bool is_tos_active, uint32_t max_off_chan_time,
+		uint32_t rest_time, bool skip_dfs_chan);
 #endif /* #if !defined( __SME_API_H ) */

@@ -1320,6 +1320,7 @@ typedef struct tagCsrConfigParam {
 	uint32_t auto_bmps_timer_val;
 	uint32_t fine_time_meas_cap;
 	uint32_t dual_mac_feature_disable;
+	uint32_t sta_sap_scc_on_dfs_chan;
 	uint32_t roam_dense_traffic_thresh;
 	uint32_t roam_dense_rssi_thresh_offset;
 	uint32_t roam_dense_min_aps;
@@ -1351,6 +1352,7 @@ typedef struct tagCsrConfigParam {
 	uint32_t rx_aggregation_size;
 	struct wmi_per_roam_config per_roam_config;
 	bool enable_bcast_probe_rsp;
+	bool is_fils_enabled;
 	bool qcn_ie_support;
 	uint8_t fils_max_chan_guard_time;
 	uint16_t pkt_err_disconn_th;
@@ -1364,6 +1366,7 @@ typedef struct tagCsrConfigParam {
 	uint32_t scan_probe_repeat_time;
 	uint32_t scan_num_probes;
 	struct sir_score_config bss_score_params;
+	uint8_t oce_feature_bitmap;
 } tCsrConfigParam;
 
 /* Tush */

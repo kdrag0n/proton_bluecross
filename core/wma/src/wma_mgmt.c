@@ -266,7 +266,9 @@ int wma_beacon_swba_handler(void *handle, uint8_t *event, uint32_t len)
 		return -EINVAL;
 	}
 
-	for (; vdev_map; vdev_id++, vdev_map >>= 1) {
+	WMA_LOGD("vdev_map = %d", vdev_map);
+	for (; vdev_map && vdev_id < wma->max_bssid;
+			vdev_id++, vdev_map >>= 1) {
 		if (!(vdev_map & 0x1))
 			continue;
 		if (!ol_cfg_is_high_latency(pdev->ctrl_pdev))
@@ -506,6 +508,12 @@ int wma_unified_bcntx_status_event_handler(void *handle,
 	resp_event = param_buf->fixed_param;
 
 	WMA_LOGD("%s", __func__);
+
+	if (resp_event->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("%s: received invalid vdev_id %d",
+			 __func__, resp_event->vdev_id);
+		return -EINVAL;
+	}
 
 	/* Check for valid handle to ensure session is not
 	 * deleted in any race
@@ -1224,8 +1232,13 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 #ifdef FEATURE_WLAN_WAPI
 	    || params->encryptType == eSIR_ED_WPI
 #endif /* FEATURE_WLAN_WAPI */
-	    )
+	    ) {
 		cmd->peer_flags |= WMI_PEER_NEED_PTK_4_WAY;
+		WMA_LOGD("Acquire set key wake lock for %d ms",
+			WMA_VDEV_SET_KEY_WAKELOCK_TIMEOUT);
+		wma_acquire_wakelock(&intr->vdev_set_key_wakelock,
+			WMA_VDEV_SET_KEY_WAKELOCK_TIMEOUT);
+	}
 	if (params->wpa_rsn >> 1)
 		cmd->peer_flags |= WMI_PEER_NEED_GTK_2_WAY;
 
@@ -1563,6 +1576,17 @@ static QDF_STATUS wma_setup_install_key_cmd(tp_wma_handle wma_handle,
 		return QDF_STATUS_E_NOMEM;
 	}
 
+	if (NULL == wma_handle) {
+		WMA_LOGE(FL("Invalid wma_handle for vdev_id: %d"),
+			key_params->vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	if (key_params->vdev_id >= wma_handle->max_bssid) {
+		WMA_LOGE(FL("Invalid vdev_id: %d"), key_params->vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	iface = &wma_handle->interfaces[key_params->vdev_id];
+
 	params.vdev_id = key_params->vdev_id;
 	params.key_idx = key_params->key_idx;
 	qdf_mem_copy(params.peer_mac, key_params->peer_mac, IEEE80211_ADDR_LEN);
@@ -1711,6 +1735,13 @@ static QDF_STATUS wma_setup_install_key_cmd(tp_wma_handle wma_handle,
 
 	status = wmi_unified_setup_install_key_cmd(wma_handle->wmi_handle,
 								&params);
+
+
+	if (!key_params->unicast) {
+		/* Its GTK release the wake lock */
+		WMA_LOGD("Release set key wake lock");
+		wma_release_wakelock(&iface->vdev_set_key_wakelock);
+	}
 
 	return status;
 }
@@ -2457,7 +2488,7 @@ int wma_tbttoffset_update_event_handler(void *handle, uint8_t *event,
 		return -EINVAL;
 	}
 
-	for (; (vdev_map); vdev_map >>= 1, if_id++) {
+	for (; (if_id < wma->max_bssid && vdev_map); vdev_map >>= 1, if_id++) {
 		if (!(vdev_map & 0x1) || (!(intf[if_id].handle)))
 			continue;
 
@@ -2714,6 +2745,10 @@ static int wma_process_mgmt_tx_completion(tp_wma_handle wma_handle,
 
 	if (pdev == NULL) {
 		WMA_LOGE("%s: NULL pdev pointer", __func__);
+		return -EINVAL;
+	}
+	if (desc_id >= WMI_DESC_POOL_MAX) {
+		WMA_LOGE("%s: Invalid desc id %d", __func__, desc_id);
 		return -EINVAL;
 	}
 
@@ -3261,14 +3296,30 @@ int wma_process_rmf_frame(tp_wma_handle wma_handle,
 		rx_pkt->pkt_meta.mpdu_hdr_ptr =
 				qdf_nbuf_data(wbuf);
 		rx_pkt->pkt_meta.mpdu_len = qdf_nbuf_len(wbuf);
-		rx_pkt->pkt_meta.mpdu_data_len =
-		rx_pkt->pkt_meta.mpdu_len -
-		rx_pkt->pkt_meta.mpdu_hdr_len;
+		rx_pkt->pkt_buf = wbuf;
+		if (rx_pkt->pkt_meta.mpdu_len >=
+			rx_pkt->pkt_meta.mpdu_hdr_len) {
+			rx_pkt->pkt_meta.mpdu_data_len =
+				rx_pkt->pkt_meta.mpdu_len -
+				rx_pkt->pkt_meta.mpdu_hdr_len;
+		} else {
+			WMA_LOGE("mpdu len %d less than hdr %d, dropping frame",
+				rx_pkt->pkt_meta.mpdu_len,
+				rx_pkt->pkt_meta.mpdu_hdr_len);
+			cds_pkt_return_packet(rx_pkt);
+			return -EINVAL;
+		}
+
+		if (rx_pkt->pkt_meta.mpdu_data_len > WMA_MAX_MGMT_MPDU_LEN) {
+			WMA_LOGE("Data Len %d greater than max, dropping frame",
+				rx_pkt->pkt_meta.mpdu_data_len);
+			cds_pkt_return_packet(rx_pkt);
+			return -EINVAL;
+		}
 		rx_pkt->pkt_meta.mpdu_data_ptr =
 		rx_pkt->pkt_meta.mpdu_hdr_ptr +
 		rx_pkt->pkt_meta.mpdu_hdr_len;
 		rx_pkt->pkt_meta.tsf_delta = rx_pkt->pkt_meta.tsf_delta;
-		rx_pkt->pkt_buf = wbuf;
 		WMA_LOGD(FL("BSSID: "MAC_ADDRESS_STR" tsf_delta: %u"),
 		    MAC_ADDR_ARRAY(wh->i_addr3), rx_pkt->pkt_meta.tsf_delta);
 	} else {
@@ -3443,10 +3494,12 @@ static int wma_mgmt_rx_process(void *handle, uint8_t *data,
 		return -EINVAL;
 	}
 
-	if (hdr->buf_len < sizeof(struct ieee80211_frame)) {
+	if (hdr->buf_len < sizeof(struct ieee80211_frame) ||
+		hdr->buf_len > data_len) {
 		limit_prints_invalid_len++;
 		if (limit_prints_invalid_len == RATE_LIMIT) {
-			WMA_LOGD("Invalid rx mgmt packet");
+			WMA_LOGD("Invalid rx mgmt packet, data_len %u, hdr->buf_len %u",
+				data_len, hdr->buf_len);
 			limit_prints_invalid_len = 0;
 		}
 		return -EINVAL;

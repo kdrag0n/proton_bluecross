@@ -46,6 +46,7 @@
 #include "cdp_txrx_bus.h"
 #include "pld_common.h"
 #include "wlan_hdd_driver_ops.h"
+#include "wlan_hdd_scan.h"
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -55,7 +56,7 @@
 
 #define DISABLE_KRAIT_IDLE_PS_VAL      1
 
-#define SSR_MAX_FAIL_CNT 2
+#define SSR_MAX_FAIL_CNT 3
 static uint8_t re_init_fail_cnt, probe_fail_cnt;
 
 /*
@@ -320,6 +321,27 @@ static void hdd_init_qdf_ctx(struct device *dev, void *bdev,
 }
 
 /**
+ * check_for_probe_defer() - API to check return value
+ * @ret: Return Value
+ *
+ * Return: return -EPROBE_DEFER to platform driver if return value
+ * is -ENOMEM. Platform driver will try to re-probe.
+ */
+#ifdef MODULE
+static int check_for_probe_defer(int ret)
+{
+	return ret;
+}
+#else
+static int check_for_probe_defer(int ret)
+{
+	if (ret == -ENOMEM)
+		return -EPROBE_DEFER;
+	return ret;
+}
+#endif
+
+/**
  * wlan_hdd_probe() - handles probe request
  *
  * This function is called to probe the wlan driver
@@ -416,7 +438,7 @@ err_hdd_deinit:
 	cds_clear_fw_state(CDS_FW_STATE_DOWN);
 	hdd_stop_driver_ops_timer();
 	mutex_unlock(&hdd_init_deinit_lock);
-	return ret;
+	return check_for_probe_defer(ret);
 }
 
 static inline void hdd_pld_driver_unloading(struct device *dev)
@@ -489,7 +511,7 @@ static inline void hdd_wlan_ssr_shutdown_event(void)
  */
 static void hdd_send_hang_reason(void)
 {
-	uint32_t reason = 0;
+	enum cds_hang_reason reason = CDS_REASON_UNSPECIFIED;
 	hdd_context_t *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
 	if (wlan_hdd_validate_context(hdd_ctx))
@@ -1300,6 +1322,29 @@ static void wlan_hdd_purge_notifier(void)
 	EXIT();
 }
 
+
+/**
+ * hdd_cleanup_on_fw_down() - cleanup on FW down event
+ *
+ * Return: void
+ */
+static void hdd_cleanup_on_fw_down(void)
+{
+	hdd_context_t *hdd_ctx;
+
+	ENTER();
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	cds_set_fw_state(CDS_FW_STATE_DOWN);
+	cds_set_target_ready(false);
+	if (hdd_ctx != NULL)
+		hdd_cleanup_scan_queue(hdd_ctx, NULL);
+	wlan_hdd_purge_notifier();
+
+	EXIT();
+
+}
+
 /**
  * wlan_hdd_pld_uevent() - update driver status
  * @dev: device
@@ -1312,6 +1357,7 @@ static void wlan_hdd_pld_uevent(struct device *dev,
 {
 	ENTER();
 
+	hdd_info("pld event %d", uevent->uevent);
 	switch (uevent->uevent) {
 	case PLD_RECOVERY:
 		cds_set_recovery_in_progress(true);
@@ -1319,9 +1365,7 @@ static void wlan_hdd_pld_uevent(struct device *dev,
 		wlan_hdd_purge_notifier();
 		break;
 	case PLD_FW_DOWN:
-		cds_set_fw_state(CDS_FW_STATE_DOWN);
-		cds_set_target_ready(false);
-		wlan_hdd_purge_notifier();
+		hdd_cleanup_on_fw_down();
 		break;
 	case PLD_FW_READY:
 		cds_set_target_ready(true);

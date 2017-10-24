@@ -83,6 +83,11 @@ static QDF_STATUS lim_send_hal_req_remain_on_chan_offload(tpAniSirGlobal pMac,
 	tSirMsgQ msg;
 	tSirRetStatus rc = eSIR_SUCCESS;
 
+	if (pMac->lim.scan_disabled) {
+		pe_err("Scan disabled, rejecting scan on ROC");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	pScanOffloadReq = qdf_mem_malloc(sizeof(tSirScanOffloadReq));
 	if (NULL == pScanOffloadReq) {
 		pe_err("Memory allocation failed for pScanOffloadReq");
@@ -106,6 +111,8 @@ static QDF_STATUS lim_send_hal_req_remain_on_chan_offload(tpAniSirGlobal pMac,
 	pScanOffloadReq->channelList.channelNumber[0] = pRemOnChnReq->chnNum;
 	pScanOffloadReq->scan_id = pRemOnChnReq->scan_id;
 	pScanOffloadReq->scan_requestor_id = ROC_SCAN_REQUESTOR_ID;
+	pScanOffloadReq->scan_ctrl_flags_ext |=
+		WMI_SCAN_FLAG_EXT_FILTER_PUBLIC_ACTION_FRAME;
 
 	pe_debug("Req-rem-on-channel: duration: %u session: %hu chan: %hu",
 		pRemOnChnReq->duration, pRemOnChnReq->sessionId,
@@ -176,6 +183,7 @@ void lim_convert_active_channel_to_passive_channel(tpAniSirGlobal pMac)
 	uint64_t lastTime = 0;
 	uint64_t timeDiff;
 	uint8_t i;
+
 	currentTime = (uint64_t)qdf_mc_timer_get_system_time();
 	for (i = 1; i < SIR_MAX_24G_5G_CHANNEL_RANGE; i++) {
 		if ((pMac->lim.dfschannelList.timeStamp[i]) != 0) {

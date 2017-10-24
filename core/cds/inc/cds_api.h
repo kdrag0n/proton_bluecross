@@ -48,7 +48,6 @@
 #include <cds_sched.h>
 #include <qdf_threads.h>
 #include <qdf_mc_timer.h>
-#include <cds_pack_align.h>
 
 /* Amount of time to wait for WMA to perform an asynchronous activity.
  * This value should be larger than the timeout used by WMI to wait for
@@ -113,7 +112,7 @@ struct cds_sme_cbacks {
  * @hdd_set_rx_mode_rps_cb: enable/disable RPS in SAP mode
  */
 struct cds_dp_cbacks {
-	void (*ol_txrx_update_mac_id_cb)(uint8_t , uint8_t);
+	void (*ol_txrx_update_mac_id_cb)(uint8_t, uint8_t);
 	void (*hdd_en_lro_in_cc_cb)(struct hdd_context_s *);
 	void (*hdd_disble_lro_in_cc_cb)(struct hdd_context_s *);
 	void (*hdd_set_rx_mode_rps_cb)(struct hdd_context_s *, void *, bool);

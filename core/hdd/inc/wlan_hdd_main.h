@@ -124,6 +124,7 @@
 #else
 #define WLAN_WAIT_TIME_DISCONNECT  5000
 #endif
+#define WLAN_WAIT_DISCONNECT_ALREADY_IN_PROGRESS  1000
 #define WLAN_WAIT_TIME_STOP_ROAM  4000
 #define WLAN_WAIT_TIME_STATS       800
 #define WLAN_WAIT_TIME_POWER       800
@@ -183,6 +184,8 @@
 /* Max and min IEs length in bytes */
 #define MAX_GENIE_LEN (512)
 #define MIN_GENIE_LEN (2)
+
+#define HDD_MAX_STA_COUNT (WLAN_MAX_STA_COUNT + QDF_MAX_NO_OF_SAP_MODE + 2)
 
 #define WLAN_CHIP_VERSION   "WCNSS"
 
@@ -266,10 +269,11 @@
 
 #define WLAN_HDD_QOS_ACTION_FRAME 1
 #define WLAN_HDD_QOS_MAP_CONFIGURE 4
-#define HDD_SAP_WAKE_LOCK_DURATION 10000        /* in msecs */
+#define HDD_SAP_WAKE_LOCK_DURATION WAKELOCK_DURATION_RECOMMENDED
 
 /* SAP client disconnect wake lock duration in milli seconds */
-#define HDD_SAP_CLIENT_DISCONNECT_WAKE_LOCK_DURATION (1000)
+#define HDD_SAP_CLIENT_DISCONNECT_WAKE_LOCK_DURATION \
+	WAKELOCK_DURATION_RECOMMENDED
 
 #if defined(CONFIG_HL_SUPPORT)
 #define HDD_MOD_EXIT_SSR_MAX_RETRIES 200
@@ -327,12 +331,14 @@
  * @eHDD_DRV_OP_REMOVE: Refers to .remove operation
  * @eHDD_DRV_OP_SHUTDOWN: Refers to .shutdown operation
  * @eHDD_DRV_OP_REINIT: Refers to .reinit operation
+ * @eHDD_DRV_OP_IFF_UP: Refers to IFF_UP operation
  */
 enum {
 	eHDD_DRV_OP_PROBE = 0,
 	eHDD_DRV_OP_REMOVE,
 	eHDD_DRV_OP_SHUTDOWN,
-	eHDD_DRV_OP_REINIT
+	eHDD_DRV_OP_REINIT,
+	eHDD_DRV_OP_IFF_UP
 };
 
 /*
@@ -1072,8 +1078,8 @@ typedef struct multicast_addr_list {
  * @unpause_count - unpause counter
  */
 struct hdd_netif_queue_stats {
-	uint16_t pause_count;
-	uint16_t unpause_count;
+	uint32_t pause_count;
+	uint32_t unpause_count;
 	qdf_time_t total_pause_time;
 };
 
@@ -1719,7 +1725,7 @@ struct hdd_context_s {
 	/* One per STA: 1 for BCMC_STA_ID, 1 for each SAP_SELF_STA_ID,
 	 * 1 for WDS_STAID
 	 */
-	hdd_adapter_t *sta_to_adapter[WLAN_MAX_STA_COUNT + QDF_MAX_NO_OF_SAP_MODE + 2];
+	hdd_adapter_t *sta_to_adapter[HDD_MAX_STA_COUNT];
 
 	/** Pointer for firmware image data */
 	const struct firmware *fw;
@@ -2350,7 +2356,8 @@ int hdd_wlan_dump_stats(hdd_adapter_t *adapter, int value);
 void wlan_hdd_deinit_tx_rx_histogram(hdd_context_t *hdd_ctx);
 void wlan_hdd_display_tx_rx_histogram(hdd_context_t *pHddCtx);
 void wlan_hdd_clear_tx_rx_histogram(hdd_context_t *pHddCtx);
-void wlan_hdd_display_netif_queue_history(hdd_context_t *hdd_ctx);
+void wlan_hdd_display_netif_queue_history(hdd_context_t *hdd_ctx,
+			enum qdf_stats_verb_lvl verb_lvl);
 void wlan_hdd_clear_netif_queue_history(hdd_context_t *hdd_ctx);
 const char *hdd_get_fwpath(void);
 void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind);

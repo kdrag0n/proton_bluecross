@@ -60,7 +60,7 @@
 #define WMA_READY_EVENTID_TIMEOUT          6000
 #define WMA_SERVICE_READY_EXT_TIMEOUT      6000
 #define WMA_TGT_SUSPEND_COMPLETE_TIMEOUT   6000
-#define WMA_WAKE_LOCK_TIMEOUT              1000
+#define WMA_WAKE_LOCK_TIMEOUT              WAKELOCK_DURATION_RECOMMENDED
 #define WMA_RESUME_TIMEOUT                 6000
 #define MAX_MEM_CHUNKS                     32
 #define NAN_CLUSTER_ID_BYTES               4
@@ -290,10 +290,11 @@ enum ds_mode {
 #define WMA_DEL_P2P_SELF_STA_RSP_START 0x03
 #define WMA_SET_LINK_PEER_RSP 0x04
 #define WMA_DELETE_PEER_RSP 0x05
-#define WMA_VDEV_START_REQUEST_TIMEOUT (6000)   /* 6 seconds */
-#define WMA_VDEV_STOP_REQUEST_TIMEOUT  (6000)   /* 6 seconds */
-#define WMA_VDEV_HW_MODE_REQUEST_TIMEOUT (5000) /* 5 seconds */
-#define WMA_VDEV_PLCY_MGR_CMD_TIMEOUT (3000)    /* 3 seconds */
+#define WMA_VDEV_START_REQUEST_TIMEOUT		6000 /* 6s */
+#define WMA_VDEV_STOP_REQUEST_TIMEOUT		6000 /* 6s */
+#define WMA_VDEV_HW_MODE_REQUEST_TIMEOUT	5000 /* 5s */
+#define WMA_VDEV_PLCY_MGR_CMD_TIMEOUT		3000 /* 3s */
+#define WMA_VDEV_SET_KEY_WAKELOCK_TIMEOUT	WAKELOCK_DURATION_RECOMMENDED
 
 #define WMA_TGT_INVALID_SNR (0)
 
@@ -343,26 +344,20 @@ enum ds_mode {
 #define WMA_RSSI_THOLD_DEFAULT   -300
 
 #ifdef FEATURE_WLAN_SCAN_PNO
-#define WMA_PNO_MATCH_WAKE_LOCK_TIMEOUT         (5 * 1000)     /* in msec */
-#ifdef CONFIG_SLUB_DEBUG_ON
-#define WMA_PNO_SCAN_COMPLETE_WAKE_LOCK_TIMEOUT (2 * 1000)     /* in msec */
-#else
-#define WMA_PNO_SCAN_COMPLETE_WAKE_LOCK_TIMEOUT (1 * 1000)     /* in msec */
-#endif /* CONFIG_SLUB_DEBUG_ON */
+#define WMA_PNO_MATCH_WAKE_LOCK_TIMEOUT         WAKELOCK_DURATION_RECOMMENDED
+#define WMA_PNO_SCAN_COMPLETE_WAKE_LOCK_TIMEOUT WAKELOCK_DURATION_RECOMMENDED
 #endif /* FEATURE_WLAN_SCAN_PNO */
 
-#define WMA_AUTH_REQ_RECV_WAKE_LOCK_TIMEOUT     (5 * 1000)     /* in msec */
-#define WMA_ASSOC_REQ_RECV_WAKE_LOCK_DURATION   (5 * 1000)     /* in msec */
-#define WMA_DEAUTH_RECV_WAKE_LOCK_DURATION      (5 * 1000)     /* in msec */
-#define WMA_DISASSOC_RECV_WAKE_LOCK_DURATION    (5 * 1000)     /* in msec */
+#define WMA_AUTH_REQ_RECV_WAKE_LOCK_TIMEOUT     WAKELOCK_DURATION_RECOMMENDED
+#define WMA_ASSOC_REQ_RECV_WAKE_LOCK_DURATION   WAKELOCK_DURATION_RECOMMENDED
+#define WMA_DEAUTH_RECV_WAKE_LOCK_DURATION      WAKELOCK_DURATION_RECOMMENDED
+#define WMA_DISASSOC_RECV_WAKE_LOCK_DURATION    WAKELOCK_DURATION_RECOMMENDED
 #define WMA_ROAM_HO_WAKE_LOCK_DURATION          (500)          /* in msec */
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
-#define WMA_AUTO_SHUTDOWN_WAKE_LOCK_DURATION    (5 * 1000)     /* in msec */
-#else
-#define WMA_AUTO_SHUTDOWN_WAKE_LOCK_DURATION    0              /* in msec */
+#define WMA_AUTO_SHUTDOWN_WAKE_LOCK_DURATION    WAKELOCK_DURATION_RECOMMENDED
 #endif
-#define WMA_BMISS_EVENT_WAKE_LOCK_DURATION      (4 * 1000)     /* in msec */
-#define WMA_FW_RSP_EVENT_WAKE_LOCK_DURATION     (3 * 1000)     /* in msec */
+#define WMA_BMISS_EVENT_WAKE_LOCK_DURATION      WAKELOCK_DURATION_RECOMMENDED
+#define WMA_FW_RSP_EVENT_WAKE_LOCK_DURATION     WAKELOCK_DURATION_MAX
 
 #define WMA_TXMIC_LEN 8
 #define WMA_RXMIC_LEN 8
@@ -996,6 +991,17 @@ typedef struct {
 	uint8_t ssidHidden;
 } vdev_restart_params_t;
 
+struct roam_synch_frame_ind {
+	uint32_t bcn_probe_rsp_len;
+	uint8_t *bcn_probe_rsp;
+	uint8_t is_beacon;
+	uint32_t reassoc_req_len;
+	uint8_t *reassoc_req;
+	uint32_t reassoc_rsp_len;
+	uint8_t *reassoc_rsp;
+};
+
+
 /**
  * struct wma_txrx_node - txrx node
  * @addr: mac address
@@ -1063,6 +1069,7 @@ typedef struct {
  * @in_bmps : Whether bmps for this interface has been enabled
  * @vdev_start_wakelock: wakelock to protect vdev start op with firmware
  * @vdev_stop_wakelock: wakelock to protect vdev stop op with firmware
+ * @vdev_set_key_wakelock: wakelock to protect vdev set key op with firmware
  */
 struct wma_txrx_node {
 	uint8_t addr[IEEE80211_ADDR_LEN];
@@ -1150,6 +1157,8 @@ struct wma_txrx_node {
 	bool beacon_filter_enabled;
 	qdf_wake_lock_t vdev_start_wakelock;
 	qdf_wake_lock_t vdev_stop_wakelock;
+	qdf_wake_lock_t vdev_set_key_wakelock;
+	struct roam_synch_frame_ind roam_synch_frame_ind;
 };
 
 #if defined(QCA_WIFI_FTM)
@@ -1520,7 +1529,9 @@ struct peer_debug_info {
  * @saved_chan: saved channel list sent as part of WMI_SCAN_CHAN_LIST_CMDID
  * @fw_mem_dump_enabled: Fw memory dump support
  * @ss_configs: spectral scan config parameters
+ * @bandcapability: band capability configured through ini
  * @ito_repeat_count: Indicates ito repeated count
+ * @critical_events_in_flight: number of suspend preventing events in flight
  */
 typedef struct {
 	void *wmi_handle;
@@ -1735,10 +1746,12 @@ typedef struct {
 	uint8_t in_imps;
 	uint64_t tx_fail_cnt;
 	uint64_t wmi_desc_fail_count;
+	uint8_t bandcapability;
 #ifdef FEATURE_SPECTRAL_SCAN
 	struct vdev_spectral_configure_params ss_configs;
 #endif
 	uint8_t  ito_repeat_count;
+	qdf_atomic_t critical_events_in_flight;
 #ifdef FEATURE_WLAN_D0WOW
 	atomic_t in_d0wow;
 #endif

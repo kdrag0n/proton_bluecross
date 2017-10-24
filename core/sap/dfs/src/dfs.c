@@ -213,6 +213,7 @@ static os_timer_func(dfs_testtimer_task)
 static int dfs_get_debug_info(struct ieee80211com *ic, int type, void *data)
 {
 	struct ath_dfs *dfs = (struct ath_dfs *)ic->ic_dfs;
+
 	if (data) {
 		*(uint32_t *) data = dfs->dfs_proc_phyerr;
 	}
@@ -393,7 +394,7 @@ int dfs_attach(struct ieee80211com *ic)
 	 * is available.
 	 */
 	if (dfs_init_radar_filters(ic, &radar_info)) {
-		DFS_PRINTK(" %s: Radar Filter Intialization Failed \n",
+		DFS_PRINTK(" %s: Radar Filter Intialization Failed\n",
 			   __func__);
 		return 1;
 	}
@@ -464,6 +465,7 @@ void dfs_detach(struct ieee80211com *ic)
 	OS_CANCEL_TIMER(&dfs->sc_dfs_war_timer);
 	if (dfs->dfs_nol != NULL) {
 		struct dfs_nolelem *nol, *next;
+
 		nol = dfs->dfs_nol;
 		/* Bug 29099 - each NOL element has its own timer, cancel it and
 		   free the element */
@@ -777,11 +779,11 @@ dfs_control(struct ieee80211com *ic, u_int id,
 		break;
 	case DFS_DISABLE_FFT:
 		/* UMACDFS: TODO: val = ath_hal_dfs_config_fft(sc->sc_ah, false); */
-		DFS_PRINTK("%s TODO disable FFT val=0x%x \n", __func__, val);
+		DFS_PRINTK("%s TODO disable FFT val=0x%x\n", __func__, val);
 		break;
 	case DFS_ENABLE_FFT:
 		/* UMACDFS TODO: val = ath_hal_dfs_config_fft(sc->sc_ah, true); */
-		DFS_PRINTK("%s TODO enable FFT val=0x%x \n", __func__, val);
+		DFS_PRINTK("%s TODO enable FFT val=0x%x\n", __func__, val);
 		break;
 	case DFS_SET_DEBUG_LEVEL:
 		if (insize < sizeof(uint32_t) || !indata) {
@@ -789,7 +791,7 @@ dfs_control(struct ieee80211com *ic, u_int id,
 			break;
 		}
 		dfs->dfs_debug_mask = *(uint32_t *) indata;
-		DFS_PRINTK("%s debug level now = 0x%x \n",
+		DFS_PRINTK("%s debug level now = 0x%x\n",
 			   __func__, dfs->dfs_debug_mask);
 		if (dfs->dfs_debug_mask & ATH_DEBUG_DFS3) {
 			/* Enable debug Radar Event */
@@ -804,7 +806,7 @@ dfs_control(struct ieee80211com *ic, u_int id,
 			break;
 		}
 		dfs->ath_dfs_false_rssi_thres = *(uint32_t *) indata;
-		DFS_PRINTK("%s false RSSI threshold now = 0x%x \n",
+		DFS_PRINTK("%s false RSSI threshold now = 0x%x\n",
 			   __func__, dfs->ath_dfs_false_rssi_thres);
 		break;
 	case DFS_SET_PEAK_MAG:
@@ -813,7 +815,7 @@ dfs_control(struct ieee80211com *ic, u_int id,
 			break;
 		}
 		dfs->ath_dfs_peak_mag = *(uint32_t *) indata;
-		DFS_PRINTK("%s peak_mag now = 0x%x \n",
+		DFS_PRINTK("%s peak_mag now = 0x%x\n",
 			   __func__, dfs->ath_dfs_peak_mag);
 		break;
 	case DFS_IGNORE_CAC:
@@ -826,7 +828,7 @@ dfs_control(struct ieee80211com *ic, u_int id,
 		} else {
 			dfs->ic->ic_dfs_state.ignore_cac = 0;
 		}
-		DFS_PRINTK("%s ignore cac = 0x%x \n",
+		DFS_PRINTK("%s ignore cac = 0x%x\n",
 			   __func__, dfs->ic->ic_dfs_state.ignore_cac);
 		break;
 	case DFS_SET_NOL_TIMEOUT:
@@ -839,7 +841,7 @@ dfs_control(struct ieee80211com *ic, u_int id,
 		} else {
 			dfs->ath_dfs_nol_timeout = DFS_NOL_TIMEOUT_S;
 		}
-		DFS_PRINTK("%s nol timeout = %d sec \n",
+		DFS_PRINTK("%s nol timeout = %d sec\n",
 			   __func__, dfs->ath_dfs_nol_timeout);
 		break;
 #ifndef ATH_DFS_RADAR_DETECTION_ONLY
@@ -909,7 +911,7 @@ dfs_control(struct ieee80211com *ic, u_int id,
 	case DFS_BANGRADAR:
 #if 0                           /* MERGE_TBD */
 		if (sc->sc_nostabeacons) {
-			printk("No radar detection Enabled \n");
+			printk("No radar detection Enabled\n");
 			break;
 		}
 #endif
@@ -1021,12 +1023,14 @@ dfs_get_thresholds(struct ieee80211com *ic, struct ath_dfs_phyerr_param *param)
 uint16_t dfs_usenol(struct ieee80211com *ic)
 {
 	struct ath_dfs *dfs = (struct ath_dfs *)ic->ic_dfs;
+
 	return dfs ? (uint16_t) dfs->dfs_rinfo.rn_use_nol : 0;
 }
 
 uint16_t dfs_isdfsregdomain(struct ieee80211com *ic)
 {
 	struct ath_dfs *dfs = (struct ath_dfs *)ic->ic_dfs;
+
 	return dfs ? dfs->dfsdomain : 0;
 }
 

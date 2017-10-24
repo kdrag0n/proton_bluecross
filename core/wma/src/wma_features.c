@@ -4650,6 +4650,11 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 
 	/* unspecified means apps-side wakeup, so there won't be a vdev */
 	if (wake_info->wake_reason != WOW_REASON_UNSPECIFIED) {
+		if (wake_info->vdev_id >= wma->max_bssid) {
+			WMA_LOGE("%s: received invalid vdev_id %d",
+				 __func__, wake_info->vdev_id);
+			return -EINVAL;
+		}
 		wma_vdev = &wma->interfaces[wake_info->vdev_id];
 		WMA_LOGA("WLAN triggered wakeup: %s (%d), vdev: %d (%s)",
 			 wma_wow_wake_reason_str(wake_info->wake_reason),
@@ -4668,13 +4673,23 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 
 	qdf_event_set(&wma->wma_resume_event);
 
-	if (param_buf->wow_packet_buffer &&
-	    tlv_check_required(wake_info->wake_reason)) {
+	if (param_buf->wow_packet_buffer) {
 		/*
 		 * In case of wow_packet_buffer, first 4 bytes is the length.
 		 * Following the length is the actual buffer.
 		 */
 		wow_buf_pkt_len = *(uint32_t *)param_buf->wow_packet_buffer;
+		if (wow_buf_pkt_len > (param_buf->num_wow_packet_buffer - 4)) {
+			WMA_LOGE("Invalid wow buf pkt len from firmware, wow_buf_pkt_len: %u, num_wow_packet_buffer: %u",
+				 wow_buf_pkt_len,
+				 param_buf->num_wow_packet_buffer);
+			return -EINVAL;
+		}
+	}
+
+	if (param_buf->wow_packet_buffer &&
+	    tlv_check_required(wake_info->wake_reason)) {
+
 		tlv_hdr = WMITLV_GET_HDR(
 				(uint8_t *)param_buf->wow_packet_buffer + 4);
 
@@ -4708,9 +4723,6 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 	case WOW_REASON_BEACON_RECV:
 	case WOW_REASON_ACTION_FRAME_RECV:
 		if (param_buf->wow_packet_buffer) {
-			/* First 4-bytes of wow_packet_buffer is the length */
-			qdf_mem_copy((uint8_t *) &wow_buf_pkt_len,
-				param_buf->wow_packet_buffer, 4);
 			if (wow_buf_pkt_len)
 				wma_wow_dump_mgmt_buffer(
 					param_buf->wow_packet_buffer,
@@ -4782,9 +4794,6 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 			break;
 		}
 
-		/* First 4-bytes of wow_packet_buffer is the length */
-		qdf_mem_copy((uint8_t *)&wow_buf_pkt_len,
-			     param_buf->wow_packet_buffer, 4);
 		if (wow_buf_pkt_len == 0) {
 			WMA_LOGE("wow packet buffer is empty");
 			break;
@@ -6912,6 +6921,7 @@ QDF_STATUS wma_process_mcbc_set_filter_req(tp_wma_handle wma_handle,
 					   tSirRcvFltMcAddrList *mcbc_param)
 {
 	uint8_t vdev_id = 0;
+	struct mcast_filter_params *filter_params;
 
 	if (mcbc_param->ulMulticastAddrCnt <= 0) {
 		WMA_LOGW("Number of multicast addresses is 0");
@@ -6947,19 +6957,25 @@ QDF_STATUS wma_process_mcbc_set_filter_req(tp_wma_handle wma_handle,
 
 	if (WMI_SERVICE_IS_ENABLED(wma_handle->wmi_service_bitmap,
 		WMI_SERVICE_MULTIPLE_MCAST_FILTER_SET)) {
-		struct mcast_filter_params filter_params;
+		filter_params = qdf_mem_malloc(
+					    sizeof(struct mcast_filter_params));
 
+		if (!filter_params) {
+			WMA_LOGE("Memory alloc failed for filter_params");
+			return QDF_STATUS_E_FAILURE;
+		}
 		WMA_LOGD("%s: FW supports multiple mcast filter", __func__);
 
-		filter_params.multicast_addr_cnt =
+		filter_params->multicast_addr_cnt =
 					mcbc_param->ulMulticastAddrCnt;
-		qdf_mem_copy(filter_params.multicast_addr,
+		qdf_mem_copy(filter_params->multicast_addr,
 			     mcbc_param->multicastAddr,
 			     mcbc_param->ulMulticastAddrCnt * ATH_MAC_LEN);
-		filter_params.action = mcbc_param->action;
+		filter_params->action = mcbc_param->action;
 
 		wma_multiple_add_clear_mcbc_filter(wma_handle, vdev_id,
-						   &filter_params);
+						   filter_params);
+		qdf_mem_free(filter_params);
 	} else {
 		int i;
 
@@ -8659,6 +8675,7 @@ void wma_handle_initial_wake_up(void)
 int wma_is_target_wake_up_received(void)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	int32_t event_count;
 
 	if (NULL == wma) {
 		WMA_LOGE("%s: wma is NULL", __func__);
@@ -8667,6 +8684,13 @@ int wma_is_target_wake_up_received(void)
 
 	if (wma->wow_initial_wake_up) {
 		WMA_LOGE("Target initial wake up received try again");
+		return -EAGAIN;
+	}
+
+	event_count = qdf_atomic_read(&wma->critical_events_in_flight);
+	if (event_count) {
+		WMA_LOGE("%d critical event(s) in flight; Try again",
+			 event_count);
 		return -EAGAIN;
 	}
 
@@ -10178,6 +10202,11 @@ int wma_p2p_lo_event_handler(void *handle, uint8_t *event_buf,
 	param_tlvs = (WMI_P2P_LISTEN_OFFLOAD_STOPPED_EVENTID_param_tlvs *)
 								event_buf;
 	fix_param = param_tlvs->fixed_param;
+	if (fix_param->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("%s: received invalid vdev_id %d",
+			 __func__, fix_param->vdev_id);
+		return -EINVAL;
+	}
 	event = qdf_mem_malloc(sizeof(*event));
 	if (event == NULL) {
 		WMA_LOGE("Event allocation failed");
@@ -10435,6 +10464,14 @@ int wma_encrypt_decrypt_msg_handler(void *handle, uint8_t *data,
 
 	encrypt_decrypt_rsp_params.vdev_id = data_event->vdev_id;
 	encrypt_decrypt_rsp_params.status = data_event->status;
+
+	if (data_event->data_length > param_buf->num_enc80211_frame) {
+		WMA_LOGE("FW msg data_len %d more than TLV hdr %d",
+			 data_event->data_length,
+			 param_buf->num_enc80211_frame);
+		return -EINVAL;
+	}
+
 	encrypt_decrypt_rsp_params.data_length = data_event->data_length;
 
 	if (encrypt_decrypt_rsp_params.data_length) {
@@ -10932,6 +10969,14 @@ int wma_rx_aggr_failure_event_handler(void *handle, u_int8_t *event_buf,
 
 	rx_aggr_failure_info = param_buf->fixed_param;
 	hole_info = param_buf->failure_info;
+
+	if (rx_aggr_failure_info->num_failure_info > ((WMI_SVC_MSG_MAX_SIZE -
+	    sizeof(*rx_aggr_hole_event)) /
+	    sizeof(rx_aggr_hole_event->hole_info_array[0]))) {
+		WMA_LOGE("%s: Excess data from WMI num_failure_info %d",
+			 __func__, rx_aggr_failure_info->num_failure_info);
+		return -EINVAL;
+	}
 
 	alloc_len = sizeof(*rx_aggr_hole_event) +
 		(rx_aggr_failure_info->num_failure_info)*

@@ -128,6 +128,9 @@
 /* Time(in ms) to detect DOS attack */
 #define WMA_MGMT_FRAME_DETECT_DOS_TIMER 1000
 
+#define MAX_NUM_HW_MODE    0xff
+#define MAX_NUM_PHY        0xff
+
 /**
  * struct index_data_rate_type - non vht data rate type
  * @mcs_index: mcs rate index
@@ -217,6 +220,19 @@ void wma_process_roam_synch_fail(WMA_HANDLE handle,
 				 struct roam_offload_synch_fail *synch_fail);
 
 int wma_roam_synch_event_handler(void *handle, uint8_t *event,
+					uint32_t len);
+
+/**
+ * wma_roam_synch_frame_event_handler() - roam synch frame event handler
+ * @handle: wma handle
+ * @event: event data
+ * @len: length of data
+ *
+ * This function is roam synch frame event handler.
+ *
+ * Return: Success or Failure status
+ */
+int wma_roam_synch_frame_event_handler(void *handle, uint8_t *event,
 					uint32_t len);
 #endif
 
@@ -1089,7 +1105,7 @@ void wma_config_plm(tp_wma_handle wma, tpSirPlmReq plm);
 #endif
 
 QDF_STATUS wma_process_mcbc_set_filter_req(tp_wma_handle wma_handle,
-					   tSirRcvFltMcAddrList * mcbc_param);
+					   struct sSirRcvFltMcAddrList *mcbc_param);
 #ifdef WLAN_FEATURE_GTK_OFFLOAD
 QDF_STATUS wma_process_gtk_offload_req(tp_wma_handle wma,
 					      tpSirGtkOffloadParams params);
@@ -1140,7 +1156,7 @@ QDF_STATUS wma_stats_ext_req(void *wma_ptr, tpStatsExtRequest preq);
 #endif
 
 QDF_STATUS wma_process_ibss_route_table_update_ind(void *wma_handle,
-						   tAniIbssRouteTable * pData);
+						   struct sAniIbssRouteTable *pData);
 
 #ifdef WLAN_FEATURE_EXTWOW_SUPPORT
 QDF_STATUS wma_enable_ext_wow(tp_wma_handle wma, tpSirExtWoWParams params);
@@ -1548,4 +1564,15 @@ QDF_STATUS wma_extract_single_phyerr_spectral(void *handle,
  */
 int wma_rx_aggr_failure_event_handler(void *handle, u_int8_t *event_buf,
 							u_int32_t len);
+
+/*
+ * wma_is_vdev_valid - check the vdev status
+ * @vdev_id: vdev identifier
+ *
+ * This function verifies the vdev validity
+ *
+ * Return: 'true' on valid vdev else 'false'
+ */
+bool wma_is_vdev_valid(uint32_t vdev_id);
+
 #endif

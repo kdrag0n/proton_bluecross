@@ -1046,6 +1046,28 @@ static const struct ccp_freq_chan_map freq_chan_map[] = {
 #define WE_SET_WOW_DATA_INACTIVITY_TO    90
 
 
+/*
+ * <ioctl>
+ * setModDTIM - Change Modulated DTIM
+ *
+ * @INPUT: set_value.
+ *
+ * @OUTPUT: None
+ *
+ * This IOCTL is used to change modulated DTIM
+ * value without WIFI OFF/ON.
+ *
+ * @E.g: iwpriv wlan0 setModDTIM <value>
+ * iwpriv wlan0 setModDTIM 2
+ *
+ * Supported Feature: N/A
+ *
+ * Usage: External
+ *
+ * </ioctl>
+ */
+#define WE_SET_MODULATED_DTIM                 91
+
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_NONE_GET_INT    (SIOCIWFIRSTPRIV + 1)
 #define WE_GET_11D_STATE     1
@@ -3040,7 +3062,8 @@ int hdd_wlan_dump_stats(hdd_adapter_t *adapter, int value)
 		wlan_hdd_display_tx_rx_histogram(hdd_ctx);
 		break;
 	case WLAN_HDD_NETIF_OPER_HISTORY:
-		wlan_hdd_display_netif_queue_history(hdd_ctx);
+		wlan_hdd_display_netif_queue_history(hdd_ctx,
+					QDF_STATS_VERB_LVL_HIGH);
 		break;
 	case WLAN_HIF_STATS:
 		hdd_display_hif_stats();
@@ -3058,7 +3081,8 @@ int hdd_wlan_dump_stats(hdd_adapter_t *adapter, int value)
 						adapter->sessionId);
 		break;
 	default:
-		status = ol_txrx_display_stats(value);
+		status = ol_txrx_display_stats(value,
+			QDF_STATS_VERB_LVL_HIGH);
 		if (status == QDF_STATUS_E_INVAL) {
 			hdd_display_stats_help();
 			ret = EINVAL;
@@ -6780,7 +6804,7 @@ static int __iw_set_encodeext(struct net_device *dev,
 	int key_index;
 	struct iw_point *encoding = &wrqu->encoding;
 	tCsrRoamSetKey setKey;
-	uint32_t roamId = 0xFF;
+	uint32_t roamId = INVALID_ROAM_ID;
 
 	ENTER_DEV(dev);
 
@@ -8865,6 +8889,18 @@ static int __iw_setint_getnone(struct net_device *dev,
 		cds_set_cur_conc_system_pref(set_value);
 		break;
 	}
+	case WE_SET_MODULATED_DTIM:
+	{
+		if ((set_value < CFG_ENABLE_MODULATED_DTIM_MIN) ||
+				(set_value > CFG_ENABLE_MODULATED_DTIM_MAX)) {
+			hdd_err("Invalid gEnableModuleDTIM value %d",
+				set_value);
+			return -EINVAL;
+		} else {
+			hdd_ctx->config->enableModulatedDTIM = set_value;
+		}
+		break;
+	}
 	default:
 	{
 		hdd_err("Invalid sub command %d",
@@ -9906,7 +9942,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 			buf =
 				scnprintf(extra + len, WE_MAX_STR_LEN - len,
 					  "\n HDD Conn State - %s "
-					  "\n \n SME State:"
+					  "\n\n SME State:"
 					  "\n Neighbour Roam State - %s"
 					  "\n CSR State - %s"
 					  "\n CSR Substate - %s",
@@ -9930,7 +9966,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 			/* Printing Lim State starting with global lim states */
 			buf =
 				scnprintf(extra + len, WE_MAX_STR_LEN - len,
-					  "\n \n LIM STATES:-"
+					  "\n\n LIM STATES:-"
 					  "\n Global Sme State - %s "
 					  "\n Global mlm State - %s " "\n",
 					  mac_trace_get_lim_sme_state
@@ -10380,7 +10416,7 @@ static int __iw_setnone_getnone(struct net_device *dev,
 
 		tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(adapter);
 		tSirMacAddr bssid;
-		uint32_t roamId = 0;
+		uint32_t roamId = INVALID_ROAM_ID;
 		uint8_t operating_ch =
 			adapter->sessionCtx.station.conn_info.operationChannel;
 		tCsrRoamModifyProfileFields modProfileFields;
@@ -13229,6 +13265,10 @@ static const struct iw_priv_args we_private_args[] = {
 	{WE_SET_CONC_SYSTEM_PREF,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0, "setConcSysPref" },
+
+	{WE_SET_MODULATED_DTIM,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0, "setModDTIM" },
 
 	{WLAN_PRIV_SET_NONE_GET_INT,
 	 0,

@@ -650,6 +650,7 @@ typedef struct tagCsrConfig {
 	uint32_t rx_aggregation_size;
 	struct wmi_per_roam_config per_roam_config;
 	bool enable_bcast_probe_rsp;
+	bool is_fils_enabled;
 	bool qcn_ie_support;
 	uint8_t fils_max_chan_guard_time;
 	uint16_t pkt_err_disconn_th;
@@ -663,6 +664,7 @@ typedef struct tagCsrConfig {
 	uint32_t scan_probe_repeat_time;
 	uint32_t scan_num_probes;
 	struct sir_score_config bss_score_params;
+	uint8_t oce_feature_bitmap;
 } tCsrConfig;
 
 typedef struct tagCsrChannelPowerInfo {

@@ -944,6 +944,11 @@ int wma_vdev_start_resp_handler(void *handle, uint8_t *cmd_param_info,
 		return -EINVAL;
 	}
 
+	if (resp_event->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("Invalid vdev id received from firmware");
+		return -EINVAL;
+	}
+
 	if (wma_is_vdev_in_ap_mode(wma, resp_event->vdev_id)) {
 		qdf_spin_lock_bh(&wma->dfs_ic->chan_lock);
 		wma->dfs_ic->disable_phy_err_processing = false;
@@ -1122,11 +1127,15 @@ int wma_vdev_start_resp_handler(void *handle, uint8_t *cmd_param_info,
 	return 0;
 }
 
-static bool wma_is_vdev_valid(uint32_t vdev_id)
+bool wma_is_vdev_valid(uint32_t vdev_id)
 {
 	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 
 	if (NULL == wma_handle)
+		return false;
+
+	/* No of interface are allocated based on max_bssid value */
+	if (vdev_id >= wma_handle->max_bssid)
 		return false;
 
 	return wma_handle->interfaces[vdev_id].vdev_active;
@@ -2209,6 +2218,17 @@ ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 			WMA_LOGE("Failed to set WMI_VDEV_PARAM_REPEAT_PROBE_TIME");
 	}
 
+	if ((self_sta_req->type == WMI_VDEV_TYPE_STA ||
+	     self_sta_req->type == WMI_VDEV_TYPE_AP) &&
+	    self_sta_req->sub_type == 0) {
+		ret = wma_vdev_set_param(wma_handle->wmi_handle,
+				     self_sta_req->session_id,
+				     WMI_VDEV_PARAM_ENABLE_DISABLE_OCE_FEATURES,
+				     self_sta_req->oce_feature_bitmap);
+		if (QDF_IS_STATUS_ERROR(ret))
+			WMA_LOGE("Failed to set WMI_VDEV_PARAM_ENABLE_DISABLE_OCE_FEATURES");
+	}
+
 	/* Initialize BMISS parameters */
 	if ((self_sta_req->type == WMI_VDEV_TYPE_STA) &&
 	    (self_sta_req->sub_type == 0))
@@ -2790,7 +2810,8 @@ static inline bool wma_crash_on_fw_timeout(bool crash_enabled)
 	if (cds_is_driver_unloading())
 		return false;
 
-	if (!cds_is_fw_down())
+	/* Firmware is down send failure response */
+	if (cds_is_fw_down())
 		return false;
 
 	return crash_enabled;
@@ -2875,6 +2896,7 @@ void wma_hold_req_timer(void *data)
 	} else if ((tgt_req->msg_type == WMA_DELETE_STA_REQ) &&
 		(tgt_req->type == WMA_DEL_P2P_SELF_STA_RSP_START)) {
 		struct del_sta_self_rsp_params *del_sta;
+
 		del_sta = (struct del_sta_self_rsp_params *)tgt_req->user_data;
 		del_sta->self_sta_param->status = QDF_STATUS_E_TIMEOUT;
 		WMA_LOGA(FL("wma delete sta p2p request timed out"));
@@ -4906,6 +4928,11 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 		    !WMI_SERVICE_IS_ENABLED(wma->wmi_service_bitmap,
 				WMI_SERVICE_SYNC_DELETE_CMDS)) {
 			WMA_LOGD(FL("vdev_id %d status %d"),
+				 del_sta->smesessionId, del_sta->status);
+			qdf_mem_free(del_sta);
+		} else if (!rsp_requested &&
+				(del_sta->status != QDF_STATUS_SUCCESS)) {
+			WMA_LOGD(FL("Release del_sta mem vdev_id %d status %d"),
 				 del_sta->smesessionId, del_sta->status);
 			qdf_mem_free(del_sta);
 		}

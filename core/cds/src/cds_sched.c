@@ -135,7 +135,7 @@ static int cds_sched_find_attach_cpu(p_cds_sched_context pSchedContext,
 	int i;
 #endif
 
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_LOW,
+	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_DEBUG,
 		"%s: num possible cpu %d",
 		__func__, num_possible_cpus());
 
@@ -242,7 +242,7 @@ static int cds_sched_find_attach_cpu(p_cds_sched_context pSchedContext,
 #endif /* WLAN_OPEN_SOURCE */
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_LOW,
+	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_DEBUG,
 		"%s: NUM PERF CORE %d, HIGH TPUTR REQ %d, RX THRE CPU %lu",
 		__func__, perf_core_count,
 		(int)pSchedContext->high_throughput_required,
@@ -467,6 +467,7 @@ QDF_STATUS cds_sched_open(void *p_cds_context,
 		uint32_t SchedCtxSize)
 {
 	QDF_STATUS vStatus = QDF_STATUS_SUCCESS;
+
 	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
 		  "%s: Opening the CDS Scheduler", __func__);
 	/* Sanity checks */
