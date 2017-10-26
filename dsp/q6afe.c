@@ -495,6 +495,7 @@ int afe_get_port_type(u16 port_id)
 	case AFE_PORT_ID_SECONDARY_PCM_RX:
 	case AFE_PORT_ID_TERTIARY_PCM_RX:
 	case AFE_PORT_ID_QUATERNARY_PCM_RX:
+	case AFE_PORT_ID_QUINARY_PCM_RX:
 	case AFE_PORT_ID_PRIMARY_TDM_RX:
 	case AFE_PORT_ID_PRIMARY_TDM_RX_1:
 	case AFE_PORT_ID_PRIMARY_TDM_RX_2:
@@ -527,6 +528,14 @@ int afe_get_port_type(u16 port_id)
 	case AFE_PORT_ID_QUATERNARY_TDM_RX_5:
 	case AFE_PORT_ID_QUATERNARY_TDM_RX_6:
 	case AFE_PORT_ID_QUATERNARY_TDM_RX_7:
+	case AFE_PORT_ID_QUINARY_TDM_RX:
+	case AFE_PORT_ID_QUINARY_TDM_RX_1:
+	case AFE_PORT_ID_QUINARY_TDM_RX_2:
+	case AFE_PORT_ID_QUINARY_TDM_RX_3:
+	case AFE_PORT_ID_QUINARY_TDM_RX_4:
+	case AFE_PORT_ID_QUINARY_TDM_RX_5:
+	case AFE_PORT_ID_QUINARY_TDM_RX_6:
+	case AFE_PORT_ID_QUINARY_TDM_RX_7:
 	case AFE_PORT_ID_USB_RX:
 	case AFE_PORT_ID_INT0_MI2S_RX:
 	case AFE_PORT_ID_INT1_MI2S_RX:
@@ -566,6 +575,7 @@ int afe_get_port_type(u16 port_id)
 	case AFE_PORT_ID_SECONDARY_PCM_TX:
 	case AFE_PORT_ID_TERTIARY_PCM_TX:
 	case AFE_PORT_ID_QUATERNARY_PCM_TX:
+	case AFE_PORT_ID_QUINARY_PCM_TX:
 	case AFE_PORT_ID_PRIMARY_TDM_TX:
 	case AFE_PORT_ID_PRIMARY_TDM_TX_1:
 	case AFE_PORT_ID_PRIMARY_TDM_TX_2:
@@ -598,6 +608,14 @@ int afe_get_port_type(u16 port_id)
 	case AFE_PORT_ID_QUATERNARY_TDM_TX_5:
 	case AFE_PORT_ID_QUATERNARY_TDM_TX_6:
 	case AFE_PORT_ID_QUATERNARY_TDM_TX_7:
+	case AFE_PORT_ID_QUINARY_TDM_TX:
+	case AFE_PORT_ID_QUINARY_TDM_TX_1:
+	case AFE_PORT_ID_QUINARY_TDM_TX_2:
+	case AFE_PORT_ID_QUINARY_TDM_TX_3:
+	case AFE_PORT_ID_QUINARY_TDM_TX_4:
+	case AFE_PORT_ID_QUINARY_TDM_TX_5:
+	case AFE_PORT_ID_QUINARY_TDM_TX_6:
+	case AFE_PORT_ID_QUINARY_TDM_TX_7:
 	case AFE_PORT_ID_USB_TX:
 	case AFE_PORT_ID_INT0_MI2S_TX:
 	case AFE_PORT_ID_INT1_MI2S_TX:
@@ -685,6 +703,8 @@ int afe_sizeof_cfg_cmd(u16 port_id)
 	case AFE_PORT_ID_TERTIARY_PCM_TX:
 	case AFE_PORT_ID_QUATERNARY_PCM_RX:
 	case AFE_PORT_ID_QUATERNARY_PCM_TX:
+	case AFE_PORT_ID_QUINARY_PCM_RX:
+	case AFE_PORT_ID_QUINARY_PCM_TX:
 	default:
 		pr_debug("%s: default case 0x%x\n", __func__, port_id);
 		ret_size = SIZEOF_CFG_CMD(afe_param_id_pcm_cfg);
@@ -2644,10 +2664,9 @@ int afe_tdm_port_start(u16 port_id, struct afe_tdm_port_config *tdm_port,
 			this_afe.dev_acdb_id[index] = this_afe.rt_cb(port_id);
 	}
 
-	/* Also send the topology id here if multiple ports: */
+	/* Also send the topology id here: */
 	port_index = afe_get_port_index(port_id);
-	if (!(this_afe.afe_cal_mode[port_index] == AFE_CAL_MODE_NONE) &&
-	    num_groups > 1) {
+	if (!(this_afe.afe_cal_mode[port_index] == AFE_CAL_MODE_NONE)) {
 		/* One time call: only for first time */
 		afe_send_custom_topology();
 		afe_send_port_topology_id(port_id);
@@ -2709,14 +2728,12 @@ int afe_tdm_port_start(u16 port_id, struct afe_tdm_port_config *tdm_port,
 		ret = -EINVAL;
 		goto fail_cmd;
 	}
-	/* slot mapping is not need if there is only one group */
-	if (num_groups > 1) {
-		ret = afe_send_slot_mapping_cfg(&tdm_port->slot_mapping,
-						port_id);
-		if (ret < 0) {
-			pr_err("%s: afe send failed %d\n", __func__, ret);
-			goto fail_cmd;
-		}
+
+	ret = afe_send_slot_mapping_cfg(&tdm_port->slot_mapping,
+					port_id);
+	if (ret < 0) {
+		pr_err("%s: afe send failed %d\n", __func__, ret);
+		goto fail_cmd;
 	}
 
 	if (tdm_port->custom_tdm_header.header_type) {
@@ -3074,6 +3091,8 @@ static int __afe_port_start(u16 port_id, union afe_port_config *afe_config,
 	case AFE_PORT_ID_TERTIARY_PCM_TX:
 	case AFE_PORT_ID_QUATERNARY_PCM_RX:
 	case AFE_PORT_ID_QUATERNARY_PCM_TX:
+	case AFE_PORT_ID_QUINARY_PCM_RX:
+	case AFE_PORT_ID_QUINARY_PCM_TX:
 		cfg_type = AFE_PARAM_ID_PCM_CONFIG;
 		break;
 	case PRIMARY_I2S_RX:
@@ -3291,6 +3310,10 @@ int afe_get_port_index(u16 port_id)
 		return IDX_AFE_PORT_ID_QUATERNARY_PCM_RX;
 	case AFE_PORT_ID_QUATERNARY_PCM_TX:
 		return IDX_AFE_PORT_ID_QUATERNARY_PCM_TX;
+	case AFE_PORT_ID_QUINARY_PCM_RX:
+		return IDX_AFE_PORT_ID_QUINARY_PCM_RX;
+	case AFE_PORT_ID_QUINARY_PCM_TX:
+		return IDX_AFE_PORT_ID_QUINARY_PCM_TX;
 	case SECONDARY_I2S_RX: return IDX_SECONDARY_I2S_RX;
 	case SECONDARY_I2S_TX: return IDX_SECONDARY_I2S_TX;
 	case MI2S_RX: return IDX_MI2S_RX;
@@ -3484,6 +3507,38 @@ int afe_get_port_index(u16 port_id)
 		return IDX_AFE_PORT_ID_QUATERNARY_TDM_RX_7;
 	case AFE_PORT_ID_QUATERNARY_TDM_TX_7:
 		return IDX_AFE_PORT_ID_QUATERNARY_TDM_TX_7;
+	case AFE_PORT_ID_QUINARY_TDM_RX:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_RX_0;
+	case AFE_PORT_ID_QUINARY_TDM_TX:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_TX_0;
+	case AFE_PORT_ID_QUINARY_TDM_RX_1:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_RX_1;
+	case AFE_PORT_ID_QUINARY_TDM_TX_1:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_TX_1;
+	case AFE_PORT_ID_QUINARY_TDM_RX_2:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_RX_2;
+	case AFE_PORT_ID_QUINARY_TDM_TX_2:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_TX_2;
+	case AFE_PORT_ID_QUINARY_TDM_RX_3:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_RX_3;
+	case AFE_PORT_ID_QUINARY_TDM_TX_3:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_TX_3;
+	case AFE_PORT_ID_QUINARY_TDM_RX_4:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_RX_4;
+	case AFE_PORT_ID_QUINARY_TDM_TX_4:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_TX_4;
+	case AFE_PORT_ID_QUINARY_TDM_RX_5:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_RX_5;
+	case AFE_PORT_ID_QUINARY_TDM_TX_5:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_TX_5;
+	case AFE_PORT_ID_QUINARY_TDM_RX_6:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_RX_6;
+	case AFE_PORT_ID_QUINARY_TDM_TX_6:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_TX_6;
+	case AFE_PORT_ID_QUINARY_TDM_RX_7:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_RX_7;
+	case AFE_PORT_ID_QUINARY_TDM_TX_7:
+		return IDX_AFE_PORT_ID_QUINARY_TDM_TX_7;
 	case AFE_PORT_ID_INT0_MI2S_RX:
 		return IDX_AFE_PORT_ID_INT0_MI2S_RX;
 	case AFE_PORT_ID_INT0_MI2S_TX:
@@ -3600,6 +3655,8 @@ int afe_open(u16 port_id,
 	case AFE_PORT_ID_TERTIARY_PCM_TX:
 	case AFE_PORT_ID_QUATERNARY_PCM_RX:
 	case AFE_PORT_ID_QUATERNARY_PCM_TX:
+	case AFE_PORT_ID_QUINARY_PCM_RX:
+	case AFE_PORT_ID_QUINARY_PCM_TX:
 		cfg_type = AFE_PARAM_ID_PCM_CONFIG;
 		break;
 	case SECONDARY_I2S_RX:
@@ -3983,6 +4040,8 @@ int afe_port_group_set_param(u16 group_id,
 	case AFE_GROUP_DEVICE_ID_TERTIARY_TDM_TX:
 	case AFE_GROUP_DEVICE_ID_QUATERNARY_TDM_RX:
 	case AFE_GROUP_DEVICE_ID_QUATERNARY_TDM_TX:
+	case AFE_GROUP_DEVICE_ID_QUINARY_TDM_RX:
+	case AFE_GROUP_DEVICE_ID_QUINARY_TDM_TX:
 		cfg_type = AFE_PARAM_ID_GROUP_DEVICE_TDM_CONFIG;
 		break;
 	default:
@@ -5265,6 +5324,8 @@ int afe_validate_port(u16 port_id)
 	case AFE_PORT_ID_TERTIARY_PCM_TX:
 	case AFE_PORT_ID_QUATERNARY_PCM_RX:
 	case AFE_PORT_ID_QUATERNARY_PCM_TX:
+	case AFE_PORT_ID_QUINARY_PCM_RX:
+	case AFE_PORT_ID_QUINARY_PCM_TX:
 	case SECONDARY_I2S_RX:
 	case SECONDARY_I2S_TX:
 	case MI2S_RX:
@@ -5379,6 +5440,22 @@ int afe_validate_port(u16 port_id)
 	case AFE_PORT_ID_QUATERNARY_TDM_TX_6:
 	case AFE_PORT_ID_QUATERNARY_TDM_RX_7:
 	case AFE_PORT_ID_QUATERNARY_TDM_TX_7:
+	case AFE_PORT_ID_QUINARY_TDM_RX:
+	case AFE_PORT_ID_QUINARY_TDM_TX:
+	case AFE_PORT_ID_QUINARY_TDM_RX_1:
+	case AFE_PORT_ID_QUINARY_TDM_TX_1:
+	case AFE_PORT_ID_QUINARY_TDM_RX_2:
+	case AFE_PORT_ID_QUINARY_TDM_TX_2:
+	case AFE_PORT_ID_QUINARY_TDM_RX_3:
+	case AFE_PORT_ID_QUINARY_TDM_TX_3:
+	case AFE_PORT_ID_QUINARY_TDM_RX_4:
+	case AFE_PORT_ID_QUINARY_TDM_TX_4:
+	case AFE_PORT_ID_QUINARY_TDM_RX_5:
+	case AFE_PORT_ID_QUINARY_TDM_TX_5:
+	case AFE_PORT_ID_QUINARY_TDM_RX_6:
+	case AFE_PORT_ID_QUINARY_TDM_TX_6:
+	case AFE_PORT_ID_QUINARY_TDM_RX_7:
+	case AFE_PORT_ID_QUINARY_TDM_TX_7:
 	case AFE_PORT_ID_INT0_MI2S_RX:
 	case AFE_PORT_ID_INT1_MI2S_RX:
 	case AFE_PORT_ID_INT2_MI2S_RX:
