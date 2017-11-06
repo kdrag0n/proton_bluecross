@@ -2249,6 +2249,10 @@ static int msm_dai_q6_afe_enc_cfg_get(struct snd_kcontrol *kcontrol,
 				sizeof(struct asm_aac_enc_cfg_v2_t));
 			break;
 		case ENC_FMT_APTX:
+			memcpy(ucontrol->value.bytes.data + format_size,
+				&dai_data->enc_config.data,
+				sizeof(struct asm_aptx_enc_cfg_t));
+			break;
 		case ENC_FMT_APTX_HD:
 			memcpy(ucontrol->value.bytes.data + format_size,
 				&dai_data->enc_config.data,
@@ -2298,6 +2302,10 @@ static int msm_dai_q6_afe_enc_cfg_put(struct snd_kcontrol *kcontrol,
 				sizeof(struct asm_aac_enc_cfg_v2_t));
 			break;
 		case ENC_FMT_APTX:
+			memcpy(&dai_data->enc_config.data,
+				ucontrol->value.bytes.data + format_size,
+				sizeof(struct asm_aptx_enc_cfg_t));
+			break;
 		case ENC_FMT_APTX_HD:
 			memcpy(&dai_data->enc_config.data,
 				ucontrol->value.bytes.data + format_size,
@@ -6535,26 +6543,12 @@ static int msm_dai_q6_tdm_set_sysclk(struct snd_soc_dai *dai,
 	struct msm_dai_q6_tdm_dai_data *dai_data =
 		dev_get_drvdata(dai->dev);
 
-	switch (dai->id) {
-	case AFE_PORT_ID_QUATERNARY_TDM_RX:
-	case AFE_PORT_ID_QUATERNARY_TDM_RX_1:
-	case AFE_PORT_ID_QUATERNARY_TDM_RX_2:
-	case AFE_PORT_ID_QUATERNARY_TDM_RX_3:
-	case AFE_PORT_ID_QUATERNARY_TDM_RX_4:
-	case AFE_PORT_ID_QUATERNARY_TDM_RX_5:
-	case AFE_PORT_ID_QUATERNARY_TDM_RX_6:
-	case AFE_PORT_ID_QUATERNARY_TDM_RX_7:
-	case AFE_PORT_ID_QUATERNARY_TDM_TX:
-	case AFE_PORT_ID_QUATERNARY_TDM_TX_1:
-	case AFE_PORT_ID_QUATERNARY_TDM_TX_2:
-	case AFE_PORT_ID_QUATERNARY_TDM_TX_3:
-	case AFE_PORT_ID_QUATERNARY_TDM_TX_4:
-	case AFE_PORT_ID_QUATERNARY_TDM_TX_5:
-	case AFE_PORT_ID_QUATERNARY_TDM_TX_6:
-	case AFE_PORT_ID_QUATERNARY_TDM_TX_7:
+	if ((dai->id >= AFE_PORT_ID_PRIMARY_TDM_RX) &&
+		(dai->id <= AFE_PORT_ID_QUINARY_TDM_TX_7)) {
 		dai_data->clk_set.clk_freq_in_hz = freq;
-		break;
-	default:
+	} else {
+		dev_err(dai->dev, "%s: invalid dai id 0x%x\n",
+			__func__, dai->id);
 		return -EINVAL;
 	}
 
