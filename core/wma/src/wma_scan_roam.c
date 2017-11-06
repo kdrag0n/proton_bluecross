@@ -2657,10 +2657,10 @@ static void wma_roam_update_vdev(tp_wma_handle wma,
 	wma_add_bss(wma, (tpAddBssParams)roam_synch_ind_ptr->add_bss_params);
 	wma_add_sta(wma, add_sta_params);
 	wma->interfaces[vdev_id].vdev_up = true;
+	WMA_LOGD(FL("Setting vdev_up flag to true"));
 	qdf_mem_copy(wma->interfaces[vdev_id].bssid,
 			roam_synch_ind_ptr->bssid.bytes, IEEE80211_ADDR_LEN);
 	qdf_mem_free(del_bss_params);
-	qdf_mem_free(del_sta_params);
 	qdf_mem_free(set_link_params);
 	qdf_mem_free(add_sta_params);
 }
@@ -6106,6 +6106,11 @@ QDF_STATUS  wma_ipa_offload_enable_disable(tp_wma_handle wma,
 	params.vdev_id = ipa_offload->vdev_id;
 	params.enable = ipa_offload->enable;
 
+	WMA_LOGI("%s: offload_type=%d, vdev_id=%d, enable=%d",
+		__func__,
+		ipa_offload->offload_type, ipa_offload->vdev_id,
+		ipa_offload->enable);
+
 	status = wmi_unified_ipa_offload_control_cmd(wma->wmi_handle,
 						&params);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -6122,7 +6127,7 @@ QDF_STATUS  wma_ipa_offload_enable_disable(tp_wma_handle wma,
 	/* Disable Intra-BSS FWD offload when gDisableIntraBssFwd=1 in INI */
 	rx_fwd_disabled = ol_txrx_is_rx_fwd_disabled(vdev);
 	if (!ipa_offload->enable || rx_fwd_disabled) {
-		WMA_LOGE("%s: ipa_offload->enable=%d, rx_fwd_disabled=%d",
+		WMA_LOGI("%s: ipa_offload->enable=%d, rx_fwd_disabled=%d",
 				__func__,
 				ipa_offload->enable, rx_fwd_disabled);
 		intra_bss_fwd = 1;

@@ -36,6 +36,7 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/cfg80211.h>
+#include <linux/ieee80211.h>
 #include <qdf_list.h>
 #include <qdf_types.h>
 #include "sir_mac_prot_def.h"
@@ -185,7 +186,10 @@
 #define MAX_GENIE_LEN (512)
 #define MIN_GENIE_LEN (2)
 
-#define HDD_MAX_STA_COUNT (WLAN_MAX_STA_COUNT + QDF_MAX_NO_OF_SAP_MODE + 2)
+/* One per STA: 1 for BCMC_STA_ID, 1 for each SAP_SELF_STA_ID,
+ * 1 for WDS_STAID
+ */
+#define HDD_MAX_ADAPTERS (WLAN_MAX_STA_COUNT + QDF_MAX_NO_OF_SAP_MODE + 2)
 
 #define WLAN_CHIP_VERSION   "WCNSS"
 
@@ -934,6 +938,13 @@ typedef struct {
 	uint8_t max_mcs_idx;
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
+	uint32_t freq;
+	bool ht_present;
+	bool vht_present;
+	struct ieee80211_ht_cap ht_caps;
+	struct ieee80211_vht_cap vht_caps;
+	uint32_t reason_code;
+	int8_t rssi;
 } hdd_station_info_t;
 
 /**
@@ -1270,6 +1281,8 @@ struct hdd_adapter_s {
 	/** Per-station structure */
 	spinlock_t staInfo_lock;        /* To protect access to station Info */
 	hdd_station_info_t aStaInfo[WLAN_MAX_STA_COUNT];
+	hdd_station_info_t cache_sta_info[WLAN_MAX_STA_COUNT];
+
 	/* uint8_t uNumActiveStation; */
 
 /*************************************************************
@@ -1722,10 +1735,7 @@ struct hdd_context_s {
 	hdd_adapter_list_node_t adapter_nodes[CSR_ROAM_SESSION_MAX];
 	qdf_list_t hddAdapters; /* List of adapters */
 
-	/* One per STA: 1 for BCMC_STA_ID, 1 for each SAP_SELF_STA_ID,
-	 * 1 for WDS_STAID
-	 */
-	hdd_adapter_t *sta_to_adapter[HDD_MAX_STA_COUNT];
+	hdd_adapter_t *sta_to_adapter[HDD_MAX_ADAPTERS];
 
 	/** Pointer for firmware image data */
 	const struct firmware *fw;
@@ -2019,6 +2029,7 @@ struct hdd_context_s {
 	hdd_adapter_t *cap_tsf_context;
 #endif
 	struct sta_ap_intf_check_work_ctx *sta_ap_intf_check_work_info;
+	qdf_wake_lock_t monitor_mode_wakelock;
 };
 
 int hdd_validate_channel_and_bandwidth(hdd_adapter_t *adapter,
@@ -2709,9 +2720,25 @@ void hdd_chip_pwr_save_fail_detected_cb(void *hdd_ctx,
  * Return: None
  */
 void hdd_clear_fils_connection_info(hdd_adapter_t *adapter);
+
+/**
+ * hdd_update_hlp_info() - Update HLP packet received in FILS (re)assoc rsp
+ * @dev: net device
+ * @roam_fils_params: Fils join rsp params
+ *
+ * This API is used to send the received HLP packet in Assoc rsp(FILS AKM)
+ * to the network layer.
+ *
+ * Return: None
+ */
+void hdd_update_hlp_info(struct net_device *dev, tCsrRoamInfo *roam_info);
 #else
 static inline void hdd_clear_fils_connection_info(hdd_adapter_t *adapter)
 { }
+
+static inline void hdd_update_hlp_info(struct net_device *dev,
+					tCsrRoamInfo *roam_info)
+{}
 #endif
 
 /**
@@ -2754,24 +2781,6 @@ int hdd_set_limit_off_chan_for_tos(hdd_adapter_t *adapter, enum tos tos,
  * Return: 0 on success and non zero value on failure
  */
 int hdd_reset_limit_off_chan(hdd_adapter_t *adapter);
-
-#if defined(WLAN_FEATURE_FILS_SK)
-/**
- * hdd_update_hlp_info() - Update HLP packet received in FILS (re)assoc rsp
- * @dev: net device
- * @roam_fils_params: Fils join rsp params
- *
- * This API is used to send the received HLP packet in Assoc rsp(FILS AKM)
- * to the network layer.
- *
- * Return: None
- */
-void hdd_update_hlp_info(struct net_device *dev, tCsrRoamInfo *roam_info);
-#else
-static inline void hdd_update_hlp_info(struct net_device *dev,
-				       tCsrRoamInfo *roam_info)
-{}
-#endif
 
 #undef nla_parse
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
@@ -2844,5 +2853,17 @@ void hdd_start_driver_ops_timer(int drv_op);
  * Return: none
  */
 void hdd_stop_driver_ops_timer(void);
+
+/**
+ * hdd_get_stainfo() - get stainfo for the specified peer
+ * @adapter: hostapd interface
+ * @mac_addr: mac address of requested peer
+ *
+ * This function find the stainfo for the peer with mac_addr
+ *
+ * Return: stainfo if found, NULL if not found
+ */
+hdd_station_info_t *hdd_get_stainfo(hdd_station_info_t *aStaInfo,
+				    struct qdf_mac_addr mac_addr);
 
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */
