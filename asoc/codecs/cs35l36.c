@@ -162,6 +162,9 @@ static SOC_ENUM_SINGLE_DECL(boost_ctrl, CS35L36_PWR_CTRL2, 5,
 static const struct snd_kcontrol_new dre_ctrl =
 	SOC_DAPM_SINGLE("Switch", CS35L36_PWR_CTRL3, 20, 1, 0);
 
+static const struct snd_kcontrol_new amp_enable_ctrl =
+	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0);
+
 static const char * const cs35l36_pcm_sftramp_text[] =  {
 	"Off", ".5ms", "1ms", "2ms", "4ms", "8ms", "15ms", "30ms"};
 
@@ -208,8 +211,7 @@ static int cs35l36_main_amp_event(struct snd_soc_dapm_widget *w,
 {
 	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
 	struct cs35l36_private *cs35l36 = snd_soc_codec_get_drvdata(codec);
-	int ret = 0, i = 0;
-	unsigned int reg[4];
+	int ret = 0;
 
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
@@ -217,33 +219,8 @@ static int cs35l36_main_amp_event(struct snd_soc_dapm_widget *w,
 				   CS35L36_PWR_CTRL1,
 				   CS35L36_GLOBAL_EN_MASK,
 				   1 << CS35L36_GLOBAL_EN_SHIFT);
+		usleep_range(4000, 4100);
 
-		if (cs35l36->rev_id == CS35L36_REV_B0) {
-			regmap_write(cs35l36->regmap, CS35L36_INT4_MASK,
-			CS35L36_PUP_DONE_IRQ_UNMASK);
-			reinit_completion(&cs35l36->global_pup_done);
-
-			ret = wait_for_completion_timeout(&cs35l36->global_pup_done,
-			msecs_to_jiffies(500));
-			if (ret == 0) {
-				dev_dbg(cs35l36->dev, "TIMEOUT PUP_DONE\n");
-				regmap_write(cs35l36->regmap,
-					     CS35L36_INT4_MASK,
-					     CS35L36_PUP_DONE_IRQ_MASK);
-				ret = -ETIMEDOUT;
-			}
-
-			regmap_write(cs35l36->regmap, CS35L36_INT4_MASK,
-				     CS35L36_PUP_DONE_IRQ_MASK);
-			for (i = 0; i < 2; i++)
-				regmap_bulk_read(cs35l36->regmap,
-						 CS35L36_INT1_STATUS,
-						 &reg, ARRAY_SIZE(reg));
-		} else {
-			regmap_write(cs35l36->regmap, CS35L36_INT4_MASK,
-				     CS35L36_PUP_DONE_IRQ_MASK);
-			usleep_range(4000, 4100);
-		}
 		regmap_update_bits(cs35l36->regmap, CS35L36_ASP_RX1_SEL,
 				   CS35L36_PCM_RX_SEL_MASK,
 				   CS35L36_PCM_RX_SEL_PCM);
@@ -262,15 +239,7 @@ static int cs35l36_main_amp_event(struct snd_soc_dapm_widget *w,
 		regmap_update_bits(cs35l36->regmap, CS35L36_PWR_CTRL1,
 				   CS35L36_GLOBAL_EN_MASK,
 				   0 << CS35L36_GLOBAL_EN_SHIFT);
-		reinit_completion(&cs35l36->global_pdn_done);
-
-		ret = wait_for_completion_timeout(&cs35l36->global_pdn_done,
-						  msecs_to_jiffies(300));
-		if (ret == 0) {
-			dev_dbg(cs35l36->dev, "TIMEOUT PDN_DONE\n");
-			ret = -ETIMEDOUT;
-		}
-		regmap_write(cs35l36->regmap, CS35L36_INT4_MASK, 0xFF);
+		usleep_range(2000, 2100);
 		break;
 	default:
 		dev_dbg(cs35l36->dev, "Invalid event = 0x%x\n", event);
@@ -298,6 +267,7 @@ static const struct snd_soc_dapm_widget cs35l36_dapm_widgets[] = {
 	SND_SOC_DAPM_ADC("VPMON ADC", NULL, CS35L36_PWR_CTRL2, 8, 0),
 	SND_SOC_DAPM_ADC("VBSTMON ADC", NULL, CS35L36_PWR_CTRL2, 9, 0),
 	SND_SOC_DAPM_ADC("CLASS H", NULL, CS35L36_PWR_CTRL3, 4, 1),
+	SND_SOC_DAPM_SWITCH("AMP Enable", SND_SOC_NOPM, 0, 1, &amp_enable_ctrl),
 
 	SND_SOC_DAPM_INPUT("VP"),
 	SND_SOC_DAPM_INPUT("VBST"),
@@ -316,7 +286,8 @@ static const struct snd_soc_dapm_route cs35l36_audio_map[] = {
 	{"SDOUT", NULL, "VPMON ADC"},
 	{"AMP Capture", NULL, "SDOUT"},
 
-	{"SDIN", NULL, "AMP Playback"},
+	{"AMP Enable", "Switch", "AMP Playback"},
+	{"SDIN", NULL, "AMP Enable"},
 	{"CLASS H", NULL, "SDIN"},
 	{"DRE", "Switch", "CLASS H"},
 	{"Main AMP", NULL, "DRE"},
@@ -353,7 +324,7 @@ static int cs35l36_set_dai_fmt(struct snd_soc_dai *codec_dai, unsigned int fmt)
 
 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
 	case SND_SOC_DAIFMT_DSP_A:
-		asp_fmt = 0;
+		asp_fmt = 4;
 		cs35l36->i2s_mode = false;
 		cs35l36->tdm_mode = true;
 		cs35l36->pdm_mode = false;
@@ -475,25 +446,28 @@ static int cs35l36_pcm_hw_params(struct snd_pcm_substream *substream,
 		case 24:
 			asp_rx_width = CS35L36_ASP_WIDTH_24;
 			break;
+		case 32:
+			asp_rx_width = CS35L36_ASP_WIDTH_32;
+			break;
 		default:
 			return -EINVAL;
 		}
 		regmap_update_bits(cs35l36->regmap, CS35L36_ASP_FRAME_CTRL,
 				   CS35L36_ASP_RX_WIDTH_MASK,
 				   asp_rx_width << CS35L36_ASP_RX_WIDTH_SHIFT);
-	if (cs35l36->i2s_mode) {
-		if (cs35l36->pdata.right_channel)
-			regmap_update_bits(cs35l36->regmap,
-			CS35L36_ASP_RX1_SLOT,
-			CS35L36_ASP_RX1_SLOT_MASK, 1);
-		else
-			regmap_update_bits(cs35l36->regmap,
-			CS35L36_ASP_RX1_SLOT,
-			CS35L36_ASP_RX1_SLOT_MASK, 0);
-	}
-	regmap_update_bits(cs35l36->regmap, CS35L36_ASP_RX_TX_EN,
-			   CS35L36_ASP_RX1_EN_MASK,
-			   CS35L36_ASP_RX1_EN_MASK);
+		if (cs35l36->i2s_mode || cs35l36->tdm_mode) {
+			if (cs35l36->pdata.right_channel)
+				regmap_update_bits(cs35l36->regmap,
+				CS35L36_ASP_RX1_SLOT,
+				CS35L36_ASP_RX1_SLOT_MASK, 1);
+			else
+				regmap_update_bits(cs35l36->regmap,
+				CS35L36_ASP_RX1_SLOT,
+				CS35L36_ASP_RX1_SLOT_MASK, 0);
+		}
+		regmap_update_bits(cs35l36->regmap, CS35L36_ASP_RX_TX_EN,
+				   CS35L36_ASP_RX1_EN_MASK,
+				   CS35L36_ASP_RX1_EN_MASK);
 	} else {
 		switch (params_width(params)) {
 		case 16:
@@ -501,6 +475,9 @@ static int cs35l36_pcm_hw_params(struct snd_pcm_substream *substream,
 			break;
 		case 24:
 			asp_tx_width = CS35L36_ASP_WIDTH_24;
+			break;
+		case 32:
+			asp_tx_width = CS35L36_ASP_WIDTH_32;
 			break;
 		default:
 			return -EINVAL;
@@ -541,9 +518,9 @@ static int cs35l36_dai_set_sysclk(struct snd_soc_dai *dai,
 	}
 
 	regmap_write(cs35l36->regmap, CS35L36_TESTKEY_CTRL,
-		     CS35L36_TEST_UNLOCK1);
+			CS35L36_TEST_UNLOCK1);
 	regmap_write(cs35l36->regmap, CS35L36_TESTKEY_CTRL,
-		     CS35L36_TEST_UNLOCK2);
+			CS35L36_TEST_UNLOCK2);
 	regmap_update_bits(cs35l36->regmap, CS35L36_TST_FS_MON0,
 			   CS35L36_FS1_WINDOW_MASK, fs1_val);
 	regmap_update_bits(cs35l36->regmap, CS35L36_TST_FS_MON0,
@@ -585,6 +562,9 @@ static const struct snd_pcm_hw_constraint_list cs35l36_constraints = {
 static int cs35l36_pcm_startup(struct snd_pcm_substream *substream,
                               struct snd_soc_dai *dai)
 {
+	if (!substream->runtime)
+		return 0;
+
 	snd_pcm_hw_constraint_list(substream->runtime, 0,
 				   SNDRV_PCM_HW_PARAM_RATE,
 				   &cs35l36_constraints);
@@ -613,7 +593,7 @@ static struct snd_soc_dai_driver cs35l36_dai[] = {
 			.stream_name = "AMP Capture",
 			.channels_min = 1,
 			.channels_max = 8,
-			.rates = SNDRV_PCM_RATE_KNOT,
+			.rates = SNDRV_PCM_RATE_48000,
 			.formats = CS35L36_TX_FORMATS,
 		},
 		.ops = &cs35l36_ops,
@@ -692,30 +672,24 @@ static int cs35l36_codec_set_sysclk(struct snd_soc_codec *codec,
 			   CS35L36_PLL_REFCLK_EN_MASK,
 			   1 << CS35L36_PLL_REFCLK_EN_SHIFT);
 
-	/*
-	 * Rev A0 Errata for PLL config
-	 * Go into manual config mode
-	 * for better performance
-	 */
-	if (cs35l36->rev_id == CS35L36_REV_A0) {
-		regmap_write(cs35l36->regmap, CS35L36_TESTKEY_CTRL,
-			     CS35L36_TEST_UNLOCK1);
-		regmap_write(cs35l36->regmap, CS35L36_TESTKEY_CTRL,
-			     CS35L36_TEST_UNLOCK2);
-		regmap_write(cs35l36->regmap, CS35L36_DCO_CTRL, 0x00036DA8);
-		regmap_write(cs35l36->regmap, CS35L36_MISC_CTRL, 0x0100EE0E);
-		regmap_update_bits(cs35l36->regmap, CS35L36_PLL_LOOP_PARAMS,
+
+	regmap_write(cs35l36->regmap, CS35L36_TESTKEY_CTRL,
+			   CS35L36_TEST_UNLOCK1);
+	regmap_write(cs35l36->regmap, CS35L36_TESTKEY_CTRL,
+			   CS35L36_TEST_UNLOCK2);
+	regmap_write(cs35l36->regmap, CS35L36_DCO_CTRL, 0x00036DA8);
+	regmap_write(cs35l36->regmap, CS35L36_MISC_CTRL, 0x0100EE0E);
+	regmap_update_bits(cs35l36->regmap, CS35L36_PLL_LOOP_PARAMS,
 				   CS35L36_PLL_IGAIN_MASK,
 				   CS35L36_PLL_IGAIN <<
 				   CS35L36_PLL_IGAIN_SHIFT);
-		regmap_update_bits(cs35l36->regmap, CS35L36_PLL_LOOP_PARAMS,
+	regmap_update_bits(cs35l36->regmap, CS35L36_PLL_LOOP_PARAMS,
 				   CS35L36_PLL_FFL_IGAIN_MASK,
 				   cs35l36->fll_igain);
-		regmap_write(cs35l36->regmap, CS35L36_TESTKEY_CTRL,
+	regmap_write(cs35l36->regmap, CS35L36_TESTKEY_CTRL,
 			     CS35L36_TEST_LOCK1);
-		regmap_write(cs35l36->regmap, CS35L36_TESTKEY_CTRL,
+	regmap_write(cs35l36->regmap, CS35L36_TESTKEY_CTRL,
 			     CS35L36_TEST_LOCK2);
-	}
 
 	if (cs35l36->pdm_mode) {
 		if (cs35l36->pdata.ldm_mode_sel) {
@@ -880,8 +854,8 @@ static int cs35l36_codec_probe(struct snd_soc_codec *codec)
 
 	if (cs35l36->pdata.bst_vctl_sel)
 		regmap_update_bits(cs35l36->regmap, CS35L36_BSTCVRT_VCTRL2,
-				   CS35L35_BSTCVRT_CTL_SEL_MASK,
-				   cs35l36->pdata.bst_vctl_sel);
+				CS35L35_BSTCVRT_CTL_SEL_MASK,
+				cs35l36->pdata.bst_vctl_sel);
 
 	if (cs35l36->pdata.bst_ipk)
 		regmap_update_bits(cs35l36->regmap, CS35L36_BSTCVRT_PEAK_CUR,
@@ -895,6 +869,10 @@ static int cs35l36_codec_probe(struct snd_soc_codec *codec)
 		regmap_update_bits(cs35l36->regmap, CS35L36_DTEMP_WARN_THLD,
 				   CS35L36_TEMP_THLD_MASK,
 				   cs35l36->pdata.temp_warn_thld);
+
+	regmap_update_bits(cs35l36->regmap, CS35L36_ASP_TX_PIN_CTRL,
+			   CS35L36_TX_DAT_HIZ_MASK,
+			   1 << CS35L36_TX_DAT_HIZ_SHIFT);
 
 	if (asp_config->is_present) {
 		if (asp_config->tx1) {
@@ -1327,6 +1305,61 @@ static int cs35l36_handle_of_data(struct i2c_client *i2c_client,
 	return 0;
 }
 
+static int cs35l36_pac(struct cs35l36_private *cs35l36)
+{
+	u32 reg;
+
+	if (cs35l36->rev_id == CS35L36_REV_B0) {
+		/*
+		 * Magic code for internal PAC
+		 */
+		regmap_write(cs35l36->regmap, CS35L36_TESTKEY_CTRL,
+				CS35L36_TEST_UNLOCK1);
+		regmap_write(cs35l36->regmap, CS35L36_TESTKEY_CTRL,
+				CS35L36_TEST_UNLOCK2);
+		msleep(200);
+		regmap_write(cs35l36->regmap, CS35L36_INT4_MASK,
+				CS35L36_MCU_CONFIG_UNMASK);
+		regmap_write(cs35l36->regmap, CS35L36_PAD_INTERFACE,
+				CS35L36_GPIO_INT_SEL_MASK);
+
+		regmap_write(cs35l36->regmap, CS35L36_PAC_CTL1,
+				CS35L36_PAC_RESET);
+		regmap_write(cs35l36->regmap, CS35L36_PAC_CTL3,
+				CS35L36_PAC_MEM_ACCESS);
+		regmap_write(cs35l36->regmap, CS35L36_PAC_PMEM_WORD0,
+				CS35L36_B0_PAC_PATCH);
+
+		regmap_write(cs35l36->regmap, CS35L36_PAC_CTL3,
+				CS35L36_PAC_MEM_ACCESS_CLR);
+		regmap_write(cs35l36->regmap, CS35L36_PAC_CTL1,
+				CS35L36_PAC_ENABLE_MASK);
+		msleep(200);
+
+		regmap_write(cs35l36->regmap, CS35L36_INT4_MASK,
+				CS35L36_MCU_CONFIG_MASK);
+		msleep(200);
+
+		regmap_write(cs35l36->regmap, CS35L36_INT4_STATUS,
+				CS35L36_MUC_CONFIG_CLR);
+		regmap_write(cs35l36->regmap, CS35L36_PAD_INTERFACE,
+				CS35L36_GPIO_INT_SEL_UNMASK);
+		regmap_update_bits(cs35l36->regmap, CS35L36_PAC_CTL1,
+					CS35L36_PAC_ENABLE_MASK, 0);
+
+		regmap_read(cs35l36->regmap, SPARE_MCU_STS_REG0, &reg);
+
+		pr_err("%s: regs = %x\n", __func__, reg);
+
+		regmap_write(cs35l36->regmap, CS35L36_TESTKEY_CTRL,
+				CS35L36_TEST_LOCK1);
+		regmap_write(cs35l36->regmap, CS35L36_TESTKEY_CTRL,
+				CS35L36_TEST_LOCK2);
+	}
+
+	return 0;
+}
+
 static int cs35l36_irq_gpio_config(struct cs35l36_private *cs35l36)
 {
 	struct cs35l36_platform_data *pdata = &cs35l36->pdata;
@@ -1381,29 +1414,62 @@ static const struct reg_sequence cs35l36_pac_int_patch[] = {
 	{ CS35L36_TESTKEY_CTRL,		CS35L36_TEST_LOCK2 },
 };
 
-static const struct reg_sequence cs35l36_errata_patch[] = {
+static const struct reg_sequence cs35l36_reva0_errata_patch[] = {
 	{ CS35L36_TESTKEY_CTRL,	CS35L36_TEST_UNLOCK1 },
 	{ CS35L36_TESTKEY_CTRL,	CS35L36_TEST_UNLOCK2 },
-	{ CS35L36_OTP_CTRL1,	0x00002060 },
-	{ CS35L36_OTP_CTRL2,	0x00000001 },
-	{ CS35L36_OTP_CTRL1,	0x00002460 },
-	{ CS35L36_OTP_CTRL2,	0x00000001 },
-	{ 0x00002088,		0x012A1838 },
+	{ 0x00000500,		0x00002060 },
+	{ 0x00000000,		0x5A000000 },
+	{ CS35L36_TESTKEY_CTRL,	CS35L36_TEST_UNLOCK1 },
+	{ CS35L36_TESTKEY_CTRL,	CS35L36_TEST_UNLOCK2 },
+	{ 0x00000500,		0x00002060 },
+	{ 0x00000504,		0x00000001 },
 	{ 0x00003014,		0x0100EE0E },
-	{ 0x00003008,		0x0008184A },
+	{ 0x00003008,		0x000D184A },
 	{ 0x00007418,		0x509001C8 },
 	{ 0x00007064,		0x0929A800 },
-	{ 0x00002D10,		0x0002C01C },
-	{ 0x0000410C,		0x00000A11 },
-	{ 0x00006E08,		0x8B19140C },
 	{ 0x00006454,		0x0300000A },
+	{ 0x00002088,		0x012A1838 },
+	{ 0x00003810,		0x009C2424 },
+	{ 0x00003814,		0x00007500 },
+	{ 0x00007410,		0x20514B00 },
+	{ 0x00003018,		0x04000000 },
+	{ 0x00004360,		0x0000AD31 },
+	{ 0x00007850,		0x00002FA9 },
+	{ 0x00007854,		0x0003F1D5 },
+	{ 0x00007858,		0x0003F5E3 },
+	{ 0x0000785C,		0x00001137 },
+	{ 0x00007860,		0x0001A7A5 },
+	{ 0x00007864,		0x0002F16A },
+	{ 0x00007868,		0x00003E21 },
+	{ 0x00007848,		0x00000001 },
+	{ 0x00003900,		0x00000240 },
+	{ 0x00002D10,		0x0002C01C },
+	{ 0x00006E08,		0x8B19140C },
 	{ CS35L36_AMP_NG_CTRL,	0x000020EF },
 	{ 0x00007E34,		0x0000000E },
 	{ 0x0000410C,		0x00000A11 },
-	{ 0x00007410,		0x20514B00 },
 	{ CS35L36_TESTKEY_CTRL,	CS35L36_TEST_LOCK1 },
 	{ CS35L36_TESTKEY_CTRL,	CS35L36_TEST_LOCK2 },
 
+};
+
+static const struct reg_sequence cs35l36_revb0_errata_patch[] = {
+	{ CS35L36_TESTKEY_CTRL,	CS35L36_TEST_UNLOCK1 },
+	{ CS35L36_TESTKEY_CTRL,	CS35L36_TEST_UNLOCK2 },
+	{ 0x00007064,		0x0929A800 },
+	{ 0x00007850,		0x00002FA9 },
+	{ 0x00007854,		0x0003F1D5 },
+	{ 0x00007858,		0x0003F5E3 },
+	{ 0x0000785C,		0x00001137 },
+	{ 0x00007860,		0x0001A7A5 },
+	{ 0x00007864,		0x0002F16A },
+	{ 0x00007868,		0x00003E21 },
+	{ 0x00007848,		0x00000001 },
+	{ 0x00003854,		0x05180240 },
+	{ 0x00007418,		0x509001C8 },
+	{ 0x0000394C,		0x028764BD },
+	{ CS35L36_TESTKEY_CTRL,	CS35L36_TEST_LOCK1 },
+	{ CS35L36_TESTKEY_CTRL,	CS35L36_TEST_LOCK2 },
 };
 
 static int cs35l36_i2c_probe(struct i2c_client *i2c_client,
@@ -1508,13 +1574,29 @@ static int cs35l36_i2c_probe(struct i2c_client *i2c_client,
 
 	cs35l36->rev_id = reg_revid >> 8;
 
+	if (cs35l36->rev_id == CS35L36_REV_B0) {
+		ret = cs35l36_pac(cs35l36);
+		if (ret < 0) {
+			dev_err(dev, "Failed to apply B0 PAC patch %d\n", ret);
+			goto err;
+		}
+		ret = regmap_register_patch(cs35l36->regmap,
+					cs35l36_revb0_errata_patch,
+					ARRAY_SIZE(cs35l36_revb0_errata_patch));
+		if (ret < 0) {
+			dev_err(dev,
+				"Failed to apply B0 errata patch %d\n", ret);
+			goto err;
+		}
+	}
+
 	if (pdata->irq_config.is_present)
 		irq_pol = cs35l36_irq_gpio_config(cs35l36);
 
 	if (cs35l36->rev_id == CS35L36_REV_A0) {
 		ret = regmap_register_patch(cs35l36->regmap,
-		cs35l36_errata_patch,
-		ARRAY_SIZE(cs35l36_errata_patch));
+		cs35l36_reva0_errata_patch,
+		ARRAY_SIZE(cs35l36_reva0_errata_patch));
 		if (ret < 0) {
 			dev_err(dev, "Failed to apply errata patch %d\n", ret);
 			goto err;
@@ -1527,10 +1609,6 @@ static int cs35l36_i2c_probe(struct i2c_client *i2c_client,
 			goto err;
 		}
 	}
-
-	init_completion(&cs35l36->global_pdn_done);
-	if (cs35l36->rev_id == CS35L36_REV_B0)
-	init_completion(&cs35l36->global_pup_done);
 
 	ret = devm_request_threaded_irq(dev, i2c_client->irq, NULL,
 					cs35l36_irq,

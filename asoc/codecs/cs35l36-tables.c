@@ -154,6 +154,7 @@ bool cs35l36_readable_reg(struct device *dev, unsigned int reg)
 	case CS35L36_DISCH_FILT:
 	case CS35L36_PROTECT_REL_ERR:
 	case CS35L36_PAD_INTERFACE:
+	case SPARE_MCU_STS_REG0:
 	case CS35L36_PLL_CLK_CTRL:
 	case CS35L36_GLOBAL_CLK_CTRL:
 	case CS35L36_ADC_CLK_CTRL:

@@ -364,7 +364,7 @@ static struct dev_config mi2s_rx_cfg[] = {
 	[PRIM_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
 	[SEC_MI2S]  = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
 	[TERT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
-	[QUAT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S24_LE, 2},
+	[QUAT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
 };
 
 static struct dev_config mi2s_tx_cfg[] = {
@@ -4528,7 +4528,6 @@ static int sdm845_tdm_snd_hw_params(struct snd_pcm_substream *substream,
 
 		pr_debug("%s: tdm rx slot_width %d slots %d\n",
 			__func__, slot_width, slots);
-
 		ret = snd_soc_dai_set_tdm_slot(cpu_dai, 0, slot_mask,
 			slots, slot_width);
 		if (ret < 0) {
@@ -4593,6 +4592,10 @@ static int sdm845_tdm_snd_startup(struct snd_pcm_substream *substream)
 	struct snd_soc_card *card = rtd->card;
 	struct msm_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
 	struct msm_pinctrl_info *pinctrl_info = &pdata->pinctrl_info;
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_codec *codec = codec_dai->codec;
+	struct snd_soc_dai **codec_dais = rtd->codec_dais;
+	int i;
 
 	/* currently only supporting TDM_RX_0 and TDM_TX_0 */
 	if ((cpu_dai->id == AFE_PORT_ID_QUATERNARY_TDM_RX) ||
@@ -4600,6 +4603,31 @@ static int sdm845_tdm_snd_startup(struct snd_pcm_substream *substream)
 		ret = msm_set_pinctrl(pinctrl_info, STATE_TDM_ACTIVE);
 		if (ret)
 			pr_err("%s: TDM TLMM pinctrl set failed with %d\n",
+				__func__, ret);
+	}
+
+	for (i = 0; i < rtd->num_codecs; i++) {
+		codec = codec_dais[i]->codec;
+		ret = snd_soc_dai_set_fmt(codec_dais[i],
+					SND_SOC_DAIFMT_DSP_A |
+					SND_SOC_DAIFMT_CBS_CFS |
+					SND_SOC_DAIFMT_IB_NF);
+		ret = snd_soc_dai_set_sysclk(codec_dais[i], 0,
+				     Q6AFE_LPASS_IBIT_CLK_12_P288_MHZ,
+				     SND_SOC_CLOCK_IN);
+
+		if (ret != 0) {
+			dev_err(codec_dai->dev,
+				"Failed to set %s's clock: ret = %d\n",
+				codec_dai->name, ret);
+			return ret;
+		}
+
+		ret = snd_soc_codec_set_sysclk(codec, 0, 0,
+				Q6AFE_LPASS_IBIT_CLK_12_P288_MHZ,
+				SND_SOC_CLOCK_IN);
+		if (ret < 0)
+			pr_err("%s: set sysclk failed, err:%d\n",
 				__func__, ret);
 	}
 
@@ -4635,7 +4663,7 @@ static int msm_mi2s_snd_init(struct snd_soc_pcm_runtime *rtd)
 {
 	int ret = 0;
 
-#if defined (CONFIG_SND_SOC_CS35L36)
+#if IS_ENABLED(CONFIG_SND_SOC_CS35L36_I2S)
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	struct snd_soc_codec *codec = codec_dai->codec;
 	struct snd_soc_dai **codec_dais = rtd->codec_dais;
@@ -4667,7 +4695,7 @@ static int msm_mi2s_snd_startup(struct snd_pcm_substream *substream)
 	struct msm_pinctrl_info *pinctrl_info = &pdata->pinctrl_info;
 	int ret_pinctrl = 0;
 
-#if IS_ENABLED(CONFIG_SND_SOC_CS35L36)
+#if IS_ENABLED(CONFIG_SND_SOC_CS35L36_I2S)
 	int i;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	struct snd_soc_codec *codec = codec_dai->codec;
@@ -4686,7 +4714,7 @@ static int msm_mi2s_snd_startup(struct snd_pcm_substream *substream)
 			__func__, cpu_dai->id);
 		goto err;
 	}
-	if ((index == QUAT_MI2S) && pinctrl_info->mi2s_active) {
+	if ((index == QUAT_MI2S) && (pinctrl_info) && (pinctrl_info->pinctrl)) {
 		ret_pinctrl = msm_set_pinctrl(pinctrl_info, STATE_MI2S_ACTIVE);
 		if (ret_pinctrl)
 			pr_err("%s: MI2S TLMM pinctrl set failed with %d\n",
@@ -4730,7 +4758,7 @@ static int msm_mi2s_snd_startup(struct snd_pcm_substream *substream)
 			goto clk_off;
 		}
 
-#if IS_ENABLED(CONFIG_SND_SOC_CS35L36)
+#if IS_ENABLED(CONFIG_SND_SOC_CS35L36_I2S)
 		for (i = 0; i < rtd->num_codecs; i++) {
 			codec = codec_dais[i]->codec;
 			ret = snd_soc_dai_set_fmt(codec_dais[i], SND_SOC_DAIFMT_CBS_CFS |
@@ -4788,7 +4816,7 @@ static void msm_mi2s_snd_shutdown(struct snd_pcm_substream *substream)
 	}
 	mutex_unlock(&mi2s_intf_conf[index].lock);
 
-	if ((index == QUAT_MI2S) && pinctrl_info->mi2s_disable) {
+	if ((index == QUAT_MI2S) && (pinctrl_info) && (pinctrl_info->pinctrl)) {
 		ret_pinctrl = msm_set_pinctrl(pinctrl_info, STATE_DISABLE);
 		if (ret_pinctrl)
 			pr_err("%s: MI2S TLMM pinctrl set failed with %d\n",
@@ -5436,6 +5464,19 @@ static struct snd_soc_dai_link msm_tavil_fe_dai_links[] = {
 	},
 };
 
+#if defined(CONFIG_SND_SOC_CS35L36)
+static struct snd_soc_dai_link_component spk_codec[] = {
+	{
+		.name = "cs35l36.4-0041",
+		.dai_name = "cs35l36-pcm",
+	},
+	{
+		.name = "cs35l36.4-0040",
+		.dai_name = "cs35l36-pcm",
+	},
+};
+#endif
+
 static struct snd_soc_dai_link msm_common_misc_fe_dai_links[] = {
 	{
 		.name = MSM_DAILINK_NAME(ASM Loopback),
@@ -5469,6 +5510,42 @@ static struct snd_soc_dai_link msm_common_misc_fe_dai_links[] = {
 		.ignore_pmdown_time = 1,
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.codec_name = "snd-soc-dummy",
+	},
+	/* Quaternary MI2S RX DAI Link */
+	{
+		.name = "QUAT_MI2S_RX Hostless",
+		.stream_name = "QUAT_MI2S_RX Hostless",
+		.cpu_dai_name = "QUAT_MI2S_RX_HOSTLESS",
+		.platform_name = "msm-pcm-hostless",
+		.dynamic = 1,
+		.dpcm_playback = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			    SND_SOC_DPCM_TRIGGER_POST},
+		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
+		.ignore_suspend = 1,
+		/* this dainlink has playback support */
+		.ignore_pmdown_time = 1,
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+
+	},
+	{
+		.name = LPASS_BE_QUAT_TDM_TX_0,
+		.stream_name = "Quaternary TDM0 Capture",
+		.cpu_dai_name = "msm-dai-q6-tdm.36913",
+		.platform_name = "msm-pcm-hostless",
+#if defined(CONFIG_SND_SOC_CS35L36_TDM)
+		.codecs = spk_codec,
+		.num_codecs = ARRAY_SIZE(spk_codec),
+#else
+		.codec_name = "msm-stub-codec.1",
+		.codec_dai_name = "msm-stub-tx",
+#endif
+		.id = MSM_BACKEND_DAI_QUAT_TDM_TX_0,
+		.be_hw_params_fixup = msm_be_hw_params_fixup,
+		.ops = &sdm845_tdm_be_ops,
+		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
+		.ignore_suspend = 1,
 	},
 };
 
@@ -5665,34 +5742,6 @@ static struct snd_soc_dai_link msm_common_be_dai_links[] = {
 		.no_pcm = 1,
 		.dpcm_capture = 1,
 		.id = MSM_BACKEND_DAI_TERT_TDM_TX_0,
-		.be_hw_params_fixup = msm_be_hw_params_fixup,
-		.ops = &sdm845_tdm_be_ops,
-		.ignore_suspend = 1,
-	},
-	{
-		.name = LPASS_BE_QUAT_TDM_RX_0,
-		.stream_name = "Quaternary TDM0 Playback",
-		.cpu_dai_name = "msm-dai-q6-tdm.36912",
-		.platform_name = "msm-pcm-routing",
-		.codec_name = "msm-stub-codec.1",
-		.codec_dai_name = "msm-stub-rx",
-		.no_pcm = 1,
-		.dpcm_playback = 1,
-		.id = MSM_BACKEND_DAI_QUAT_TDM_RX_0,
-		.be_hw_params_fixup = msm_tdm_be_hw_params_fixup,
-		.ops = &sdm845_tdm_be_ops,
-		.ignore_suspend = 1,
-	},
-	{
-		.name = LPASS_BE_QUAT_TDM_TX_0,
-		.stream_name = "Quaternary TDM0 Capture",
-		.cpu_dai_name = "msm-dai-q6-tdm.36913",
-		.platform_name = "msm-pcm-routing",
-		.codec_name = "msm-stub-codec.1",
-		.codec_dai_name = "msm-stub-tx",
-		.no_pcm = 1,
-		.dpcm_capture = 1,
-		.id = MSM_BACKEND_DAI_QUAT_TDM_TX_0,
 		.be_hw_params_fixup = msm_be_hw_params_fixup,
 		.ops = &sdm845_tdm_be_ops,
 		.ignore_suspend = 1,
@@ -5957,19 +6006,6 @@ static struct snd_soc_dai_link ext_disp_be_dai_link[] = {
 	},
 };
 
-#if IS_ENABLED(CONFIG_SND_SOC_CS35L36)
-static struct snd_soc_dai_link_component spk_codec[] = {
-	{
-		.name = "cs35l36.4-0041",
-		.dai_name = "cs35l36-pcm",
-	},
-	{
-		.name = "cs35l36.4-0040",
-		.dai_name = "cs35l36-pcm",
-	},
-};
-#endif
-
 static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 	{
 		.name = LPASS_BE_PRI_MI2S_RX,
@@ -6063,7 +6099,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.stream_name = "Quaternary MI2S Playback",
 		.cpu_dai_name = "msm-dai-q6-mi2s.3",
 		.platform_name = "msm-pcm-routing",
-#if IS_ENABLED(CONFIG_SND_SOC_CS35L36)
+#if IS_ENABLED(CONFIG_SND_SOC_CS35L36_I2S)
 		.codecs = spk_codec,
 		.num_codecs = ARRAY_SIZE(spk_codec),
 #else
@@ -6083,17 +6119,9 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.name = LPASS_BE_QUAT_MI2S_TX,
 		.stream_name = "Quaternary MI2S Capture",
 		.cpu_dai_name = "msm-dai-q6-mi2s.3",
-#if IS_ENABLED(CONFIG_SND_SOC_CS35L36)
-		.platform_name = "msm-pcm-dsp.0",
-		.codecs = spk_codec,
-		.num_codecs = ARRAY_SIZE(spk_codec),
-		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
-#else
 		.platform_name = "msm-pcm-routing",
 		.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-tx",
-#endif
-		.init = msm_mi2s_snd_init,
 		.no_pcm = 1,
 		.dpcm_capture = 1,
 		.id = MSM_BACKEND_DAI_QUATERNARY_MI2S_TX,
@@ -6101,6 +6129,46 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.ops = &msm_mi2s_be_ops,
 		.ignore_suspend = 1,
 	},
+	{
+		.name = LPASS_BE_QUAT_TDM_RX_0,
+		.stream_name = "Quaternary TDM0 Playback",
+		.cpu_dai_name = "msm-dai-q6-tdm.36912",
+		.platform_name = "msm-pcm-routing",
+#if defined(CONFIG_SND_SOC_CS35L36_TDM)
+		.codecs = spk_codec,
+		.num_codecs = ARRAY_SIZE(spk_codec),
+#else
+		.codec_name = "msm-stub-codec.1",
+		.codec_dai_name = "msm-stub-rx",
+#endif
+		.no_pcm = 1,
+		.dpcm_playback = 1,
+		.id = MSM_BACKEND_DAI_QUAT_TDM_RX_0,
+		.be_hw_params_fixup = msm_tdm_be_hw_params_fixup,
+		.ops = &sdm845_tdm_be_ops,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+	},
+	{
+		.name = "Quaternary TDM0 Capture",
+		.stream_name = "Quaternary TDM0 Capture",
+		.cpu_dai_name = "msm-dai-q6-tdm.36913",
+		.platform_name = "msm-pcm-routing",
+#if defined(CONFIG_SND_SOC_CS35L36_TDM)
+		.codecs = spk_codec,
+		.num_codecs = ARRAY_SIZE(spk_codec),
+#else
+		.codec_name = "msm-stub-codec.1",
+		.codec_dai_name = "msm-stub-tx",
+#endif
+		.no_pcm = 1,
+		.dpcm_capture = 1,
+		.id = MSM_BACKEND_DAI_QUAT_TDM_TX_0,
+		.be_hw_params_fixup = msm_be_hw_params_fixup,
+		.ops = &sdm845_tdm_be_ops,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+	}
 };
 
 static struct snd_soc_dai_link msm_auxpcm_be_dai_links[] = {

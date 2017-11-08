@@ -26,6 +26,10 @@
 #include <ipc/apr_tal.h>
 #include "adsp_err.h"
 
+#if defined(CONFIG_CIRRUS_SPKR_PROTECTION)
+#include <asoc/msm-cirrus-playback.h>
+#endif
+
 #define WAKELOCK_TIMEOUT	5000
 enum {
 	AFE_COMMON_RX_CAL = 0,
@@ -354,6 +358,11 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 			av_dev_drift_afe_cb_handler(data->payload,
 						    data->payload_size);
 		} else {
+#if defined(CONFIG_CIRRUS_SPKR_PROTECTION)
+			if (!crus_afe_callback(data->payload,
+					       data->payload_size))
+				return 0;
+#endif
 			if (rtac_make_afe_callback(data->payload,
 						   data->payload_size))
 				return 0;
@@ -769,6 +778,16 @@ static int afe_apr_send_pkt(void *data, wait_queue_head_t *wait)
 	pr_debug("%s: leave %d\n", __func__, ret);
 	return ret;
 }
+
+#if defined(CONFIG_CIRRUS_SPKR_PROTECTION)
+extern int afe_apr_send_pkt_crus(void *data, int index, int set)
+{
+	if (set)
+		return afe_apr_send_pkt(data, &this_afe.wait[index]);
+	else /* get */
+		return afe_apr_send_pkt(data, 0);
+}
+#endif
 
 static int afe_send_cal_block(u16 port_id, struct cal_block_data *cal_block)
 {

@@ -43,3 +43,4 @@ obj-y += codecs/
 # for SDM845 board with MAX98927 codec
 snd-soc-sdm845-max98927-objs := sdm845_max98927.o
 obj-$(CONFIG_SND_SOC_MACHINE_SDM845_MAX98927) += snd-soc-sdm845-max98927.o
+obj-$(CONFIG_CIRRUS_SPKR_PROTECTION) += msm-cirrus-playback.o
