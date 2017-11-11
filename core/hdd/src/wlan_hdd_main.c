@@ -2373,7 +2373,10 @@ static int __hdd_stop(struct net_device *dev)
 	 * Disable TX on the interface, after this hard_start_xmit() will not
 	 * be called on that interface
 	 */
-	hdd_info("Disabling queues");
+	hdd_info("Disabling queues, adapter device mode: %s(%d)",
+		 hdd_device_mode_to_string(adapter->device_mode),
+		 adapter->device_mode);
+
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
@@ -4441,8 +4444,10 @@ QDF_STATUS hdd_reset_all_adapters(hdd_context_t *hdd_ctx)
 				     &adapter->event_flags)) {
 				hdd_sap_indicate_disconnect_for_sta(adapter);
 				hdd_cleanup_actionframe(hdd_ctx, adapter);
-				hdd_sap_destroy_events(adapter);
 			}
+			if (test_bit(DEVICE_IFACE_OPENED,
+				     &adapter->event_flags))
+				hdd_sap_destroy_events(adapter);
 			clear_bit(SOFTAP_BSS_STARTED, &adapter->event_flags);
 		} else {
 			wlan_hdd_netif_queue_control(adapter,
@@ -5946,6 +5951,7 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 		hdd_abort_mac_scan_all_adapters(hdd_ctx);
 		hdd_abort_sched_scan_all_adapters(hdd_ctx);
 		hdd_stop_all_adapters(hdd_ctx, true);
+		hdd_deinit_all_adapters(hdd_ctx, false);
 	}
 
 	unregister_netdevice_notifier(&hdd_netdev_notifier);
@@ -11265,6 +11271,9 @@ void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter, bool reinit)
 		cds_incr_active_session(ap_adapter->device_mode,
 					ap_adapter->sessionId);
 	hostapd_state->bCommit = true;
+	mutex_unlock(&hdd_ctx->sap_lock);
+
+	return;
 
 end:
 	mutex_unlock(&hdd_ctx->sap_lock);
@@ -11364,18 +11373,17 @@ int hdd_init(void)
 	int ret = 0;
 
 	p_cds_context = cds_init();
+	if (p_cds_context == NULL) {
+		hdd_err("Failed to allocate CDS context");
+		ret = -ENOMEM;
+		goto err_out;
+	}
 
 	wlan_init_bug_report_lock();
 
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
 	wlan_logging_sock_init_svc();
 #endif
-
-	if (p_cds_context == NULL) {
-		hdd_err("Failed to allocate CDS context");
-		ret = -ENOMEM;
-		goto err_out;
-	}
 
 	qdf_timer_init(NULL, &hdd_drv_ops_inactivity_timer,
 		(void *)hdd_drv_ops_inactivity_handler, NULL,

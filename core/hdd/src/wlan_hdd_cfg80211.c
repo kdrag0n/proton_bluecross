@@ -4379,11 +4379,11 @@ static int hdd_get_cached_station_remote(hdd_context_t *hdd_ctx,
 
 	nl_buf_len += hdd_add_link_standard_info_sap_get_len() +
 			hdd_add_ap_standard_info_sap_get_len(stainfo) +
-			(sizeof(stainfo->mode) + NLA_HDRLEN) +
+			(sizeof(stainfo->dot11_mode) + NLA_HDRLEN) +
 			(sizeof(stainfo->ch_width) + NLA_HDRLEN) +
-			(sizeof(adapter->peer_sta_info.info[0].tx_rate) +
+			(sizeof(stainfo->tx_rate) +
 			 NLA_HDRLEN) +
-			(sizeof(adapter->peer_sta_info.info[0].rx_rate) +
+			(sizeof(stainfo->rx_rate) +
 			 NLA_HDRLEN);
 
 	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, nl_buf_len);
@@ -4408,9 +4408,7 @@ static int hdd_get_cached_station_remote(hdd_context_t *hdd_ctx,
 	stainfo->ch_width = hdd_decode_ch_width((tSirMacHTChannelWidth)
 						stainfo->ch_width);
 
-	if (nla_put_u32(skb, REMOTE_SUPPORTED_MODE,
-			hdd_convert_dot11mode(
-			stainfo->mode)) ||
+	if (nla_put_u32(skb, REMOTE_SUPPORTED_MODE, stainfo->dot11_mode) ||
 	    nla_put_u8(skb, REMOTE_CH_WIDTH, stainfo->ch_width)) {
 		hdd_err("remote ch put fail");
 		goto fail;
@@ -9484,6 +9482,7 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 		ap_ctx->sapConfig.channel = config_channel;
 		ap_ctx->sapConfig.ch_params.ch_width =
 					ap_ctx->sapConfig.ch_width_orig;
+		ap_ctx->bss_stop_reason = BSS_STOP_DUE_TO_VENDOR_CONFIG_CHAN;
 
 		cds_set_channel_params(ap_ctx->sapConfig.channel,
 				ap_ctx->sapConfig.sec_ch,

@@ -867,10 +867,13 @@ typedef struct hdd_hostapd_state_s {
  *  to maintain SCC mode with the STA role on the same card.
  *  this usually happens when STA is connected to an external
  *  AP that runs on a different channel
+ * @BSS_STOP_DUE_TO_VENDOR_CONFIG_CHAN: BSS stopped due to
+ *  vendor subcmd set sap config channel
  */
 enum bss_stop_reason {
 	BSS_STOP_REASON_INVALID = 0,
 	BSS_STOP_DUE_TO_MCC_SCC_SWITCH = 1,
+	BSS_STOP_DUE_TO_VENDOR_CONFIG_CHAN = 2,
 };
 
 /**
@@ -907,6 +910,14 @@ enum bss_stop_reason {
  * @max_mcs_idx: Max supported mcs index of the station
  * @rx_mcs_map: VHT Rx mcs map
  * @tx_mcs_map: VHT Tx mcs map
+ * @freq : Frequency of the current station
+ * @dot11_mode: 802.11 Mode of the connection
+ * @ht_present: HT caps present or not in the current station
+ * @vht_present: VHT caps present or not in the current station
+ * @ht_caps: HT capabilities of current station
+ * @vht_caps: VHT capabilities of current station
+ * @reason_code: Disconnection reason code for current station
+ * @rssi: RSSI of the current station reported from F/W
  */
 typedef struct {
 	bool isUsed;
@@ -939,6 +950,7 @@ typedef struct {
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
 	uint32_t freq;
+	uint8_t dot11_mode;
 	bool ht_present;
 	bool vht_present;
 	struct ieee80211_ht_cap ht_caps;
@@ -1198,7 +1210,7 @@ struct hdd_adapter_s {
 	/* TODO Move this to sta Ctx */
 	struct wireless_dev wdev;
 	struct cfg80211_scan_request *request;
-	uint8_t scan_source;
+	struct cfg80211_scan_request *vendor_request;
 
 	/** ops checks if Opportunistic Power Save is Enable or Not
 	 * ctw stores ctWindow value once we receive Opps command from

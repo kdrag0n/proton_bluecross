@@ -668,7 +668,6 @@ QDF_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
 	if (iface->type == WMI_VDEV_TYPE_STA)
 		wma_pno_stop(wma_handle, vdev_id);
 
-	iface->vdev_active = false;
 	/* P2P Device */
 	if ((iface->type == WMI_VDEV_TYPE_AP) &&
 	    (iface->sub_type == WMI_UNIFIED_VDEV_SUBTYPE_P2P_DEVICE)) {
@@ -682,6 +681,9 @@ QDF_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
 		status = wma_handle_vdev_detach(wma_handle,
 				pdel_sta_self_req_param, generateRsp);
 	}
+
+	if (QDF_IS_STATUS_SUCCESS(status))
+		iface->vdev_active = false;
 
 	return status;
 
@@ -770,9 +772,10 @@ send_fail_resp:
 		WMA_LOGE("%s: ADD BSS failure %d", __func__, add_bss->status);
 
 		/* Send vdev stop if vdev start was success*/
-		if (!resp_event->status)
+		if (!resp_event->status) {
 			if (wma_send_vdev_stop_to_fw(wma, resp_event->vdev_id))
 				WMA_LOGE("%s: %d Failed to send vdev stop", __func__, __LINE__);
+		}
 
 		pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 		if (NULL == pdev)
@@ -1046,6 +1049,15 @@ int wma_vdev_start_resp_handler(void *handle, uint8_t *cmd_param_info,
 
 		WMA_LOGD("%s: Send channel switch resp vdev %d status %d",
 			 __func__, resp_event->vdev_id, resp_event->status);
+
+		if (QDF_IS_STATUS_ERROR(resp_event->status)) {
+			wma_cli_set_command(resp_event->vdev_id,
+				(int)WMI_VDEV_PARAM_ABG_MODE_TX_CHAIN_NUM, 0,
+				VDEV_CMD);
+			WMA_LOGD("vdev: %d WMI_VDEV_PARAM_ABG_MODE_TX_CHAIN_NUM 0",
+				resp_event->vdev_id);
+		}
+
 		params->chainMask = resp_event->chain_mask;
 		if ((2 != resp_event->cfgd_rx_streams) ||
 			(2 != resp_event->cfgd_tx_streams)) {
@@ -1134,14 +1146,24 @@ bool wma_is_vdev_valid(uint32_t vdev_id)
 {
 	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 
-	if (NULL == wma_handle)
+	if (!wma_handle) {
+		WMA_LOGD("%s: vdev_id: %d, null wma_handle", __func__, vdev_id);
 		return false;
+	}
 
 	/* No of interface are allocated based on max_bssid value */
-	if (vdev_id >= wma_handle->max_bssid)
+	if (vdev_id >= wma_handle->max_bssid) {
+		WMA_LOGD("%s: vdev_id: %d is invalid, max_bssid: %d",
+				__func__, vdev_id, wma_handle->max_bssid);
 		return false;
+	}
 
-	return wma_handle->interfaces[vdev_id].vdev_active;
+	WMA_LOGD("%s: vdev_id: %d, vdev_active: %d, is_vdev_valid %d",
+		 __func__, vdev_id, wma_handle->interfaces[vdev_id].vdev_active,
+		 wma_handle->interfaces[vdev_id].is_vdev_valid);
+
+	return wma_handle->interfaces[vdev_id].vdev_active ||
+		wma_handle->interfaces[vdev_id].is_vdev_valid;
 }
 
 /**
@@ -1976,9 +1998,10 @@ ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 		WMA_LOGE("%s: Failed to get mac", __func__);
 		goto end;
 	}
-	if (wma_handle->interfaces[self_sta_req->session_id].vdev_active) {
-		WMA_LOGE("%s: vdev %d already active",
-				__func__, self_sta_req->session_id);
+
+	vdev_id = self_sta_req->session_id;
+	if (wma_is_vdev_valid(vdev_id)) {
+		WMA_LOGE("%s: vdev %d already active", __func__, vdev_id);
 		goto end;
 	}
 
@@ -1997,8 +2020,6 @@ ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 			 __func__);
 		goto end;
 	}
-
-	vdev_id = self_sta_req->session_id;
 
 	txrx_vdev_type = wma_get_txrx_vdev_type(self_sta_req->type);
 
@@ -3089,7 +3110,13 @@ void wma_vdev_resp_timer(void *data)
 		tpSwitchChannelParams params =
 			(tpSwitchChannelParams) tgt_req->user_data;
 		params->status = QDF_STATUS_E_TIMEOUT;
+
 		WMA_LOGA("%s: WMA_SWITCH_CHANNEL_REQ timedout", __func__);
+
+		wma_cli_set_command(tgt_req->vdev_id,
+			(int)WMI_VDEV_PARAM_ABG_MODE_TX_CHAIN_NUM, 0, VDEV_CMD);
+		WMA_LOGD("vdev: %d WMI_VDEV_PARAM_ABG_MODE_TX_CHAIN_NUM 0",
+			tgt_req->vdev_id);
 
 		/*
 		 * Trigger host crash if the flag is set or if the timeout
@@ -5258,13 +5285,17 @@ void wma_delete_bss(tp_wma_handle wma, tpDeleteBssParams params)
 			   OL_TXQ_PAUSE_REASON_VDEV_STOP);
 	iface->pause_bitmap |= (1 << PAUSE_TYPE_HOST);
 
-	if (wma_send_vdev_stop_to_fw(wma, params->smesessionId)) {
+	status = wma_send_vdev_stop_to_fw(wma, params->smesessionId);
+	wma_cli_set_command(params->smesessionId,
+			(int)WMI_VDEV_PARAM_ABG_MODE_TX_CHAIN_NUM, 0, VDEV_CMD);
+	WMA_LOGD("vdev: %d WMI_VDEV_PARAM_ABG_MODE_TX_CHAIN_NUM 0",
+		 params->smesessionId);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		WMA_LOGE("%s: %d Failed to send vdev stop", __func__, __LINE__);
 		wma_remove_vdev_req(wma, params->smesessionId,
 				WMA_TARGET_REQ_TYPE_VDEV_STOP);
-		status = QDF_STATUS_E_FAILURE;
 		goto detach_peer;
-		}
+	}
 	WMA_LOGD("%s: bssid %pM vdev_id %d",
 		 __func__, params->bssid, params->smesessionId);
 	return;
