@@ -555,6 +555,7 @@ static struct snd_soc_dapm_route wcd_audio_paths[] = {
 	{"MIC BIAS2", NULL, "MCLK TX"},
 	{"MIC BIAS3", NULL, "MCLK TX"},
 	{"MIC BIAS4", NULL, "MCLK TX"},
+	{"AMIC1", NULL, "MCLK TX"},
 };
 
 static struct afe_clk_set mi2s_clk[MI2S_MAX] = {
@@ -3063,6 +3064,7 @@ static const struct snd_soc_dapm_widget msm_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Digital Mic3", NULL),
 	SND_SOC_DAPM_MIC("Digital Mic4", NULL),
 	SND_SOC_DAPM_MIC("Digital Mic5", NULL),
+	SND_SOC_DAPM_MIC("Flicker Mic", NULL),
 };
 
 static inline int param_is_mask(int p)
@@ -3833,6 +3835,7 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_ignore_suspend(dapm, "VIINPUT");
 	snd_soc_dapm_ignore_suspend(dapm, "ANC HPHL");
 	snd_soc_dapm_ignore_suspend(dapm, "ANC HPHR");
+	snd_soc_dapm_ignore_suspend(dapm, "Flicker Mic");
 
 	snd_soc_dapm_sync(dapm);
 
