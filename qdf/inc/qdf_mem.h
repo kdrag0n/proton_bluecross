@@ -126,9 +126,33 @@ void qdf_mem_set_domain(enum qdf_mem_domain domain);
 const uint8_t *qdf_mem_domain_name(enum qdf_mem_domain domain);
 
 #ifdef MEMORY_DEBUG
+/**
+ * qdf_mem_malloc_debug() - debug version of QDF memory allocation API
+ * @size: Number of bytes of memory to allocate.
+ * @file: File name of the call site
+ * @line: Line number of the call site
+ *
+ * This function will dynamicallly allocate the specified number of bytes of
+ * memory and add it to the qdf tracking list to check for memory leaks and
+ * corruptions
+ *
+ * Return: A valid memory location on success, or NULL on failure
+ */
+void *qdf_mem_malloc_debug(size_t size, const char *file, uint32_t line);
+
 #define qdf_mem_malloc(size) \
 	qdf_mem_malloc_debug(size, __FILE__, __LINE__)
-void *qdf_mem_malloc_debug(size_t size, char *file_name, uint32_t line_num);
+
+/**
+ * qdf_mem_free_debug() - debug version of qdf_mem_free
+ * @ptr: Pointer to the starting address of the memory to be freed.
+ *
+ * Return: None
+ */
+void qdf_mem_free_debug(void *ptr, const char *file, uint32_t line);
+
+#define qdf_mem_free(ptr) \
+	qdf_mem_free_debug(ptr, __FILE__, __LINE__)
 
 /**
  * qdf_mem_check_for_leaks() - Assert that the current memory domain is empty
@@ -164,19 +188,18 @@ void qdf_mem_check_for_leaks(void);
 #else
 void *qdf_mem_malloc(qdf_size_t size);
 
+/**
+ * qdf_mem_free() - free QDF memory
+ * @ptr: Pointer to the starting address of the memory to be free'd.
+ *
+ * Return: None
+ */
+void qdf_mem_free(void *ptr);
+
 static inline void qdf_mem_check_for_leaks(void) { }
 #endif /* MEMORY_DEBUG */
 
 void *qdf_mem_alloc_outline(qdf_device_t osdev, qdf_size_t size);
-
-/**
- * qdf_mem_free() - free QDF memory
- * @ptr: Pointer to the starting address of the memory to be free'd.
- * This function will free the memory pointed to by 'ptr'.
- * Return:
- * None
- */
-void qdf_mem_free(void *ptr);
 
 void qdf_mem_set(void *ptr, uint32_t num_bytes, uint32_t value);
 
@@ -469,6 +492,18 @@ qdf_mem_dma_get_sgtable(struct device *dev, void *sgt, void *cpu_addr,
 }
 
 /**
+ * qdf_mem_free_sgtable() - Free a previously allocated sg table
+ * @sgt: the mapped sg table header
+ *
+ * @Return: None
+ */
+static inline void
+qdf_mem_free_sgtable(struct sg_table *sgt)
+{
+	__qdf_os_mem_free_sgtable(sgt);
+}
+
+/**
  * qdf_dma_get_sgtable_dma_addr() - Assigns DMA address to scatterlist elements
  * @sgt: scatter gather table pointer
  *
@@ -528,6 +563,7 @@ static inline qdf_shared_mem_t *qdf_mem_shared_mem_alloc(qdf_device_t osdev,
 							 uint32_t size)
 {
 	qdf_shared_mem_t *shared_mem;
+	int ret;
 
 	shared_mem = qdf_mem_malloc(sizeof(qdf_shared_mem_t));
 	if (!shared_mem) {
@@ -549,12 +585,24 @@ static inline qdf_shared_mem_t *qdf_mem_shared_mem_alloc(qdf_device_t osdev,
 	qdf_mem_zero(shared_mem->vaddr, shared_mem->mem_info.size);
 	shared_mem->mem_info.pa = __qdf_mem_paddr_from_dmaaddr(osdev,
 				    (qdf_dma_addr_t)shared_mem->mem_info.iova);
-	qdf_mem_dma_get_sgtable(osdev->dev,
+	ret = qdf_mem_dma_get_sgtable(osdev->dev,
 				(void *)&shared_mem->sgtable,
 				shared_mem->vaddr,
 				qdf_mem_get_dma_addr(osdev,
 						     &shared_mem->mem_info),
 				shared_mem->mem_info.size);
+	if (ret) {
+		__qdf_print("%s; Unable to get DMA sgtable\n", __func__);
+		qdf_mem_free_consistent(osdev, osdev->dev,
+					shared_mem->mem_info.size,
+					shared_mem->vaddr,
+					qdf_mem_get_dma_addr(osdev,
+						&shared_mem->mem_info),
+					qdf_get_dma_mem_context(shared_mem,
+								memctx));
+		qdf_mem_free(shared_mem);
+		return NULL;
+	}
 
 	qdf_dma_get_sgtable_dma_addr(&shared_mem->sgtable);
 
@@ -588,6 +636,7 @@ static inline void qdf_mem_shared_mem_free(qdf_device_t osdev,
 					qdf_get_dma_mem_context(shared_mem,
 								memctx));
 	}
+	qdf_mem_free_sgtable(&(shared_mem->sgtable));
 	qdf_mem_free(shared_mem);
 }
 
