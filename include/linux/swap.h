@@ -440,11 +440,22 @@ extern sector_t swapdev_block(int, pgoff_t);
 extern int page_swapcount(struct page *);
 extern int swp_swapcount(swp_entry_t entry);
 extern struct swap_info_struct *page_swap_info(struct page *);
+extern struct swap_info_struct *swp_swap_info(swp_entry_t entry);
 extern bool reuse_swap_page(struct page *, int *);
 extern int try_to_free_swap(struct page *);
 struct backing_dev_info;
 
 #else /* CONFIG_SWAP */
+
+static inline int swap_readpage(struct page *page, bool do_poll)
+{
+	return 0;
+}
+
+static inline struct swap_info_struct *swp_swap_info(swp_entry_t entry)
+{
+	return NULL;
+}
 
 #define swap_address_space(entry)		(NULL)
 #define get_nr_swap_pages()			0L
