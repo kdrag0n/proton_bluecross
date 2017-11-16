@@ -1597,7 +1597,8 @@ static QDF_STATUS wma_setup_install_key_cmd(tp_wma_handle wma_handle,
 #endif
 	params.key_txmic_len = 0;
 	params.key_rxmic_len = 0;
-
+	qdf_mem_copy(&params.key_rsc_counter,
+		     &key_params->key_rsc[0], sizeof(uint64_t));
 	params.key_flags = 0;
 	if (key_params->unicast)
 		params.key_flags |= PAIRWISE_USAGE;
@@ -1732,6 +1733,9 @@ static QDF_STATUS wma_setup_install_key_cmd(tp_wma_handle wma_handle,
 	WMA_LOGD("unicast %d peer_mac %pM def_key_idx %d",
 		 key_params->unicast, key_params->peer_mac,
 		 key_params->def_key_idx);
+	WMA_LOGD("keyrsc param key_seq_counter_h:0x%x key_seq_counter_l: 0x%x",
+		params.key_rsc_counter.key_seq_counter_h,
+		params.key_rsc_counter.key_seq_counter_l);
 
 	status = wmi_unified_setup_install_key_cmd(wma_handle->wmi_handle,
 								&params);
@@ -1832,6 +1836,9 @@ void wma_set_bsskey(tp_wma_handle wma_handle, tpSetBssKeyParams key_info)
 			key_params.key_idx = key_info->key[i].keyId;
 
 		key_params.key_len = key_info->key[i].keyLength;
+		qdf_mem_copy(key_params.key_rsc,
+				key_info->key[i].keyRsc,
+				SIR_MAC_MAX_KEY_RSC_LEN);
 		if (key_info->encType == eSIR_ED_TKIP) {
 			qdf_mem_copy(key_params.key_data,
 				     key_info->key[i].key, 16);
@@ -2652,6 +2659,7 @@ void wma_send_beacon(tp_wma_handle wma, tpSendbeaconParams bcn_info)
 				return;
 			}
 			wma->interfaces[vdev_id].vdev_up = true;
+			WMA_LOGD(FL("Setting vdev_up flag to true"));
 			wma_set_sap_keepalive(wma, vdev_id);
 			wma_set_vdev_mgmt_rate(wma, vdev_id);
 		}
@@ -2834,7 +2842,8 @@ int wma_mgmt_tx_bundle_completion_handler(void *handle, uint8_t *buf,
 	uint32_t num_reports;
 	uint32_t *desc_ids;
 	uint32_t *status;
-	int i;
+	uint32_t i, buf_len;
+	bool excess_data = false;
 
 	param_buf = (WMI_MGMT_TX_BUNDLE_COMPLETION_EVENTID_param_tlvs *)buf;
 	if (!param_buf || !wma_handle) {
@@ -2845,6 +2854,31 @@ int wma_mgmt_tx_bundle_completion_handler(void *handle, uint8_t *buf,
 	num_reports = cmpl_params->num_reports;
 	desc_ids = (uint32_t *)(param_buf->desc_ids);
 	status = (uint32_t *)(param_buf->status);
+
+	/* buf contains num_reports * sizeof(uint32) len of desc_ids and
+	 * num_reports * sizeof(uint32) status,
+	 * so (2 x (num_reports * sizeof(uint32)) should not exceed MAX
+	 */
+	if (cmpl_params->num_reports > (WMI_SVC_MSG_MAX_SIZE /
+	    (2 * sizeof(uint32_t))))
+		excess_data = true;
+	else
+		buf_len = cmpl_params->num_reports * (2 * sizeof(uint32_t));
+
+	if (excess_data || (sizeof(*cmpl_params) > (WMI_SVC_MSG_MAX_SIZE -
+	    buf_len))) {
+		WMA_LOGE("excess wmi buffer: num_reports %d",
+			  cmpl_params->num_reports);
+		return -EINVAL;
+	}
+
+	if ((cmpl_params->num_reports > param_buf->num_desc_ids) ||
+	    (cmpl_params->num_reports > param_buf->num_status)) {
+		WMA_LOGE("Invalid num_reports %d, num_desc_ids %d, num_status %d",
+			 cmpl_params->num_reports, param_buf->num_desc_ids,
+			 param_buf->num_status);
+		return -EINVAL;
+	}
 
 	for (i = 0; i < num_reports; i++)
 		wma_process_mgmt_tx_completion(wma_handle,
@@ -3081,7 +3115,6 @@ void wma_hidden_ssid_vdev_restart(tp_wma_handle wma_handle,
 			       hidden_ssid_restart_in_progress, 0);
 		wma_remove_vdev_req(wma_handle, pReq->sessionId,
 					WMA_TARGET_REQ_TYPE_VDEV_STOP);
-		return;
 	}
 }
 

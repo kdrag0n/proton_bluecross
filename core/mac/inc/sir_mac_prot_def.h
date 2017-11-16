@@ -566,6 +566,7 @@
 
 /* / MAX key length when ULA is used */
 #define SIR_MAC_MAX_KEY_LENGTH               32
+#define SIR_MAC_MAX_KEY_RSC_LEN              16
 
 /* / Macro definitions for get/set on FC fields */
 #define SIR_MAC_GET_PROT_VERSION(x)      ((((uint16_t) x) & 0x0300) >> 8)
@@ -619,19 +620,11 @@
 #define SIR_MAC_VENDOR_AP_1_OUI             "\x00\x0C\x43"
 #define SIR_MAC_VENDOR_AP_1_OUI_LEN         3
 
-#define SIR_MAC_VENDOR_AP_2_OUI             "\x00\x10\x18"
-#define SIR_MAC_VENDOR_AP_2_OUI_LEN         3
-
-#define SIR_MAC_VENDOR_AP_2_DATA            "\x02\xFF\xF0\x2C\x00\x00"
-#define SIR_MAC_VENDOR_AP_2_DATA_2          "\x02\xFF\x04\x0C\x00\x00"
-#define SIR_MAC_VENDOR_AP_2_DATA_LEN        6
-
 #define SIR_MAC_VENDOR_AP_3_OUI             "\x00\x03\x7F"
 #define SIR_MAC_VENDOR_AP_3_OUI_LEN         3
 
 #define SIR_MAC_VENDOR_AP_4_OUI             "\x8C\xFD\xF0"
 #define SIR_MAC_VENDOR_AP_4_OUI_LEN         3
-
 /* / Status Code (present in Management response frames) enum */
 
 typedef enum eSirMacStatusCodes {

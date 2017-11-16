@@ -3488,6 +3488,7 @@ QDF_STATUS wma_wni_cfg_dnld(tp_wma_handle wma_handle)
 	return qdf_status;
 }
 
+#define BIG_ENDIAN_MAX_DEBUG_BUF   500
 /**
  * wma_unified_debug_print_event_handler() - debug print event handler
  * @handle: wma handle
@@ -3513,7 +3514,12 @@ int wma_unified_debug_print_event_handler(void *handle, uint8_t *datap,
 
 #ifdef BIG_ENDIAN_HOST
 	{
-		char dbgbuf[500] = { 0 };
+		if (datalen > BIG_ENDIAN_MAX_DEBUG_BUF) {
+			WMA_LOGE("%s Invalid data len %d, limiting to max",
+				 __func__, datalen);
+			datalen = BIG_ENDIAN_MAX_DEBUG_BUF;
+		}
+		char dbgbuf[BIG_ENDIAN_MAX_DEBUG_BUF] = { 0 };
 
 		memcpy(dbgbuf, data, datalen);
 		SWAPME(dbgbuf, datalen);
@@ -5887,6 +5893,11 @@ QDF_STATUS wma_send_vdev_up_to_fw(t_wma_handle *wma,
 	QDF_STATUS status;
 	struct wma_txrx_node *vdev = &wma->interfaces[params->vdev_id];
 
+	if (vdev->vdev_up == true) {
+		WMA_LOGD("vdev %d is already up for bssid %pM. Do not send",
+			 params->vdev_id, bssid);
+		return QDF_STATUS_SUCCESS;
+	}
 	status = wmi_unified_vdev_up_send(wma->wmi_handle, bssid, params);
 	wma_release_wakelock(&vdev->vdev_start_wakelock);
 

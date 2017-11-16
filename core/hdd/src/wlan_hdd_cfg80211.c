@@ -4038,24 +4038,26 @@ static int wlan_hdd_get_txrx_rate(hdd_adapter_t *adapter,
 
 /**
  * hdd_get_stainfo() - get stainfo for the specified peer
- * @adapter: hostapd interface
+ * @astainfo: array of station info
  * @mac_addr: mac address of requested peer
  *
  * This function find the stainfo for the peer with mac_addr
  *
  * Return: stainfo if found, NULL if not found
  */
-static hdd_station_info_t *hdd_get_stainfo(hdd_adapter_t *adapter,
-		struct qdf_mac_addr mac_addr)
+hdd_station_info_t *hdd_get_stainfo(hdd_station_info_t *astainfo,
+				    struct qdf_mac_addr mac_addr)
 {
 	hdd_station_info_t *stainfo = NULL;
 	int i;
 
 	for (i = 0; i < WLAN_MAX_STA_COUNT; i++) {
-		if (!qdf_mem_cmp(&adapter->aStaInfo[i].macAddrSTA,
-					&mac_addr,
-					QDF_MAC_ADDR_SIZE))
-			stainfo = &adapter->aStaInfo[i];
+		if (!qdf_mem_cmp(&astainfo[i].macAddrSTA,
+				 &mac_addr,
+				 QDF_MAC_ADDR_SIZE)) {
+			stainfo = &astainfo[i];
+			break;
+		}
 	}
 
 	return stainfo;
@@ -4076,29 +4078,378 @@ static inline int32_t remote_station_put_u64(struct sk_buff *skb,
 #endif
 
 /**
- * hdd_get_station_remote() - get remote peer's info
+ * hdd_add_survey_info_sap_get_len - get data length used in
+ * hdd_add_survey_info_sap()
+ *
+ * This function calculates the data length used in hdd_add_survey_info_sap()
+ *
+ * Return: total data length used in hdd_add_survey_info_sap()
+ */
+static uint32_t hdd_add_survey_info_sap_get_len(void)
+{
+	return ((NLA_HDRLEN) + (sizeof(uint32_t) + NLA_HDRLEN));
+}
+
+/**
+ * hdd_add_survey_info - add survey info attribute
+ * @skb: pointer to response skb buffer
+ * @stainfo: station information
+ * @idx: attribute type index for nla_next_start()
+ *
+ * This function adds survey info attribute to response skb buffer
+ *
+ * Return : 0 on success and errno on failure
+ */
+static int32_t hdd_add_survey_info_sap(struct sk_buff *skb,
+				       hdd_station_info_t *stainfo,
+				       int idx)
+{
+	struct nlattr *nla_attr;
+
+	nla_attr = nla_nest_start(skb, idx);
+	if (!nla_attr)
+		goto fail;
+	if (nla_put_u32(skb, NL80211_SURVEY_INFO_FREQUENCY,
+			stainfo->freq)) {
+		hdd_err("put fail");
+		goto fail;
+	}
+	nla_nest_end(skb, nla_attr);
+	return 0;
+fail:
+	return -EINVAL;
+}
+
+/**
+ * hdd_add_tx_bitrate_sap_get_len - get data length used in
+ * hdd_add_tx_bitrate_sap()
+ *
+ * This function calculates the data length used in hdd_add_tx_bitrate_sap()
+ *
+ * Return: total data length used in hdd_add_tx_bitrate_sap()
+ */
+static uint32_t hdd_add_tx_bitrate_sap_get_len(void)
+{
+	return ((NLA_HDRLEN) + (sizeof(uint8_t) + NLA_HDRLEN));
+}
+
+/**
+ * hdd_add_tx_bitrate_sap - add vhs nss info attribute
+ * @skb: pointer to response skb buffer
+ * @stainfo: station information
+ * @idx: attribute type index for nla_next_start()
+ *
+ * This function adds vht nss attribute to response skb buffer
+ *
+ * Return : 0 on success and errno on failure
+ */
+static int hdd_add_tx_bitrate_sap(struct sk_buff *skb,
+				  hdd_station_info_t *stainfo,
+				  int idx)
+{
+	struct nlattr *nla_attr;
+
+	nla_attr = nla_nest_start(skb, idx);
+	if (!nla_attr)
+		goto fail;
+
+	if (nla_put_u8(skb, NL80211_RATE_INFO_VHT_NSS,
+		       stainfo->nss)) {
+		hdd_err("put fail");
+		goto fail;
+	}
+	nla_nest_end(skb, nla_attr);
+	return 0;
+fail:
+	return -EINVAL;
+}
+
+/**
+ * hdd_add_sta_info_sap_get_len - get data length used in
+ * hdd_add_sta_info_sap()
+ *
+ * This function calculates the data length used in hdd_add_sta_info_sap()
+ *
+ * Return: total data length used in hdd_add_sta_info_sap()
+ */
+static uint32_t hdd_add_sta_info_sap_get_len(void)
+{
+	return ((NLA_HDRLEN) + (sizeof(uint8_t) + NLA_HDRLEN) +
+		hdd_add_tx_bitrate_sap_get_len());
+}
+
+/**
+ * hdd_add_sta_info_sap - add sta signal info attribute
+ * @skb: pointer to response skb buffer
+ * @stainfo: station information
+ * @idx: attribute type index for nla_next_start()
+ *
+ * This function adds sta signal attribute to response skb buffer
+ *
+ * Return : 0 on success and errno on failure
+ */
+static int32_t hdd_add_sta_info_sap(struct sk_buff *skb, int8_t rssi,
+				    hdd_station_info_t *stainfo, int idx)
+{
+	struct nlattr *nla_attr;
+
+	nla_attr = nla_nest_start(skb, idx);
+	if (!nla_attr)
+		goto fail;
+
+	if (nla_put_u8(skb, NL80211_STA_INFO_SIGNAL, rssi)) {
+		hdd_err("put fail");
+		goto fail;
+	}
+	if (hdd_add_tx_bitrate_sap(skb, stainfo, NL80211_STA_INFO_TX_BITRATE))
+		goto fail;
+
+	nla_nest_end(skb, nla_attr);
+	return 0;
+fail:
+	return -EINVAL;
+}
+
+/**
+ * hdd_add_link_standard_info_sap_get_len - get data length used in
+ * hdd_add_link_standard_info_sap()
+ *
+ * This function calculates the data length used in
+ * hdd_add_link_standard_info_sap()
+ *
+ * Return: total data length used in hdd_add_link_standard_info_sap()
+ */
+static uint32_t hdd_add_link_standard_info_sap_get_len(void)
+{
+	return ((NLA_HDRLEN) +
+		hdd_add_survey_info_sap_get_len() +
+		hdd_add_sta_info_sap_get_len() +
+		(sizeof(uint32_t) + NLA_HDRLEN));
+}
+
+/**
+ * hdd_add_link_standard_info_sap - add add link info attribut
+ * @skb: pointer to response skb buffer
+ * @stainfo: station information
+ * @idx: attribute type index for nla_next_start()
+ *
+ * This function adds link info attribut to response skb buffer
+ *
+ * Return : 0 on success and errno on failure
+ */
+static int hdd_add_link_standard_info_sap(struct sk_buff *skb, int8_t rssi,
+					  hdd_station_info_t *stainfo, int idx)
+{
+	struct nlattr *nla_attr;
+
+	nla_attr = nla_nest_start(skb, idx);
+	if (!nla_attr)
+		goto fail;
+	if (hdd_add_survey_info_sap(skb, stainfo, NL80211_ATTR_SURVEY_INFO))
+		goto fail;
+	if (hdd_add_sta_info_sap(skb, rssi, stainfo, NL80211_ATTR_STA_INFO))
+		goto fail;
+
+	if (nla_put_u32(skb, NL80211_ATTR_REASON_CODE, stainfo->reason_code)) {
+		hdd_err("Reason code put fail");
+		goto fail;
+	}
+
+	nla_nest_end(skb, nla_attr);
+	return 0;
+fail:
+	return -EINVAL;
+}
+
+/**
+ * hdd_add_ap_standard_info_sap_get_len - get data length used in
+ * hdd_add_ap_standard_info_sap()
+ * @stainfo: station information
+ *
+ * This function calculates the data length used in
+ * hdd_add_ap_standard_info_sap()
+ *
+ * Return: total data length used in hdd_add_ap_standard_info_sap()
+ */
+static uint32_t hdd_add_ap_standard_info_sap_get_len(
+				hdd_station_info_t *stainfo)
+{
+	uint32_t len;
+
+	len = NLA_HDRLEN;
+	if (stainfo->vht_present)
+		len += (sizeof(stainfo->vht_caps) + NLA_HDRLEN);
+	if (stainfo->ht_present)
+		len += (sizeof(stainfo->ht_caps) + NLA_HDRLEN);
+
+	return len;
+}
+
+/**
+ * hdd_add_ap_standard_info_sap - add HT and VHT info attributes
+ * @skb: pointer to response skb buffer
+ * @stainfo: station information
+ * @idx: attribute type index for nla_next_start()
+ *
+ * This function adds HT and VHT info attributes to response skb buffer
+ *
+ * Return : 0 on success and errno on failure
+ */
+static int hdd_add_ap_standard_info_sap(struct sk_buff *skb,
+					hdd_station_info_t *stainfo, int idx)
+{
+	struct nlattr *nla_attr;
+
+	nla_attr = nla_nest_start(skb, idx);
+	if (!nla_attr)
+		goto fail;
+
+	if (stainfo->vht_present) {
+		if (nla_put(skb, NL80211_ATTR_VHT_CAPABILITY,
+			    sizeof(stainfo->vht_caps),
+			    &stainfo->vht_caps)) {
+			hdd_err("put fail");
+			goto fail;
+		}
+	}
+	if (stainfo->ht_present) {
+		if (nla_put(skb, NL80211_ATTR_HT_CAPABILITY,
+			    sizeof(stainfo->ht_caps),
+			    &stainfo->ht_caps)) {
+			hdd_err("put fail");
+			goto fail;
+		}
+	}
+	nla_nest_end(skb, nla_attr);
+	return 0;
+fail:
+	return -EINVAL;
+}
+
+/**
+ * hdd_decode_ch_width - decode channel band width based
+ * @ch_width: encoded enum value holding channel band width
+ *
+ * This function decodes channel band width from the given encoded enum value.
+ *
+ * Returns: decoded channel band width.
+ */
+static uint8_t hdd_decode_ch_width(tSirMacHTChannelWidth ch_width)
+{
+	switch (ch_width) {
+	case 0:
+		return 20;
+	case 1:
+		return 40;
+	case 2:
+		return 80;
+	case 3:
+	case 4:
+		return 160;
+	default:
+		hdd_debug("invalid enum: %d", ch_width);
+		return 20;
+	}
+}
+
+/**
+ * hdd_get_cached_station_remote() - get cached(deleted) peer's info
  * @hdd_ctx: hdd context
  * @adapter: hostapd interface
  * @mac_addr: mac address of requested peer
  *
- * This function collect and indicate the remote peer's info
+ * This function collect and indicate the cached(deleted) peer's info
  *
  * Return: 0 on success, otherwise error value
  */
-static int hdd_get_station_remote(hdd_context_t *hdd_ctx,
-		hdd_adapter_t *adapter,
-		struct qdf_mac_addr mac_addr)
+static int hdd_get_cached_station_remote(hdd_context_t *hdd_ctx,
+					 hdd_adapter_t *adapter,
+					 struct qdf_mac_addr mac_addr)
 {
-	hdd_station_info_t *stainfo = hdd_get_stainfo(adapter, mac_addr);
+	hdd_station_info_t *stainfo = hdd_get_stainfo(adapter->cache_sta_info,
+						      mac_addr);
 	struct sk_buff *skb = NULL;
-	uint32_t nl_buf_len;
-	bool txrx_rate = true;
+	uint32_t nl_buf_len = 0;
 
 	if (!stainfo) {
 		hdd_err("peer " MAC_ADDRESS_STR " not found",
-				MAC_ADDR_ARRAY(mac_addr.bytes));
+			MAC_ADDR_ARRAY(mac_addr.bytes));
+		return -EINVAL;
+	}
+
+	nl_buf_len += hdd_add_link_standard_info_sap_get_len() +
+			hdd_add_ap_standard_info_sap_get_len(stainfo) +
+			(sizeof(stainfo->dot11_mode) + NLA_HDRLEN) +
+			(sizeof(stainfo->ch_width) + NLA_HDRLEN) +
+			(sizeof(stainfo->tx_rate) +
+			 NLA_HDRLEN) +
+			(sizeof(stainfo->rx_rate) +
+			 NLA_HDRLEN);
+
+	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, nl_buf_len);
+	if (!skb) {
+		hdd_err(FL("cfg80211_vendor_cmd_alloc_reply_skb failed"));
+		return -ENOMEM;
+	}
+
+	if (hdd_add_link_standard_info_sap(skb, stainfo->rssi, stainfo,
+					   LINK_INFO_STANDARD_NL80211_ATTR)) {
+		hdd_err("link standard put fail");
 		goto fail;
 	}
+
+	if (hdd_add_ap_standard_info_sap(skb, stainfo,
+					 AP_INFO_STANDARD_NL80211_ATTR)) {
+		hdd_err("ap standard put fail");
+		goto fail;
+	}
+
+	/* upper layer expects decoded channel BW */
+	stainfo->ch_width = hdd_decode_ch_width((tSirMacHTChannelWidth)
+						stainfo->ch_width);
+
+	if (nla_put_u32(skb, REMOTE_SUPPORTED_MODE, stainfo->dot11_mode) ||
+	    nla_put_u8(skb, REMOTE_CH_WIDTH, stainfo->ch_width)) {
+		hdd_err("remote ch put fail");
+		goto fail;
+	}
+	if (nla_put_u32(skb, REMOTE_LAST_TX_RATE, stainfo->tx_rate)) {
+		hdd_err("tx rate put fail");
+		goto fail;
+	}
+	if (nla_put_u32(skb, REMOTE_LAST_RX_RATE, stainfo->rx_rate)) {
+		hdd_err("rx rate put fail");
+		goto fail;
+	}
+
+	qdf_mem_zero(stainfo, sizeof(*stainfo));
+
+	return cfg80211_vendor_cmd_reply(skb);
+fail:
+	if (skb)
+		kfree_skb(skb);
+
+	return -EINVAL;
+}
+
+/**
+ * hdd_get_cached_station_remote() - get connected peer's info
+ * @hdd_ctx: hdd context
+ * @adapter: hostapd interface
+ * @mac_addr: mac address of requested peer
+ *
+ * This function collect and indicate the connected peer's info
+ *
+ * Return: 0 on success, otherwise error value
+ */
+static int hdd_get_connected_station_info(hdd_context_t *hdd_ctx,
+					  hdd_adapter_t *adapter,
+					  struct qdf_mac_addr mac_addr,
+					  hdd_station_info_t *stainfo)
+{
+	struct sk_buff *skb = NULL;
+	uint32_t nl_buf_len;
+	bool txrx_rate = true;
 
 	nl_buf_len = NLMSG_HDRLEN;
 	nl_buf_len += (sizeof(stainfo->max_phy_rate) + NLA_HDRLEN) +
@@ -4192,6 +4543,43 @@ fail:
 		kfree_skb(skb);
 
 	return -EINVAL;
+}
+
+/**
+ * hdd_get_station_remote() - get remote peer's info
+ * @hdd_ctx: hdd context
+ * @adapter: hostapd interface
+ * @mac_addr: mac address of requested peer
+ *
+ * This function collect and indicate the remote peer's info
+ *
+ * Return: 0 on success, otherwise error value
+ */
+static int hdd_get_station_remote(hdd_context_t *hdd_ctx,
+				  hdd_adapter_t *adapter,
+				  struct qdf_mac_addr mac_addr)
+{
+	hdd_station_info_t *stainfo = hdd_get_stainfo(adapter->aStaInfo,
+						      mac_addr);
+	int status = 0;
+	bool is_associated = false;
+
+	if (!stainfo) {
+		status = hdd_get_cached_station_remote(hdd_ctx, adapter,
+						       mac_addr);
+		return status;
+	} else {
+		is_associated = hdd_is_peer_associated(adapter, &mac_addr);
+		if (!is_associated) {
+			status = hdd_get_cached_station_remote(hdd_ctx, adapter,
+							       mac_addr);
+			return status;
+		}
+	}
+
+	status = hdd_get_connected_station_info(hdd_ctx, adapter,
+						mac_addr, stainfo);
+	return status;
 }
 
 /**
@@ -9094,6 +9482,7 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 		ap_ctx->sapConfig.channel = config_channel;
 		ap_ctx->sapConfig.ch_params.ch_width =
 					ap_ctx->sapConfig.ch_width_orig;
+		ap_ctx->bss_stop_reason = BSS_STOP_DUE_TO_VENDOR_CONFIG_CHAN;
 
 		cds_set_channel_params(ap_ctx->sapConfig.channel,
 				ap_ctx->sapConfig.sec_ch,
@@ -13567,13 +13956,21 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	hdd_debug("called with key index = %d & key length %d", key_index, params->key_len);
+	if (CSR_MAX_RSC_LEN < params->seq_len) {
+		hdd_err("Invalid seq length %d", params->seq_len);
+
+		return -EINVAL;
+	}
+
+	hdd_debug("key index %d, key length %d, seq length %d",
+		  key_index, params->key_len, params->seq_len);
 
 	/*extract key idx, key len and key */
 	qdf_mem_zero(&setKey, sizeof(tCsrRoamSetKey));
 	setKey.keyId = key_index;
 	setKey.keyLength = params->key_len;
 	qdf_mem_copy(&setKey.Key[0], params->key, params->key_len);
+	qdf_mem_copy(&setKey.keyRsc[0], params->seq, params->seq_len);
 
 	switch (params->cipher) {
 	case WLAN_CIPHER_SUITE_WEP40:
@@ -15014,7 +15411,11 @@ static int wlan_hdd_cfg80211_connect_start(hdd_adapter_t *pAdapter,
 		qdf_mem_copy((void *)(pRoamProfile->SSIDs.SSIDList->SSID.ssId),
 			     ssid, ssid_len);
 
-		pRoamProfile->do_not_roam = !pAdapter->fast_roaming_allowed;
+		pRoamProfile->supplicant_disabled_roaming =
+			!pAdapter->fast_roaming_allowed;
+		pRoamProfile->roaming_allowed_on_iface =
+			pAdapter->fast_roaming_allowed;
+
 		/* cleanup bssid hint */
 		qdf_mem_zero(pRoamProfile->bssid_hint.bytes,
 			QDF_MAC_ADDR_SIZE);
@@ -15023,7 +15424,7 @@ static int wlan_hdd_cfg80211_connect_start(hdd_adapter_t *pAdapter,
 
 		if (bssid) {
 			pRoamProfile->BSSIDs.numOfBSSIDs = 1;
-			pRoamProfile->do_not_roam = true;
+			pRoamProfile->supplicant_disabled_roaming = true;
 			qdf_mem_copy((void *)(pRoamProfile->BSSIDs.bssid),
 				     bssid, QDF_MAC_ADDR_SIZE);
 			/*
@@ -15554,12 +15955,6 @@ static bool wlan_hdd_is_conn_type_fils(struct cfg80211_connect_params *req)
 	return true;
 }
 #else
-static enum eAniAuthType wlan_hdd_get_fils_auth_type(
-		enum nl80211_auth_type auth)
-{
-	return eSIR_DONOT_USE_AUTH_TYPE;
-}
-
 static int wlan_hdd_cfg80211_set_fils_config(struct hdd_adapter_s *adapter,
 					 struct cfg80211_connect_params *req)
 {
@@ -17758,6 +18153,8 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 			}
 
 			pAdapter->aStaInfo[staId].isDeauthInProgress = true;
+			pAdapter->cache_sta_info[staId].reason_code =
+				pDelStaParams->reason_code;
 
 			hdd_debug("Delete STA with MAC::" MAC_ADDRESS_STR,
 			       MAC_ADDR_ARRAY(mac));

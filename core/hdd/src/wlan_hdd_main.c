@@ -2252,10 +2252,11 @@ static int __hdd_open(struct net_device *dev)
 		return -EBUSY;
 	}
 
-	if (!hdd_wait_for_recovery_completion()) {
-		hdd_err("Recovery failed");
-		return -EIO;
+	if (cds_is_driver_recovering()) {
+		hdd_err("WLAN is currently recovering; Please try again.");
+		return -EBUSY;
 	}
+
 	mutex_lock(&hdd_init_deinit_lock);
 
 	hdd_start_driver_ops_timer(eHDD_DRV_OP_IFF_UP);
@@ -2372,7 +2373,10 @@ static int __hdd_stop(struct net_device *dev)
 	 * Disable TX on the interface, after this hard_start_xmit() will not
 	 * be called on that interface
 	 */
-	hdd_info("Disabling queues");
+	hdd_info("Disabling queues, adapter device mode: %s(%d)",
+		 hdd_device_mode_to_string(adapter->device_mode),
+		 adapter->device_mode);
+
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
@@ -4226,10 +4230,7 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 
 	case QDF_SAP_MODE:
 		hdd_ipa_flush(hdd_ctx);
-		sap_config = &adapter->sessionCtx.ap.sapConfig;
-		if (sap_config)
-			wlansap_reset_sap_config_add_ie(sap_config,
-							eUPDATE_IE_ALL);
+
 	case QDF_P2P_GO_MODE:
 		if (hdd_ctx->config->conc_custom_rule1 &&
 			(QDF_SAP_MODE == adapter->device_mode)) {
@@ -4247,7 +4248,11 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 			}
 		}
 		cds_flush_work(&adapter->sap_stop_bss_work);
+
 		/* Any softap specific cleanup here... */
+		sap_config = &adapter->sessionCtx.ap.sapConfig;
+		wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
+		wlan_hdd_undo_acs(adapter);
 		if (adapter->device_mode == QDF_P2P_GO_MODE)
 			wlan_hdd_cleanup_remain_on_channel_ctx(adapter);
 
@@ -4439,8 +4444,10 @@ QDF_STATUS hdd_reset_all_adapters(hdd_context_t *hdd_ctx)
 				     &adapter->event_flags)) {
 				hdd_sap_indicate_disconnect_for_sta(adapter);
 				hdd_cleanup_actionframe(hdd_ctx, adapter);
-				hdd_sap_destroy_events(adapter);
 			}
+			if (test_bit(DEVICE_IFACE_OPENED,
+				     &adapter->event_flags))
+				hdd_sap_destroy_events(adapter);
 			clear_bit(SOFTAP_BSS_STARTED, &adapter->event_flags);
 		} else {
 			wlan_hdd_netif_queue_control(adapter,
@@ -5809,6 +5816,8 @@ static void hdd_roc_context_destroy(hdd_context_t *hdd_ctx)
  */
 static int hdd_context_deinit(hdd_context_t *hdd_ctx)
 {
+	qdf_wake_lock_destroy(&hdd_ctx->monitor_mode_wakelock);
+
 	wlan_hdd_cfg80211_deinit(hdd_ctx->wiphy);
 
 	hdd_roc_context_destroy(hdd_ctx);
@@ -5942,6 +5951,7 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 		hdd_abort_mac_scan_all_adapters(hdd_ctx);
 		hdd_abort_sched_scan_all_adapters(hdd_ctx);
 		hdd_stop_all_adapters(hdd_ctx, true);
+		hdd_deinit_all_adapters(hdd_ctx, false);
 	}
 
 	unregister_netdevice_notifier(&hdd_netdev_notifier);
@@ -5961,6 +5971,12 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 #endif
 
 	qdf_nbuf_deinit_replenish_timer();
+
+	if (QDF_GLOBAL_MONITOR_MODE ==  hdd_get_conparam()) {
+		hdd_info("Release wakelock for monitor mode!");
+		qdf_wake_lock_release(&hdd_ctx->monitor_mode_wakelock,
+				WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
+	}
 
 	qdf_spinlock_destroy(&hdd_ctx->hdd_adapter_lock);
 	qdf_spinlock_destroy(&hdd_ctx->sta_update_info_lock);
@@ -7967,6 +7983,9 @@ static int hdd_context_init(hdd_context_t *hdd_ctx)
 	if (ret)
 		goto roc_destroy;
 
+	qdf_wake_lock_create(&hdd_ctx->monitor_mode_wakelock,
+						 "monitor_mode_wakelock");
+
 	return 0;
 
 roc_destroy:
@@ -9054,6 +9073,28 @@ static int hdd_set_ani_enabled(hdd_context_t *hdd_ctx)
 }
 
 /**
+ * hdd_send_all_sme_action_ouis() - send all action oui extensions to firmware
+ * @hdd_ctx: pointer to hdd context
+ *
+ * Return: None
+ */
+static void hdd_send_all_sme_action_ouis(hdd_context_t *hdd_ctx)
+{
+	QDF_STATUS qdf_status;
+	uint32_t i;
+
+	if (!hdd_ctx->config->enable_action_oui)
+		return;
+
+	for (i = 0; i < WMI_ACTION_OUI_MAXIMUM_ID; i++) {
+		qdf_status = sme_send_action_oui(hdd_ctx->hHal, i);
+		/* print the error and continue for another action */
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+			hdd_err("Failed to send action OUI: %u", i);
+	}
+}
+
+/**
  * hdd_pre_enable_configure() - Configurations prior to cds_enable
  * @hdd_ctx:	HDD context
  *
@@ -9091,6 +9132,8 @@ static int hdd_pre_enable_configure(hdd_context_t *hdd_ctx)
 		goto out;
 	}
 
+	hdd_set_all_sme_action_ouis(hdd_ctx);
+
 	ret = sme_cli_set_command(0, WMI_PDEV_PARAM_TX_CHAIN_MASK_1SS,
 				  hdd_ctx->config->tx_chain_mask_1ss,
 				  PDEV_CMD);
@@ -9120,6 +9163,9 @@ static int hdd_pre_enable_configure(hdd_context_t *hdd_ctx)
 		goto out;
 	}
 
+	hdd_apply_cached_country_info(hdd_ctx);
+
+	cds_fill_and_send_ctl_to_fw(&hdd_ctx->reg);
 
 	status = hdd_set_sme_chan_list(hdd_ctx);
 	if (status != QDF_STATUS_SUCCESS) {
@@ -9688,6 +9734,8 @@ int hdd_configure_cds(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 	if (0 != wlan_hdd_set_wow_pulse(hdd_ctx, true))
 		hdd_debug("Failed to set wow pulse");
 
+	hdd_send_all_sme_action_ouis(hdd_ctx);
+
 	return 0;
 
 hdd_features_deinit:
@@ -9720,6 +9768,8 @@ static int hdd_deconfigure_cds(hdd_context_t *hdd_ctx)
 	/* De-register the SME callbacks */
 	hdd_deregister_cb(hdd_ctx);
 	hdd_encrypt_decrypt_deinit(hdd_ctx);
+
+	sme_destroy_config(hdd_ctx->hHal);
 
 	/* De-init Policy Manager */
 	if (!QDF_IS_STATUS_SUCCESS(cds_deinit_policy_mgr())) {
@@ -10244,6 +10294,11 @@ err_stop_modules:
 	hdd_wlan_stop_modules(hdd_ctx, false);
 
 err_exit_nl_srv:
+	hdd_driver_memdump_deinit();
+	memdump_deinit();
+
+	qdf_mc_timer_destroy(&hdd_ctx->tdls_source_timer);
+
 	hdd_green_ap_deinit(hdd_ctx);
 	hdd_exit_netlink_services(hdd_ctx);
 
@@ -10551,6 +10606,8 @@ void hdd_softap_sta_disassoc(hdd_adapter_t *adapter,
 	if (pDelStaParams->peerMacAddr.bytes[0] & 0x1)
 		return;
 
+	wlan_hdd_get_peer_rssi(adapter, &pDelStaParams->peerMacAddr,
+			       HDD_WLAN_GET_PEER_RSSI_SOURCE_DRIVER);
 	wlansap_disassoc_sta(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
 			     pDelStaParams);
 }
@@ -11214,6 +11271,9 @@ void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter, bool reinit)
 		cds_incr_active_session(ap_adapter->device_mode,
 					ap_adapter->sessionId);
 	hostapd_state->bCommit = true;
+	mutex_unlock(&hdd_ctx->sap_lock);
+
+	return;
 
 end:
 	mutex_unlock(&hdd_ctx->sap_lock);
@@ -11313,18 +11373,17 @@ int hdd_init(void)
 	int ret = 0;
 
 	p_cds_context = cds_init();
+	if (p_cds_context == NULL) {
+		hdd_err("Failed to allocate CDS context");
+		ret = -ENOMEM;
+		goto err_out;
+	}
 
 	wlan_init_bug_report_lock();
 
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
 	wlan_logging_sock_init_svc();
 #endif
-
-	if (p_cds_context == NULL) {
-		hdd_err("Failed to allocate CDS context");
-		ret = -ENOMEM;
-		goto err_out;
-	}
 
 	qdf_timer_init(NULL, &hdd_drv_ops_inactivity_timer,
 		(void *)hdd_drv_ops_inactivity_handler, NULL,
@@ -11817,8 +11876,11 @@ static void hdd_stop_present_mode(hdd_context_t *hdd_ctx,
 		return;
 
 	switch (curr_mode) {
-	case QDF_GLOBAL_MISSION_MODE:
 	case QDF_GLOBAL_MONITOR_MODE:
+		hdd_info("Release wakelock for monitor mode!");
+		qdf_wake_lock_release(&hdd_ctx->monitor_mode_wakelock,
+				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
+	case QDF_GLOBAL_MISSION_MODE:
 	case QDF_GLOBAL_FTM_MODE:
 		hdd_abort_mac_scan_all_adapters(hdd_ctx);
 		hdd_cleanup_scan_queue(hdd_ctx, NULL);
@@ -12003,6 +12065,12 @@ static int __con_mode_handler(const char *kmessage, struct kernel_param *kp,
 			ret = -EINVAL;
 			goto reset_flags;
 		}
+	}
+
+	if (con_mode == QDF_GLOBAL_MONITOR_MODE) {
+		hdd_info("Acquire wakelock for monitor mode!");
+		qdf_wake_lock_acquire(&hdd_ctx->monitor_mode_wakelock,
+				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
 	}
 
 	hdd_info("Mode successfully changed to %s", kmessage);
