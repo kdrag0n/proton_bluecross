@@ -87,6 +87,8 @@
 #define TASHA_NUM_INTERPOLATORS 9
 #define TASHA_NUM_DECIMATORS 9
 
+#define WCD9335_CHILD_DEVICES_MAX	6
+
 #define BYTE_BIT_MASK(nr) (1 << ((nr) % BITS_PER_BYTE))
 #define TASHA_MAD_AUDIO_FIRMWARE_PATH "wcd9335/wcd9335_mad_audio.bin"
 #define TASHA_CPE_SS_ERR_STATUS_MEM_ACCESS (1 << 0)
@@ -829,6 +831,10 @@ struct tasha_priv {
 	u32 ref_count;
 	/* Lock to protect mclk enablement */
 	struct mutex mclk_lock;
+
+	struct platform_device *pdev_child_devices
+			[WCD9335_CHILD_DEVICES_MAX];
+	int child_count;
 };
 
 static int tasha_codec_vote_max_bw(struct snd_soc_codec *codec,
@@ -8653,6 +8659,66 @@ static int tasha_ear_spkr_pa_gain_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int tasha_spkr_left_boost_stage_get(struct snd_kcontrol *kcontrol,
+			      struct snd_ctl_elem_value *ucontrol)
+{
+	u8 bst_state_max = 0;
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+
+	bst_state_max = snd_soc_read(codec, WCD9335_CDC_BOOST0_BOOST_CTL);
+	bst_state_max = (bst_state_max & 0x0c) >> 2;
+	ucontrol->value.integer.value[0] = bst_state_max;
+	dev_dbg(codec->dev, "%s: ucontrol->value.integer.value[0]  = %ld\n",
+			__func__, ucontrol->value.integer.value[0]);
+
+	return 0;
+}
+
+static int tasha_spkr_left_boost_stage_put(struct snd_kcontrol *kcontrol,
+			      struct snd_ctl_elem_value *ucontrol)
+{
+	u8 bst_state_max;
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+
+	dev_dbg(codec->dev, "%s: ucontrol->value.integer.value[0]  = %ld\n",
+			__func__, ucontrol->value.integer.value[0]);
+	bst_state_max =  ucontrol->value.integer.value[0] << 2;
+	snd_soc_update_bits(codec, WCD9335_CDC_BOOST0_BOOST_CTL,
+		0x0c, bst_state_max);
+
+	return 0;
+}
+
+static int tasha_spkr_right_boost_stage_get(struct snd_kcontrol *kcontrol,
+			      struct snd_ctl_elem_value *ucontrol)
+{
+	u8 bst_state_max = 0;
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+
+	bst_state_max = snd_soc_read(codec, WCD9335_CDC_BOOST1_BOOST_CTL);
+	bst_state_max = (bst_state_max & 0x0c) >> 2;
+	ucontrol->value.integer.value[0] = bst_state_max;
+	dev_dbg(codec->dev, "%s: ucontrol->value.integer.value[0]  = %ld\n",
+			__func__, ucontrol->value.integer.value[0]);
+
+	return 0;
+}
+
+static int tasha_spkr_right_boost_stage_put(struct snd_kcontrol *kcontrol,
+			      struct snd_ctl_elem_value *ucontrol)
+{
+	u8 bst_state_max;
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+
+	dev_dbg(codec->dev, "%s: ucontrol->value.integer.value[0]  = %ld\n",
+			__func__, ucontrol->value.integer.value[0]);
+	bst_state_max =  ucontrol->value.integer.value[0] << 2;
+	snd_soc_update_bits(codec, WCD9335_CDC_BOOST1_BOOST_CTL,
+		0x0c, bst_state_max);
+
+	return 0;
+}
+
 static int tasha_config_compander(struct snd_soc_codec *codec, int interp_n,
 				  int event)
 {
@@ -8947,6 +9013,10 @@ static const char * const tasha_ear_spkr_pa_gain_text[] = {
 	"G_5_DB", "G_6_DB"
 };
 
+static const char * const tasha_speaker_boost_stage_text[] = {
+	"NO_MAX_STATE", "MAX_STATE_1", "MAX_STATE_2"
+};
+
 static const struct soc_enum tasha_ear_pa_gain_enum =
 	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(tasha_ear_pa_gain_text),
 			tasha_ear_pa_gain_text);
@@ -8955,12 +9025,24 @@ static const struct soc_enum tasha_ear_spkr_pa_gain_enum =
 	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(tasha_ear_spkr_pa_gain_text),
 			    tasha_ear_spkr_pa_gain_text);
 
+static const struct soc_enum tasha_spkr_boost_stage_enum =
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(tasha_speaker_boost_stage_text),
+			    tasha_speaker_boost_stage_text);
+
 static const struct snd_kcontrol_new tasha_analog_gain_controls[] = {
 	SOC_ENUM_EXT("EAR PA Gain", tasha_ear_pa_gain_enum,
 		tasha_ear_pa_gain_get, tasha_ear_pa_gain_put),
 
 	SOC_ENUM_EXT("EAR SPKR PA Gain", tasha_ear_spkr_pa_gain_enum,
 		     tasha_ear_spkr_pa_gain_get, tasha_ear_spkr_pa_gain_put),
+
+	SOC_ENUM_EXT("SPKR Left Boost Max State", tasha_spkr_boost_stage_enum,
+			tasha_spkr_left_boost_stage_get,
+			tasha_spkr_left_boost_stage_put),
+
+	SOC_ENUM_EXT("SPKR Right Boost Max State", tasha_spkr_boost_stage_enum,
+			tasha_spkr_right_boost_stage_get,
+			tasha_spkr_right_boost_stage_put),
 
 	SOC_SINGLE_TLV("HPHL Volume", WCD9335_HPH_L_EN, 0, 20, 1,
 		line_gain),
@@ -13576,11 +13658,14 @@ static int tasha_codec_remove(struct snd_soc_codec *codec)
 	struct wcd9xxx *control;
 
 	control = dev_get_drvdata(codec->dev->parent);
+	control->num_rx_port = 0;
+	control->num_tx_port = 0;
 	control->rx_chs = NULL;
 	control->tx_chs = NULL;
 
 	tasha_cleanup_irqs(tasha);
 	/* Cleanup MBHC */
+	wcd_mbhc_deinit(&tasha->mbhc);
 	/* Cleanup resmgr */
 
 	return 0;
@@ -13920,6 +14005,7 @@ static void tasha_add_child_devices(struct work_struct *work)
 	}
 
 	platdata = &tasha->swr_plat_data;
+	tasha->child_count = 0;
 
 	for_each_child_of_node(wcd9xxx->dev->of_node, node) {
 		if (!strcmp(node->name, "swr_master"))
@@ -13980,6 +14066,11 @@ static void tasha_add_child_devices(struct work_struct *work)
 			tasha->nr = ctrl_num;
 			tasha->swr_ctrl_data = swr_ctrl_data;
 		}
+
+		if (tasha->child_count < WCD9335_CHILD_DEVICES_MAX)
+			tasha->pdev_child_devices[tasha->child_count++] = pdev;
+		else
+			goto err;
 	}
 
 	return;
@@ -14179,17 +14270,25 @@ err_cdc_pwr:
 static int tasha_remove(struct platform_device *pdev)
 {
 	struct tasha_priv *tasha;
+	int count = 0;
 
 	tasha = platform_get_drvdata(pdev);
+
+	if (!tasha)
+		return -EINVAL;
+
+	for (count = 0; count < tasha->child_count &&
+		count < WCD9335_CHILD_DEVICES_MAX; count++)
+		platform_device_unregister(tasha->pdev_child_devices[count]);
 
 	mutex_destroy(&tasha->codec_mutex);
 	clk_put(tasha->wcd_ext_clk);
 	if (tasha->wcd_native_clk)
 		clk_put(tasha->wcd_native_clk);
 	mutex_destroy(&tasha->mclk_lock);
-	devm_kfree(&pdev->dev, tasha);
-	snd_soc_unregister_codec(&pdev->dev);
 	mutex_destroy(&tasha->sb_clk_gear_lock);
+	snd_soc_unregister_codec(&pdev->dev);
+	devm_kfree(&pdev->dev, tasha);
 	return 0;
 }
 

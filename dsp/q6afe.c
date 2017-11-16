@@ -1021,6 +1021,7 @@ static int afe_spk_prot_prepare(int src_port, int dst_port, int param_id,
 	}
 	switch (param_id) {
 	case AFE_PARAM_ID_FBSP_MODE_RX_CFG:
+	case AFE_PARAM_ID_SP_RX_LIMITER_TH:
 		config.pdata.module_id = AFE_MODULE_FB_SPKR_PROT_V2_RX;
 		break;
 	case AFE_PARAM_ID_FEEDBACK_PATH_CFG:
@@ -1205,6 +1206,7 @@ static void afe_send_cal_spkr_prot_tx(int port_id)
 static void afe_send_cal_spkr_prot_rx(int port_id)
 {
 	union afe_spkr_prot_config afe_spk_config;
+	union afe_spkr_prot_config afe_spk_limiter_config;
 
 	if (this_afe.cal_data[AFE_FB_SPKR_PROT_CAL] == NULL)
 		goto done;
@@ -1226,6 +1228,30 @@ static void afe_send_cal_spkr_prot_rx(int port_id)
 			&afe_spk_config))
 			pr_err("%s: RX MODE_VI_PROC_CFG failed\n",
 				   __func__);
+
+		if (afe_spk_config.mode_rx_cfg.mode ==
+			Q6AFE_MSM_SPKR_PROCESSING) {
+			if (this_afe.prot_cfg.sp_version >=
+				AFE_API_VERSION_SUPPORT_SPV3) {
+				afe_spk_limiter_config.limiter_th_cfg.
+					minor_version = 1;
+				afe_spk_limiter_config.limiter_th_cfg.
+				lim_thr_per_calib_q27[SP_V2_SPKR_1] =
+				this_afe.prot_cfg.limiter_th[SP_V2_SPKR_1];
+				afe_spk_limiter_config.limiter_th_cfg.
+				lim_thr_per_calib_q27[SP_V2_SPKR_2] =
+				this_afe.prot_cfg.limiter_th[SP_V2_SPKR_2];
+				if (afe_spk_prot_prepare(port_id, 0,
+					AFE_PARAM_ID_SP_RX_LIMITER_TH,
+					&afe_spk_limiter_config))
+					pr_err("%s: SP_RX_LIMITER_TH failed.\n",
+						__func__);
+			} else {
+				pr_debug("%s: SPv3 failed to apply on AFE API version=%d.\n",
+					__func__,
+					this_afe.prot_cfg.sp_version);
+			}
+		}
 	}
 	mutex_unlock(&this_afe.cal_data[AFE_FB_SPKR_PROT_CAL]->lock);
 done:
@@ -2892,6 +2918,24 @@ static int q6afe_send_enc_config(u16 port_id,
 		pr_err("%s: AFE_ENCODER_PARAM_ID_ENC_CFG_BLK for port 0x%x failed %d\n",
 			__func__, port_id, ret);
 		goto exit;
+	}
+
+	if (format == ASM_MEDIA_FMT_APTX) {
+		config.param.payload_size =
+			payload_size + sizeof(config.port.sync_mode_param);
+		pr_debug("%s: sending AFE_PARAM_ID_APTX_SYNC_MODE to DSP",
+			__func__);
+		config.pdata.param_id = AFE_PARAM_ID_APTX_SYNC_MODE;
+		config.pdata.param_size = sizeof(config.port.sync_mode_param);
+		config.port.sync_mode_param.sync_mode =
+			config.port.enc_blk_param.enc_blk_config.aptx_config.
+				aptx_v2_cfg.sync_mode;
+		ret = afe_apr_send_pkt(&config, &this_afe.wait[index]);
+		if (ret) {
+			pr_err("%s: AFE_PARAM_ID_APTX_SYNC_MODE for port 0x%x failed %d\n",
+				__func__, port_id, ret);
+			goto exit;
+		}
 	}
 
 	config.param.payload_size =
