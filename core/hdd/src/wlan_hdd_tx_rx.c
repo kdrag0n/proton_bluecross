@@ -1170,7 +1170,7 @@ static bool hdd_is_arp_local(struct sk_buff *skb)
 			arp_ptr += (skb->dev->addr_len + 4 +
 					skb->dev->addr_len);
 			memcpy(&tip, arp_ptr, 4);
-			hdd_info("ARP packet: local IP: %x dest IP: %x",
+			hdd_debug("ARP packet: local IP: %x dest IP: %x",
 				ifa->ifa_local, tip);
 			if (ifa->ifa_local == tip)
 				return true;
@@ -1294,7 +1294,16 @@ static inline void *hdd_init_rx_thread_napi(void)
 	struct napi_struct   *napi;
 
 	napi = qdf_mem_malloc(sizeof(struct napi_struct));
+	if (napi == NULL) {
+		hdd_err("Failed to alloc memory for napi");
+		return NULL;
+	}
 	netdev = qdf_mem_malloc(sizeof(struct net_device));
+	if (netdev == NULL) {
+		qdf_mem_free(napi);
+		hdd_err("Failed to alloc memory for netdev");
+		return NULL;
+	}
 	init_dummy_netdev(netdev);
 	netif_napi_add(netdev, napi, hdd_rxthread_napi_poll, 64);
 	napi_enable(napi);
