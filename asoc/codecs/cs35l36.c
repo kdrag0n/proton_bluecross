@@ -324,7 +324,7 @@ static int cs35l36_set_dai_fmt(struct snd_soc_dai *codec_dai, unsigned int fmt)
 
 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
 	case SND_SOC_DAIFMT_DSP_A:
-		asp_fmt = 4;
+		asp_fmt = 0;
 		cs35l36->i2s_mode = false;
 		cs35l36->tdm_mode = true;
 		cs35l36->pdm_mode = false;
