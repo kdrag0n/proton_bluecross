@@ -1817,6 +1817,7 @@ ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
 EXTRA_CFLAGS += -Wmaybe-uninitialized
 endif
 EXTRA_CFLAGS += -Wmissing-prototypes
+EXTRA_CFLAGS += -Wno-error-enum-conversion
 
 ifeq ($(call cc-option-yn, -Wheader-guard),y)
 EXTRA_CFLAGS += -Wheader-guard
