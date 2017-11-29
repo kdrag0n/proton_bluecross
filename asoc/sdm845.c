@@ -4483,7 +4483,7 @@ static int sdm845_tdm_snd_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	int ret = 0;
 	int slot_width = 32;
-	int channels, slots;
+	int channels, slots = 8;
 	unsigned int slot_mask, rate, clk_freq;
 	unsigned int slot_offset[8] = {0, 4, 8, 12, 16, 20, 24, 28};
 
@@ -4492,28 +4492,28 @@ static int sdm845_tdm_snd_hw_params(struct snd_pcm_substream *substream,
 	/* currently only supporting TDM_RX_0 and TDM_TX_0 */
 	switch (cpu_dai->id) {
 	case AFE_PORT_ID_PRIMARY_TDM_RX:
-		slots = tdm_rx_cfg[TDM_PRI][TDM_0].channels;
+		channels = tdm_rx_cfg[TDM_PRI][TDM_0].channels;
 		break;
 	case AFE_PORT_ID_SECONDARY_TDM_RX:
-		slots = tdm_rx_cfg[TDM_SEC][TDM_0].channels;
+		channels = tdm_rx_cfg[TDM_SEC][TDM_0].channels;
 		break;
 	case AFE_PORT_ID_TERTIARY_TDM_RX:
-		slots = tdm_rx_cfg[TDM_TERT][TDM_0].channels;
+		channels = tdm_rx_cfg[TDM_TERT][TDM_0].channels;
 		break;
 	case AFE_PORT_ID_QUATERNARY_TDM_RX:
-		slots = tdm_rx_cfg[TDM_QUAT][TDM_0].channels;
+		channels = tdm_rx_cfg[TDM_QUAT][TDM_0].channels;
 		break;
 	case AFE_PORT_ID_PRIMARY_TDM_TX:
-		slots = tdm_tx_cfg[TDM_PRI][TDM_0].channels;
+		channels = tdm_tx_cfg[TDM_PRI][TDM_0].channels;
 		break;
 	case AFE_PORT_ID_SECONDARY_TDM_TX:
-		slots = tdm_tx_cfg[TDM_SEC][TDM_0].channels;
+		channels = tdm_tx_cfg[TDM_SEC][TDM_0].channels;
 		break;
 	case AFE_PORT_ID_TERTIARY_TDM_TX:
-		slots = tdm_tx_cfg[TDM_TERT][TDM_0].channels;
+		channels = tdm_tx_cfg[TDM_TERT][TDM_0].channels;
 		break;
 	case AFE_PORT_ID_QUATERNARY_TDM_TX:
-		slots = tdm_tx_cfg[TDM_QUAT][TDM_0].channels;
+		channels = tdm_tx_cfg[TDM_QUAT][TDM_0].channels;
 		break;
 	default:
 		pr_err("%s: dai id 0x%x not supported\n",
@@ -4523,8 +4523,7 @@ static int sdm845_tdm_snd_hw_params(struct snd_pcm_substream *substream,
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		/*2 slot config - bits 0 and 1 set for the first two slots */
-		slot_mask = 0x0000FFFF >> (16-slots);
-		channels = slots;
+		slot_mask = 0x0000FFFF >> (16 - channels);
 
 		pr_debug("%s: tdm rx slot_width %d slots %d\n",
 			__func__, slot_width, slots);
@@ -4545,8 +4544,7 @@ static int sdm845_tdm_snd_hw_params(struct snd_pcm_substream *substream,
 		}
 	} else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		/*2 slot config - bits 0 and 1 set for the first two slots */
-		slot_mask = 0x0000FFFF >> (16-slots);
-		channels = slots;
+		slot_mask = 0x0000FFFF >> (16 - channels);
 
 		pr_debug("%s: tdm tx slot_width %d slots %d\n",
 			__func__, slot_width, slots);
