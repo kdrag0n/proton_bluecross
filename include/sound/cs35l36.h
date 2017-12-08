@@ -52,6 +52,9 @@ struct cs35l36_platform_data {
 	bool amp_gain_zc;
 	bool pdm_ldm_exit;
 	bool pdm_ldm_enter;
+	bool amp_pcm_inv;
+	bool imon_pol_inv;
+	bool vmon_pol_inv;
 	int boost_ind;
 	int bst_vctl;
 	int bst_vctl_sel;
