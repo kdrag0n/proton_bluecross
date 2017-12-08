@@ -1507,13 +1507,13 @@ hdd_stop_sap_due_to_invalid_channel(struct work_struct *work)
 	 */
 	hdd_adapter_t *sap_adapter = container_of(work, hdd_adapter_t,
 						  sap_stop_bss_work);
-	hdd_debug("work started for sap session[%d]", sap_adapter->sessionId);
 	cds_ssr_protect(__func__);
 	if (sap_adapter == NULL) {
 	    cds_err("sap_adapter is NULL, no work needed");
 	    cds_ssr_unprotect(__func__);
 	    return;
 	}
+	hdd_debug("work started for sap session[%d]", sap_adapter->sessionId);
 	wlan_hdd_stop_sap(sap_adapter);
 	wlansap_set_invalid_session(WLAN_HDD_GET_SAP_CTX_PTR(sap_adapter));
 	wlansap_cleanup_cac_timer(WLAN_HDD_GET_SAP_CTX_PTR(sap_adapter));
@@ -2203,20 +2203,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 			hdd_err("Failed to find sta id status: %d", qdf_status);
 			return QDF_STATUS_E_FAILURE;
 		}
-#ifdef IPA_OFFLOAD
-		if (hdd_ipa_is_enabled(pHddCtx)) {
-			status = hdd_ipa_wlan_evt(pHostapdAdapter, staId,
-					HDD_IPA_CLIENT_DISCONNECT,
-					pSapEvent->sapevt.
-					sapStationDisassocCompleteEvent.
-					staMac.bytes);
 
-			if (status) {
-				hdd_err("WLAN_CLIENT_DISCONNECT event failed");
-				goto stopbss;
-			}
-		}
-#endif
 		DPTRACE(qdf_dp_trace_mgmt_pkt(QDF_DP_TRACE_MGMT_PACKET_RECORD,
 			pHostapdAdapter->sessionId,
 			QDF_PROTO_TYPE_MGMT, QDF_PROTO_MGMT_DISASSOC));

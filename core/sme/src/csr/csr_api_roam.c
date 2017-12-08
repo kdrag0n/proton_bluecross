@@ -19161,6 +19161,11 @@ static void csr_update_fils_params_rso(tpAniSirGlobal mac,
 	if (!fils_info || !req_buffer)
 		return;
 
+	if ((!fils_info->key_nai_length)) {
+		sme_debug("key_nai_length is NULL");
+		return;
+	}
+
 	roam_fils_params = &req_buffer->roam_fils_params;
 	if ((fils_info->key_nai_length > FILS_MAX_KEYNAME_NAI_LENGTH) ||
 			(fils_info->r_rk_length > FILS_MAX_RRK_LENGTH)) {
@@ -21133,10 +21138,6 @@ void csr_process_nss_update_req(tpAniSirGlobal mac, tSmeCmd *command)
 	struct sir_beacon_tx_complete_rsp *param;
 	tCsrRoamSession *session;
 
-	if (!command) {
-		sme_err("nss update param is NULL");
-		goto fail;
-	}
 
 	if (!CSR_IS_SESSION_VALID(mac, command->sessionId)) {
 		sme_err("Invalid session id %d", command->sessionId);
