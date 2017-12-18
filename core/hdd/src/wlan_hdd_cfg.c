@@ -3317,6 +3317,11 @@ struct reg_table_entry g_registry_table[] = {
 			    VAR_FLAGS_OPTIONAL,
 			    (void *)CFG_ENABLE_FW_MODULE_LOG_DEFAULT),
 
+	REG_VARIABLE_STRING(CFG_ENABLE_CONCURRENT_STA, WLAN_PARAM_String,
+			    struct hdd_config, enableConcurrentSTA,
+			    VAR_FLAGS_NONE,
+			    (void *)CFG_ENABLE_CONCURRENT_STA_DEFAULT),
+
 #ifdef WLAN_FEATURE_11W
 	REG_VARIABLE(CFG_PMF_SA_QUERY_MAX_RETRIES_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, pmfSaQueryMaxRetries,
@@ -4417,6 +4422,13 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_SAP_FORCE_11N_FOR_11AC_MIN,
 		     CFG_SAP_FORCE_11N_FOR_11AC_MAX),
 
+	REG_VARIABLE(CFG_GO_FORCE_11N_FOR_11AC_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, go_force_11n_for_11ac,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_GO_FORCE_11N_FOR_11AC_DEFAULT,
+		     CFG_GO_FORCE_11N_FOR_11AC_MIN,
+		     CFG_GO_FORCE_11N_FOR_11AC_MAX),
+
 	REG_VARIABLE(CFG_INTERFACE_CHANGE_WAIT_NAME, WLAN_PARAM_Integer,
 			struct hdd_config, iface_change_wait_time,
 			VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
@@ -5048,6 +5060,48 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_ENABLE_11D_IN_WORLD_MODE_DEFAULT,
 		     CFG_ENABLE_11D_IN_WORLD_MODE_MIN,
 		     CFG_ENABLE_11D_IN_WORLD_MODE_MAX),
+
+	REG_VARIABLE(CFG_LATENCY_ENABLE_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, wlm_latency_enable,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_LATENCY_ENABLE_DEFAULT,
+		     CFG_LATENCY_ENABLE_MIN,
+		     CFG_LATENCY_ENABLE_MAX),
+
+	REG_VARIABLE(CFG_LATENCY_LEVEL_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, wlm_latency_level,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_LATENCY_LEVEL_DEFAULT,
+		     CFG_LATENCY_LEVEL_MIN,
+		     CFG_LATENCY_LEVEL_MAX),
+
+	REG_VARIABLE(CFG_LATENCY_FLAGS_NORMAL_NAME, WLAN_PARAM_HexInteger,
+		     struct hdd_config, wlm_latency_flags_normal,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_LATENCY_FLAGS_NORMAL_DEFAULT,
+		     CFG_LATENCY_FLAGS_NORMAL_MIN,
+		     CFG_LATENCY_FLAGS_NORMAL_MAX),
+
+	REG_VARIABLE(CFG_LATENCY_FLAGS_MODERATE_NAME, WLAN_PARAM_HexInteger,
+		     struct hdd_config, wlm_latency_flags_moderate,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_LATENCY_FLAGS_MODERATE_DEFAULT,
+		     CFG_LATENCY_FLAGS_MODERATE_MIN,
+		     CFG_LATENCY_FLAGS_MODERATE_MAX),
+
+	REG_VARIABLE(CFG_LATENCY_FLAGS_LOW_NAME, WLAN_PARAM_HexInteger,
+		     struct hdd_config, wlm_latency_flags_low,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_LATENCY_FLAGS_LOW_DEFAULT,
+		     CFG_LATENCY_FLAGS_LOW_MIN,
+		     CFG_LATENCY_FLAGS_LOW_MAX),
+
+	REG_VARIABLE(CFG_LATENCY_FLAGS_ULTRALOW_NAME, WLAN_PARAM_HexInteger,
+		     struct hdd_config, wlm_latency_flags_ultralow,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_LATENCY_FLAGS_ULTRALOW_DEFAULT,
+		     CFG_LATENCY_FLAGS_ULTRALOW_MIN,
+		     CFG_LATENCY_FLAGS_ULTRALOW_MAX),
 
 	REG_VARIABLE(CFG_RSSI_WEIGHTAGE_NAME, WLAN_PARAM_Integer,
 		struct hdd_config, rssi_weightage,
@@ -6209,6 +6263,28 @@ static void hdd_mawc_cfg_log(hdd_context_t *pHddCtx)
 		pHddCtx->config->mawc_roam_rssi_low_adjust);
 }
 
+static void hdd_wlm_cfg_log(hdd_context_t *pHddCtx)
+{
+	hdd_debug("Name = [%s] value = [%u]",
+		  CFG_LATENCY_ENABLE_NAME,
+		  pHddCtx->config->wlm_latency_enable);
+	hdd_debug("Name = [%s] value = [%u]",
+		  CFG_LATENCY_LEVEL_NAME,
+		  pHddCtx->config->wlm_latency_level);
+	hdd_debug("Name = [%s] value = [%u]",
+		  CFG_LATENCY_FLAGS_NORMAL_NAME,
+		  pHddCtx->config->wlm_latency_flags_normal);
+	hdd_debug("Name = [%s] value = [%u]",
+		  CFG_LATENCY_FLAGS_MODERATE_NAME,
+		  pHddCtx->config->wlm_latency_flags_moderate);
+	hdd_debug("Name = [%s] value = [%u]",
+		  CFG_LATENCY_FLAGS_LOW_NAME,
+		  pHddCtx->config->wlm_latency_flags_low);
+	hdd_debug("Name = [%s] value = [%u]",
+		  CFG_LATENCY_FLAGS_ULTRALOW_NAME,
+		  pHddCtx->config->wlm_latency_flags_ultralow);
+}
+
 /**
  * hdd_cfg_print() - print the hdd configuration
  * @iniTable: pointer to hdd context
@@ -6914,6 +6990,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 		CFG_SAP_FORCE_11N_FOR_11AC_NAME,
 		pHddCtx->config->sap_force_11n_for_11ac);
 	hdd_debug("Name = [%s] Value = [%d]",
+		CFG_GO_FORCE_11N_FOR_11AC_NAME,
+		pHddCtx->config->go_force_11n_for_11ac);
+	hdd_debug("Name = [%s] Value = [%d]",
 		CFG_BPF_PACKET_FILTER_OFFLOAD,
 		pHddCtx->config->bpf_packet_filter_enable);
 	hdd_debug("Name = [%s] Value = [%u]",
@@ -7015,6 +7094,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_debug("Name = [%s] value = [%u]",
 		CFG_DTIM_1CHRX_ENABLE_NAME,
 		pHddCtx->config->enable_dtim_1chrx);
+
+	hdd_wlm_cfg_log(pHddCtx);
+
 	hdd_debug("Name = [%s] value = [%u]",
 		CFG_RSSI_WEIGHTAGE_NAME,
 		pHddCtx->config->rssi_weightage);
@@ -9362,7 +9444,7 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 	smeConfig->csrConfig.ProprietaryRatesEnabled = 0;
 	smeConfig->csrConfig.HeartbeatThresh50 = 40;
 	smeConfig->csrConfig.bandCapability = pConfig->nBandCapability;
-	if (pConfig->nBandCapability == eCSR_BAND_24) {
+	if (pConfig->nBandCapability == SIR_BAND_2_4_GHZ) {
 		smeConfig->csrConfig.Is11hSupportEnabled = 0;
 	} else {
 		smeConfig->csrConfig.Is11hSupportEnabled =
@@ -9663,6 +9745,19 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 			pHddCtx->config->num_11b_tx_chains;
 	smeConfig->csrConfig.num_11ag_tx_chains =
 			pHddCtx->config->num_11ag_tx_chains;
+	smeConfig->csrConfig.wlm_latency_enable =
+			pHddCtx->config->wlm_latency_enable;
+	smeConfig->csrConfig.wlm_latency_level =
+			pHddCtx->config->wlm_latency_level;
+	smeConfig->csrConfig.wlm_latency_flags[0] =
+			pHddCtx->config->wlm_latency_flags_normal;
+	smeConfig->csrConfig.wlm_latency_flags[1] =
+			pHddCtx->config->wlm_latency_flags_moderate;
+	smeConfig->csrConfig.wlm_latency_flags[2] =
+			pHddCtx->config->wlm_latency_flags_low;
+	smeConfig->csrConfig.wlm_latency_flags[3] =
+			pHddCtx->config->wlm_latency_flags_ultralow;
+
 	val = (pConfig->oce_probe_req_rate_enabled *
 		WMI_VDEV_OCE_PROBE_REQUEST_RATE_FEATURE_BITMAP) +
 		(pConfig->oce_probe_resp_rate_enabled *

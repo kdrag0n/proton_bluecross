@@ -564,6 +564,9 @@ static QDF_STATUS wma_handle_vdev_detach(tp_wma_handle wma_handle,
 	status = wmi_unified_vdev_delete_send(wma_handle->wmi_handle, vdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		WMA_LOGE("Unable to remove an interface");
+		ol_txrx_vdev_detach(iface->handle, NULL, NULL);
+		iface->handle = NULL;
+		wma_handle->interfaces[vdev_id].is_vdev_valid = false;
 		goto out;
 	}
 
@@ -3249,6 +3252,7 @@ void wma_vdev_resp_timer(void *data)
 	} else if (tgt_req->msg_type == WMA_ADD_BSS_REQ) {
 		tpAddBssParams params = (tpAddBssParams) tgt_req->user_data;
 
+		params->status = QDF_STATUS_E_TIMEOUT;
 		WMA_LOGA("%s: WMA_ADD_BSS_REQ timedout", __func__);
 		WMA_LOGD("%s: bssid %pM vdev_id %d", __func__, params->bssId,
 			 tgt_req->vdev_id);
@@ -3962,6 +3966,8 @@ static void wma_add_bss_sta_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 				pps_val, status);
 		wma_send_peer_assoc(wma, add_bss->nwType,
 					    &add_bss->staContext);
+		/* we just had peer assoc, so install key will be done later */
+		iface->is_waiting_for_key = true;
 		peer_assoc_sent = true;
 
 		if (add_bss->rmfEnabled)
@@ -5151,7 +5157,7 @@ static void wma_wait_tx_complete(tp_wma_handle wma,
 
 	while (ol_txrx_get_tx_pending(pdev) && max_wait_iterations) {
 		WMA_LOGW(FL("Waiting for outstanding packet to drain."));
-		qdf_wait_single_event(&wma->tx_queue_empty_event,
+		qdf_wait_for_event_completion(&wma->tx_queue_empty_event,
 				      WMA_TX_Q_RECHECK_TIMER_WAIT);
 		max_wait_iterations--;
 	}
@@ -5406,4 +5412,22 @@ int wma_fill_beacon_interval_reset_req(tp_wma_handle wma, uint8_t vdev_id,
 	qdf_timer_start(&req->event_timeout, timeout);
 
 	return 0;
+}
+
+QDF_STATUS wma_set_wlm_latency_level(void *wma_ptr,
+			struct wlm_latency_level_param *latency_params)
+{
+	QDF_STATUS ret;
+	tp_wma_handle wma = (tp_wma_handle)wma_ptr;
+
+	WMA_LOGD("%s: set latency level %d, flags flag 0x%x",
+		 __func__, latency_params->wlm_latency_level,
+		 latency_params->wlm_latency_flags);
+
+	ret = wmi_unified_wlm_latency_level_cmd(wma->wmi_handle,
+						latency_params);
+	if (QDF_IS_STATUS_ERROR(ret))
+		WMA_LOGW("Failed to set latency level");
+
+	return ret;
 }

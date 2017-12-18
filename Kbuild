@@ -42,7 +42,9 @@ ifeq ($(KERNEL_BUILD), 0)
 	# Need to explicitly configure for Android-based builds
 
 	ifneq ($(DEVELOPER_DISABLE_BUILD_TIMESTAMP),y)
-	CONFIG_BUILD_TIMESTAMP := y
+	ifneq ($(WLAN_DISABLE_BUILD_TAG),y)
+	CONFIG_BUILD_TAG := y
+	endif
 	endif
 
 	ifeq ($(CONFIG_ARCH_MDM9630), y)
@@ -108,6 +110,14 @@ ifeq ($(KERNEL_BUILD), 0)
 	CONFIG_QCACLD_FEATURE_METERING := y
 	endif
 
+	ifeq ($(CONFIG_ARCH_SDM845), y)
+	CONFIG_QCACLD_FEATURE_METERING := y
+	endif
+
+	ifeq ($(CONFIG_ARCH_SDM670), y)
+	CONFIG_QCACLD_FEATURE_METERING := y
+	endif
+
 	#Flag to enable Fast Transition (11r) feature
 	CONFIG_QCOM_VOWIFI_11R := y
 
@@ -170,9 +180,6 @@ ifeq ($(KERNEL_BUILD), 0)
 	CONFIG_WLAN_FEATURE_DSRC := y
 	endif
 
-	#enable spectral scan feature
-	CONFIG_WLAN_SPECTRAL_SCAN := y
-
 ifneq ($(CONFIG_ROME_IF),sdio)
 	#Flag to enable DISA
 	CONFIG_WLAN_FEATURE_DISA := y
@@ -233,6 +240,8 @@ ifneq ($(TARGET_BUILD_VARIANT),user)
 	CONFIG_FEATURE_PKTLOG := y
 endif
 
+#enable spectral scan feature
+CONFIG_WLAN_SPECTRAL_SCAN := y
 
 #Enable WLAN/Power debugfs feature only if debug_fs is enabled
 ifeq ($(CONFIG_DEBUG_FS), y)
@@ -778,6 +787,10 @@ ifeq ($(CONFIG_WLAN_DEBUGFS), y)
 QDF_OBJS += $(QDF_OBJ_DIR)/qdf_debugfs.o
 endif
 
+QDF_CLEAN_FILES := $(QDF_OBJ_DIR)/*.o \
+		   $(QDF_OBJ_DIR)/*.o.* \
+		   $(QDF_OBJ_DIR)/.*.o.*
+
 ############ CDS (Connectivity driver services) ############
 CDS_DIR :=	core/cds
 CDS_INC_DIR :=	$(CDS_DIR)/inc
@@ -821,6 +834,10 @@ WMI_OBJS := $(WMI_OBJ_DIR)/wmi_unified.o \
 	    $(WMI_OBJ_DIR)/wmi_unified_tlv.o \
 	    $(WMI_OBJ_DIR)/wmi_unified_api.o \
 	    $(WMI_OBJ_DIR)/wmi_unified_non_tlv.o
+
+WMI_CLEAN_FILES := $(WMI_OBJ_DIR)/*.o \
+		   $(WMI_OBJ_DIR)/*.o.* \
+		   $(WMI_OBJ_DIR)/.*.o.*
 
 ########### FWLOG ###########
 FWLOG_DIR := core/utils/fwlog
@@ -893,6 +910,10 @@ HTC_OBJS := $(WLAN_COMMON_ROOT)/$(HTC_DIR)/htc.o \
             $(WLAN_COMMON_ROOT)/$(HTC_DIR)/htc_recv.o \
             $(WLAN_COMMON_ROOT)/$(HTC_DIR)/htc_services.o
 
+HTC_CLEAN_FILES := $(WLAN_COMMON_ROOT)/$(HTC_DIR)/*.o \
+		   $(WLAN_COMMON_ROOT)/$(HTC_DIR)/*.o.* \
+		   $(WLAN_COMMON_ROOT)/$(HTC_DIR)/.*.o.*
+
 ########### HIF ###########
 HIF_DIR := hif
 HIF_CE_DIR := $(HIF_DIR)/src/ce
@@ -938,6 +959,10 @@ HIF_COMMON_OBJS := $(WLAN_COMMON_ROOT)/$(HIF_DIR)/src/ath_procfs.o \
                 $(WLAN_COMMON_ROOT)/$(HIF_DIR)/src/hif_main.o \
                 $(WLAN_COMMON_ROOT)/$(HIF_DIR)/src/mp_dev.o
 
+HIF_CLEAN_FILES := $(WLAN_COMMON_ROOT)/$(HIF_DIR)/src/*.o \
+		   $(WLAN_COMMON_ROOT)/$(HIF_DIR)/src/*.o.* \
+		   $(WLAN_COMMON_ROOT)/$(HIF_DIR)/src/.*.o.*
+
 HIF_CE_OBJS :=  $(WLAN_COMMON_ROOT)/$(HIF_CE_DIR)/ce_bmi.o \
                 $(WLAN_COMMON_ROOT)/$(HIF_CE_DIR)/ce_diag.o \
                 $(WLAN_COMMON_ROOT)/$(HIF_CE_DIR)/ce_main.o \
@@ -945,10 +970,18 @@ HIF_CE_OBJS :=  $(WLAN_COMMON_ROOT)/$(HIF_CE_DIR)/ce_bmi.o \
                 $(WLAN_COMMON_ROOT)/$(HIF_CE_DIR)/ce_tasklet.o \
                 $(WLAN_COMMON_ROOT)/$(HIF_DIR)/src/regtable.o
 
+HIF_CLEAN_FILES += $(WLAN_COMMON_ROOT)/$(HIF_CE_DIR)/*.o \
+		   $(WLAN_COMMON_ROOT)/$(HIF_CE_DIR)/*.o.* \
+		   $(WLAN_COMMON_ROOT)/$(HIF_CE_DIR)/.*.o.*
+
 HIF_USB_OBJS := $(WLAN_COMMON_ROOT)/$(HIF_USB_DIR)/usbdrv.o \
                 $(WLAN_COMMON_ROOT)/$(HIF_USB_DIR)/hif_usb.o \
                 $(WLAN_COMMON_ROOT)/$(HIF_USB_DIR)/if_usb.o \
                 $(WLAN_COMMON_ROOT)/$(HIF_USB_DIR)/regtable_usb.o
+
+HIF_CLEAN_FILES += $(WLAN_COMMON_ROOT)/$(HIF_USB_DIR)/*.o \
+		   $(WLAN_COMMON_ROOT)/$(HIF_USB_DIR)/*.o.* \
+		   $(WLAN_COMMON_ROOT)/$(HIF_USB_DIR)/.*.o.*
 
 HIF_SDIO_OBJS := $(WLAN_COMMON_ROOT)/$(HIF_SDIO_DIR)/hif_sdio_send.o \
                  $(WLAN_COMMON_ROOT)/$(HIF_SDIO_DIR)/hif_bmi_reg_access.o \
@@ -958,8 +991,16 @@ HIF_SDIO_OBJS := $(WLAN_COMMON_ROOT)/$(HIF_SDIO_DIR)/hif_sdio_send.o \
                  $(WLAN_COMMON_ROOT)/$(HIF_SDIO_DIR)/hif_sdio_recv.o \
                  $(WLAN_COMMON_ROOT)/$(HIF_SDIO_DIR)/regtable_sdio.o
 
+HIF_CLEAN_FILES += $(WLAN_COMMON_ROOT)/$(HIF_SDIO_DIR)/*.o \
+		   $(WLAN_COMMON_ROOT)/$(HIF_SDIO_DIR)/*.o.* \
+		   $(WLAN_COMMON_ROOT)/$(HIF_SDIO_DIR)/.*.o.*
+
 HIF_SDIO_NATIVE_OBJS := $(WLAN_COMMON_ROOT)/$(HIF_SDIO_NATIVE_SRC_DIR)/hif.o \
                         $(WLAN_COMMON_ROOT)/$(HIF_SDIO_NATIVE_SRC_DIR)/hif_scatter.o
+
+HIF_CLEAN_FILES += $(WLAN_COMMON_ROOT)/$(HIF_SDIO_NATIVE_SRC_DIR)/*.o \
+		   $(WLAN_COMMON_ROOT)/$(HIF_SDIO_NATIVE_SRC_DIR)/*.o.* \
+		   $(WLAN_COMMON_ROOT)/$(HIF_SDIO_NATIVE_SRC_DIR)/.*.o.*
 
 ifeq ($(CONFIG_WLAN_NAPI), y)
 HIF_OBJS += $(WLAN_COMMON_ROOT)/$(HIF_DIR)/src/hif_napi.o
@@ -971,6 +1012,19 @@ HIF_SDIO_OBJS += $(WLAN_COMMON_ROOT)/$(HIF_SDIO_DIR)/if_sdio.o
 
 HIF_OBJS += $(WLAN_COMMON_ROOT)/$(HIF_DISPATCHER_DIR)/multibus.o
 HIF_OBJS += $(WLAN_COMMON_ROOT)/$(HIF_DISPATCHER_DIR)/dummy.o
+
+HIF_CLEAN_FILES += $(WLAN_COMMON_ROOT)/$(HIF_PCIE_DIR)/*.o \
+		   $(WLAN_COMMON_ROOT)/$(HIF_PCIE_DIR)/*.o.* \
+		   $(WLAN_COMMON_ROOT)/$(HIF_PCIE_DIR)/.*.o.* \
+		   $(WLAN_COMMON_ROOT)/$(HIF_SNOC_DIR)/*.o \
+		   $(WLAN_COMMON_ROOT)/$(HIF_SNOC_DIR)/*.o.* \
+		   $(WLAN_COMMON_ROOT)/$(HIF_SNOC_DIR)/.*.o.* \
+		   $(WLAN_COMMON_ROOT)/$(HIF_SDIO_DIR)/*.o \
+		   $(WLAN_COMMON_ROOT)/$(HIF_SDIO_DIR)/*.o.* \
+		   $(WLAN_COMMON_ROOT)/$(HIF_SDIO_DIR)/.*.o.* \
+		   $(WLAN_COMMON_ROOT)/$(HIF_DISPATCHER_DIR)/*.o \
+		   $(WLAN_COMMON_ROOT)/$(HIF_DISPATCHER_DIR)/*.o.* \
+		   $(WLAN_COMMON_ROOT)/$(HIF_DISPATCHER_DIR)/.*.o.*
 
 ifeq ($(CONFIG_HIF_PCI), 1)
 HIF_OBJS += $(HIF_PCIE_OBJS)
@@ -1136,6 +1190,10 @@ ifeq ($(BUILD_DIAG_VERSION), 1)
 OBJS +=		$(HOST_DIAG_LOG_OBJS)
 endif
 
+CLEAN_FILES :=  $(HIF_CLEAN_FILES) \
+		$(HTC_CLEAN_FILES) \
+		$(QDF_CLEAN_FILES) \
+		$(WMI_CLEAN_FILES)
 
 EXTRA_CFLAGS += $(INCS)
 
@@ -1739,8 +1797,13 @@ CDEFINES += -DFEATURE_WLAN_D0WOW
 endif
 endif
 
-#Flag to enable SMMU S1 support
+#Flag to enable SMMU S1 support for SDM845
 ifeq ($(CONFIG_ARCH_SDM845), y)
+CDEFINES += -DENABLE_SMMU_S1_TRANSLATION
+endif
+
+#Flag to enable SMMU S1 support for SDM670
+ifeq ($(CONFIG_ARCH_SDM670), y)
 CDEFINES += -DENABLE_SMMU_S1_TRANSLATION
 endif
 
@@ -1783,10 +1846,27 @@ CDEFINES += -DWLAN_HDD_ADAPTER_MAGIC=$(WLAN_HDD_ADAPTER_MAGIC)
 endif
 
 # inject some build related information
-ifeq ($(CONFIG_BUILD_TIMESTAMP), y)
-CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+ifeq ($(CONFIG_BUILD_TAG), y)
+CLD_CHECKOUT = $(shell cd "$(WLAN_ROOT)" && \
+	git reflog | grep -vm1 cherry-pick | grep -oE ^[0-f]+)
+CLD_IDS = $(shell cd "$(WLAN_ROOT)" && \
+	git log $(CLD_CHECKOUT)~..HEAD | \
+		sed -nE 's/^\s*Change-Id: (I[0-f]{10})[0-f]{30}\s*$$/\1/p' | \
+		paste -sd "," -)
+
+CMN_CHECKOUT = $(shell cd "$(WLAN_COMMON_INC)" && \
+	git reflog | grep -vm1 cherry-pick | grep -oE ^[0-f]+)
+CMN_IDS = $(shell cd "$(WLAN_COMMON_INC)" && \
+	git log $(CMN_CHECKOUT)~..HEAD | \
+		sed -nE 's/^\s*Change-Id: (I[0-f]{10})[0-f]{30}\s*$$/\1/p' | \
+		paste -sd "," -)
+
+TIMESTAMP = $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
+BUILD_TAG = "$(TIMESTAMP); cld:$(CLD_IDS); cmn:$(CMN_IDS);"
+CDEFINES += -DBUILD_TAG=\"$(BUILD_TAG)\"
 endif
 
 # Module information used by KBuild framework
 obj-$(CONFIG_QCA_CLD_WLAN) += $(MODNAME).o
 $(MODNAME)-y := $(OBJS)
+clean-files := $(CLEAN_FILES)
