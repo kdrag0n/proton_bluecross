@@ -3119,6 +3119,12 @@ struct afe_param_id_aptx_sync_mode {
 #define AFE_ENCODER_PARAM_ID_ENC_FMT_ID         0x0001322B
 
 /*
+ * Encoder scrambler parameter for the #AVS_MODULE_ID_ENCODER module.
+ * This parameter cannot be set runtime.
+ */
+#define AFE_ENCODER_PARAM_ID_ENABLE_SCRAMBLING         0x0001323C
+
+/*
  * Data format to send compressed data
  * is transmitted/received over Slimbus lines.
  */
@@ -3377,6 +3383,50 @@ struct asm_celt_enc_cfg_t {
 	struct asm_celt_specific_enc_cfg_t  celt_specific_config;
 } __packed;
 
+#define ASM_MEDIA_FMT_LDAC 0x00013224
+struct asm_ldac_specific_enc_cfg_t {
+	/*
+	 * This is used to calculate the encoder output
+	 * bytes per frame (i.e. bytes per packet).
+	 * Bit rate also configures the EQMID.
+	 * The min bit rate 303000 bps is calculated for
+	 * 44.1 kHz and 88.2 KHz sampling frequencies with
+	 * Mobile use Quality.
+	 * The max bit rate of 990000 bps is calculated for
+	 * 96kHz and 48 KHz with High Quality
+	 * @Range(in bits per second)
+	 * 303000 for Mobile use Quality
+	 * 606000 for standard Quality
+	 * 909000 for High Quality
+	 */
+	uint32_t                     bit_rate;
+	/*
+	 * The channel setting information for LDAC specification
+	 * of Bluetooth A2DP which is determined by SRC and SNK
+	 * devices in Bluetooth transmission.
+	 * @Range:
+	 * 0 for native mode
+	 * 4 for mono
+	 * 2 for dual channel
+	 * 1 for stereo
+	 */
+	uint16_t                     channel_mode;
+	/*
+	 * Maximum Transmission Unit (MTU).
+	 * The minimum MTU that a L2CAP implementation for LDAC shall
+	 * support is 679 bytes, because LDAC is optimized with 2-DH5
+	 * packet as its target.
+	 * @Range : 679
+	 * @Default: 679 for LDACBT_MTU_2DH5
+	 */
+	uint16_t                     mtu;
+} __packed;
+
+struct asm_ldac_enc_cfg_t {
+	struct asm_custom_enc_cfg_t  custom_config;
+	struct asm_ldac_specific_enc_cfg_t  ldac_specific_config;
+} __packed;
+
 struct afe_enc_fmt_id_param_t {
 	/*
 	 * Supported values:
@@ -3447,10 +3497,12 @@ union afe_enc_config_data {
 	struct asm_custom_enc_cfg_t  custom_config;
 	struct asm_celt_enc_cfg_t  celt_config;
 	struct asm_aptx_enc_cfg_t  aptx_config;
+	struct asm_ldac_enc_cfg_t  ldac_config;
 };
 
 struct afe_enc_config {
 	u32 format;
+	u32 scrambler_mode;
 	union afe_enc_config_data data;
 };
 
@@ -3474,6 +3526,18 @@ struct avs_enc_packetizer_id_param_t {
 	uint32_t enc_packetizer_id;
 };
 
+/*
+ * Payload of the AVS_ENCODER_PARAM_ID_ENABLE_SCRAMBLING parameter.
+ */
+struct avs_enc_set_scrambler_param_t {
+	/*
+	 *  Supported values:
+	 *  1 : enable scrambler
+	 *  0 : disable scrambler
+	 */
+	uint32_t enable_scrambler;
+};
+
 union afe_port_config {
 	struct afe_param_id_pcm_cfg               pcm;
 	struct afe_param_id_i2s_cfg               i2s;
@@ -3492,6 +3556,7 @@ union afe_port_config {
 	struct afe_port_media_type_t              media_type;
 	struct afe_enc_cfg_blk_param_t            enc_blk_param;
 	struct avs_enc_packetizer_id_param_t      enc_pkt_id_param;
+	struct avs_enc_set_scrambler_param_t      enc_set_scrambler_param;
 } __packed;
 
 struct afe_audioif_config_command_no_payload {
