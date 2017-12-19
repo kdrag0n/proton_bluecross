@@ -59,6 +59,7 @@ typedef struct sAniSirGlobal *tpAniSirGlobal;
 #include <dot11f.h>
 
 #define MAX_PEERS 32
+#define SIR_MAX_SUPPORTED_BSS 5
 
 #define OFFSET_OF(structType, fldName)   (&((structType *)0)->fldName)
 
@@ -343,6 +344,7 @@ typedef enum eSirResultCodes {
 	eSIR_SME_SEND_ACTION_FAIL,
 	eSIR_SME_DEAUTH_STATUS,
 	eSIR_PNO_SCAN_SUCCESS,
+	eSIR_SME_INVALID_SESSION,
 	eSIR_DONOT_USE_RESULT_CODE = SIR_MAX_ENUM_SIZE
 } tSirResultCodes;
 
@@ -419,8 +421,10 @@ typedef struct sSirSupportedRates {
 
 typedef enum eSirRFBand {
 	SIR_BAND_UNKNOWN,
+	SIR_BAND_ALL,
 	SIR_BAND_2_4_GHZ,
 	SIR_BAND_5_GHZ,
+	SIR_BAND_MAX
 } tSirRFBand;
 
 typedef struct sSirRemainOnChnReq {
@@ -3244,6 +3248,21 @@ typedef struct {
 
 #define ALLOWED_ACTION_FRAME_MAP_WORDS (SIR_MAC_ACTION_MAX / 32)
 
+/*
+ * DROP_PUBLIC_ACTION_FRAME_BITMAP
+ *
+ * Bitmask is based on the below. The frames with 1's
+ * set to their corresponding bit can be dropped in FW.
+ *
+ * ----------------------------------+-----+------+
+ *         Type                      | Bit | Drop |
+ * ----------------------------------+-----+------+
+ * SIR_MAC_ACTION_MEASUREMENT_PILOT  |  7  |   1  |
+ * ----------------------------------+-----+------+
+ */
+#define DROP_PUBLIC_ACTION_FRAME_BITMAP \
+		(1 << SIR_MAC_ACTION_MEASUREMENT_PILOT)
+
 #ifndef ANI_SUPPORT_11H
 /*
  * DROP_SPEC_MGMT_ACTION_FRAME_BITMAP
@@ -3255,7 +3274,7 @@ typedef struct {
  *         Type                      | Bit | Drop |
  * ----------------------------------+-----+------+
  * SIR_MAC_ACTION_MEASURE_REQUEST_ID    0     1
- * SIR_MAC_ACTION_TPC_REQUEST_ID        1     1
+ * SIR_MAC_ACTION_TPC_REQUEST_ID        2     1
  * ----------------------------------+-----+------+
  */
 #define DROP_SPEC_MGMT_ACTION_FRAME_BITMAP \

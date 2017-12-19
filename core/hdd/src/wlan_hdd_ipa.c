@@ -3153,7 +3153,7 @@ QDF_STATUS hdd_ipa_uc_ol_init(hdd_context_t *hdd_ctx)
 		ret = ipa_connect_wdi_pipe(&ipa_ctxt->cons_pipe_in, &pipe_out);
 		if (ret) {
 			HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
-				"ipa_connect_wdi_pipe falied for Tx: ret=%d",
+				"ipa_connect_wdi_pipe failed for Tx: ret=%d",
 				ret);
 			stat = QDF_STATUS_E_FAILURE;
 			goto fail_return;
@@ -3397,7 +3397,7 @@ QDF_STATUS hdd_ipa_uc_ol_init(hdd_context_t *hdd_ctx)
 		ret = ipa_connect_wdi_pipe(&ipa_ctxt->cons_pipe_in, &pipe_out);
 		if (ret) {
 			HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
-				"ipa_connect_wdi_pipe falied for Tx: ret=%d",
+				"ipa_connect_wdi_pipe failed for Tx: ret=%d",
 				ret);
 			stat = QDF_STATUS_E_FAILURE;
 			goto fail_return;
@@ -4551,6 +4551,7 @@ static void hdd_ipa_send_skb_to_network(qdf_nbuf_t skb,
 	int result;
 	struct hdd_ipa_priv *hdd_ipa = ghdd_ipa;
 	unsigned int cpu_index;
+	uint32_t enabled;
 
 	if (!adapter || adapter->magic != WLAN_HDD_ADAPTER_MAGIC) {
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG, "Invalid adapter: 0x%pK",
@@ -4565,6 +4566,14 @@ static void hdd_ipa_send_skb_to_network(qdf_nbuf_t skb,
 		kfree_skb(skb);
 		return;
 	}
+
+	/*
+	 * Set PF_WAKE_UP_IDLE flag in the task structure
+	 * This task and any task woken by this will be waken to idle CPU
+	 */
+	enabled = sched_get_wake_up_idle(current);
+	if (!enabled)
+		sched_set_wake_up_idle(current, true);
 
 	skb->destructor = hdd_ipa_uc_rt_debug_destructor;
 	skb->dev = adapter->dev;
@@ -4581,6 +4590,12 @@ static void hdd_ipa_send_skb_to_network(qdf_nbuf_t skb,
 		++adapter->hdd_stats.hddTxRxStats.rxRefused[cpu_index];
 
 	hdd_ipa->ipa_rx_net_send_count++;
+
+	/*
+	 * Restore PF_WAKE_UP_IDLE flag in the task structure
+	 */
+	if (!enabled)
+		sched_set_wake_up_idle(current, false);
 }
 
 /**

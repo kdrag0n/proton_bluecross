@@ -7685,6 +7685,60 @@ bool cds_is_safe_channel(uint8_t channel)
 }
 
 /**
+ * cds_is_sap_restart_required_after_sta_disconnect() - is sap restart required
+ * after sta disconnection
+ * @hdd_ctx: pointer to hdd context
+ * @intf_ch: sap channel
+ *
+ * Check if SAP should be moved to a non dfs channel after STA disconnection.
+ * This API applicable only for STA+SAP SCC and ini 'sta_sap_scc_on_dfs_chan'
+ * is enabled.
+ *
+ * Return: true if sap restart is required, otherwise false
+ */
+
+static bool cds_is_sap_restart_required_after_sta_disconnect(
+		hdd_context_t *hdd_ctx, uint8_t *intf_ch)
+{
+	hdd_adapter_t *ap_adapter;
+	hdd_ap_ctx_t *hdd_ap_ctx;
+	uint8_t sap_chan = cds_mode_specific_get_channel(CDS_SAP_MODE);
+	bool sta_sap_scc_on_dfs_chan =
+		cds_is_sta_sap_scc_allowed_on_dfs_channel();
+
+	*intf_ch = 0;
+
+	cds_debug("sta_sap_scc_on_dfs_chan %u, sap_chan %u",
+			sta_sap_scc_on_dfs_chan, sap_chan);
+	if (!sta_sap_scc_on_dfs_chan ||
+		!(sap_chan && CDS_IS_CHANNEL_5GHZ(sap_chan) &&
+		(cds_get_channel_state(sap_chan) ==
+		 CHANNEL_STATE_DFS))) {
+		return false;
+	}
+
+	ap_adapter = hdd_get_adapter(hdd_ctx, QDF_SAP_MODE);
+	if (ap_adapter == NULL) {
+		cds_err("Invalid ap_adapter");
+		return false;
+	}
+
+	if (!test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
+		cds_err("SOFTAP_BSS_STARTED not set");
+		return false;
+	}
+
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
+
+	*intf_ch =
+		hdd_ap_ctx->sapConfig.user_config_channel;
+
+	cds_debug("Standalone SAP is not allowed on DFS channel, Move it to channel %u",
+			*intf_ch);
+	return true;
+}
+
+/**
  * __cds_check_sta_ap_concurrent_ch_intf() - Restart SAP in
  * STA-AP case
  * @data: Pointer to STA adapter
@@ -7703,6 +7757,7 @@ static void __cds_check_sta_ap_concurrent_ch_intf(void *data)
 	uint8_t intf_ch = 0;
 	p_cds_contextType cds_ctx;
 	hdd_station_ctx_t *hdd_sta_ctx;
+	bool skip_conc_check = false;
 
 	cds_ctx = cds_get_global_context();
 	if (!cds_ctx) {
@@ -7730,6 +7785,21 @@ static void __cds_check_sta_ap_concurrent_ch_intf(void *data)
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(sta_adapter);
 
+	if (cds_get_connection_count() == 1) {
+		/*
+		 * If STA+SAP sessions are on DFS channel and STA+SAP SCC is
+		 * enabled on DFS channel then move the SAP out of DFS channel
+		 * as soon as STA gets disconnect.
+		 */
+		if (cds_is_sap_restart_required_after_sta_disconnect(
+					hdd_ctx, &intf_ch)) {
+			cds_debug("move the SAP to configured channel %u",
+					intf_ch);
+			skip_conc_check = true;
+			goto sap_restart;
+		}
+	}
+
 	cds_debug("cds_concurrent_open_sessions_running: %d",
 		cds_concurrent_open_sessions_running());
 
@@ -7742,6 +7812,7 @@ static void __cds_check_sta_ap_concurrent_ch_intf(void *data)
 		goto end;
 	}
 
+sap_restart:
 	ap_adapter = hdd_get_adapter(hdd_ctx, QDF_SAP_MODE);
 	if (ap_adapter == NULL) {
 		cds_err("Invalid ap_adapter");
@@ -7761,30 +7832,33 @@ static void __cds_check_sta_ap_concurrent_ch_intf(void *data)
 		goto end;
 	}
 
-	/*
-	 * Check if STA's channel is DFS or passive or part of LTE avoided
-	 * channel list. In that case move SAP to other band if DBS is
-	 * supported, return from here if DBS is not supported.
-	 * Need to take care of 3 port cases with 2 STA iface in future.
-	 */
-	intf_ch = wlansap_check_cc_intf(hdd_ap_ctx->sapContext);
+	if (!skip_conc_check) {
+		/*
+		 * Check if STA's channel is DFS or passive or part of LTE
+		 * avoided channel list. In that case move SAP to other band
+		 * if DBS is supported, return from here if DBS is not
+		 * supported. Need to take care of 3 port cases with 2 STA
+		 * iface in future.
+		 */
+		intf_ch = wlansap_check_cc_intf(hdd_ap_ctx->sapContext);
 
-	cds_debug("intf_ch:%d", intf_ch);
-	if (QDF_IS_STATUS_ERROR(
-		cds_valid_sap_conc_channel_check(&intf_ch,
+		cds_debug("intf_ch:%d", intf_ch);
+		if (QDF_IS_STATUS_ERROR(cds_valid_sap_conc_channel_check(
+			&intf_ch,
 			cds_mode_specific_get_channel(CDS_SAP_MODE)))) {
 			cds_debug("can't move sap to %d",
 				hdd_sta_ctx->conn_info.operationChannel);
 			goto end;
-	}
-	if (intf_ch == 0) {
-		cds_debug("No need for sap channel change");
-		goto end;
-	}
+		}
 
-	cds_debug("SAP moves due to MCC->SCC/DBS switch, orig chan: %d, new chan: %d",
-		hdd_ap_ctx->sapConfig.channel, intf_ch);
+		if (intf_ch == 0) {
+			cds_debug("No need for sap channel change");
+			goto end;
+		}
 
+		cds_debug("SAP moves due to MCC->SCC/DBS switch, orig chan: %d, new chan: %d",
+				hdd_ap_ctx->sapConfig.channel, intf_ch);
+	}
 	hdd_ap_ctx->sapConfig.channel = intf_ch;
 	hdd_ap_ctx->sapConfig.ch_params.ch_width =
 		hdd_ap_ctx->sapConfig.ch_width_orig;
@@ -7822,7 +7896,8 @@ static void cds_check_sta_ap_concurrent_ch_intf(void *data)
 
 static bool cds_valid_sta_channel_check(uint8_t sta_channel)
 {
-	if (CDS_IS_DFS_CH(sta_channel) ||
+	if ((CDS_IS_DFS_CH(sta_channel) &&
+			(!cds_is_sta_sap_scc_allowed_on_dfs_channel())) ||
 		CDS_IS_PASSIVE_OR_DISABLE_CH(sta_channel) ||
 		!cds_is_safe_channel(sta_channel))
 		if (wma_is_hw_dbs_capable())
@@ -7844,11 +7919,28 @@ void cds_check_concurrent_intf_and_restart_sap(hdd_adapter_t *adapter)
 {
 	hdd_context_t *hdd_ctx;
 	hdd_station_ctx_t *hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	bool restart_sap = false;
+	uint8_t sap_ch;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx) {
 		cds_err("HDD context is NULL");
 		return;
+	}
+
+	if (cds_get_connection_count() == 1) {
+		/*
+		 * If STA+SAP sessions are on DFS channel and STA+SAP SCC is
+		 * enabled on DFS channel then move the SAP out of DFS channel
+		 * as soon as STA gets disconnect.
+		 */
+		if (cds_is_sap_restart_required_after_sta_disconnect(hdd_ctx,
+					&sap_ch)) {
+			cds_debug("move the SAP to configured channel %u",
+					sap_ch);
+			restart_sap = true;
+			goto sap_restart;
+		}
 	}
 
 	cds_debug("mode:%d rule1:%d rule2:%d chan:%d",
@@ -7866,13 +7958,23 @@ void cds_check_concurrent_intf_and_restart_sap(hdd_adapter_t *adapter)
 		return;
 	}
 
-	if ((hdd_ctx->config->WlanMccToSccSwitchMode
+sap_restart:
+	/*
+	 * If sta_sap_scc_on_dfs_chan is true then standalone SAP is not
+	 * allowed on DFS channel. SAP is allowed on DFS channel only when STA
+	 * is already connected on that channel.
+	 * In following condition restart_sap will be true if
+	 * sta_sap_scc_on_dfs_chan is true and SAP is on DFS channel.
+	 * This scenario can come if STA+SAP are operating on DFS channel and
+	 * STA gets disconnected.
+	 */
+	if (restart_sap || ((hdd_ctx->config->WlanMccToSccSwitchMode
 				!= QDF_MCC_TO_SCC_SWITCH_DISABLE) &&
 			((0 == hdd_ctx->config->conc_custom_rule1) &&
 			 (0 == hdd_ctx->config->conc_custom_rule2)) &&
 			cds_valid_sta_channel_check(hdd_sta_ctx->conn_info.
 				operationChannel) &&
-			!hdd_ctx->sta_ap_intf_check_work_info) {
+			!hdd_ctx->sta_ap_intf_check_work_info)) {
 		struct sta_ap_intf_check_work_ctx *work_info;
 
 		work_info = qdf_mem_malloc(
@@ -8373,7 +8475,7 @@ void cds_restart_sap(hdd_adapter_t *ap_adapter)
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
 		if (QDF_STATUS_SUCCESS == wlansap_stop_bss(sap_ctx)) {
 			qdf_status =
-				qdf_wait_single_event(&hostapd_state->
+				qdf_wait_for_event_completion(&hostapd_state->
 					qdf_stop_bss_event,
 					SME_CMD_TIMEOUT_VALUE);
 
@@ -8406,7 +8508,7 @@ void cds_restart_sap(hdd_adapter_t *ap_adapter)
 
 		cds_debug("Waiting for SAP to start");
 		qdf_status =
-			qdf_wait_single_event(&hostapd_state->qdf_event,
+			qdf_wait_for_event_completion(&hostapd_state->qdf_event,
 					SME_CMD_TIMEOUT_VALUE);
 		wlansap_reset_sap_config_add_ie(sap_config,
 				eUPDATE_IE_ALL);
@@ -8840,7 +8942,7 @@ QDF_STATUS qdf_wait_for_connection_update(void)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	status = qdf_wait_single_event(
+	status = qdf_wait_for_event_completion(
 			&cds_context->connection_update_done_evt,
 			CONNECTION_UPDATE_TIMEOUT);
 
@@ -10547,4 +10649,40 @@ bool cds_is_valid_channel_for_channel_switch(uint8_t channel)
 
 	cds_debug("Invalid channel for channel switch");
 	return false;
+}
+
+bool cds_is_sta_connected_in_2g(void)
+{
+	QDF_STATUS status;
+	hdd_adapter_t *hdd_adapter = NULL;
+	hdd_adapter_list_node_t *adapter_node = NULL, *next = NULL;
+	bool ret = false;
+	hdd_station_ctx_t *sta_ctx;
+	hdd_context_t *hdd_ctx;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		cds_err("HDD context is NULL");
+		return ret;
+	}
+
+	status =  hdd_get_front_adapter(hdd_ctx, &adapter_node);
+
+	/* loop through all adapters and check connection info for
+	 * STA adapters.
+	 */
+	while (NULL != adapter_node && QDF_STATUS_SUCCESS == status) {
+		hdd_adapter = adapter_node->pAdapter;
+		if (QDF_STA_MODE == hdd_adapter->device_mode) {
+			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(hdd_adapter);
+			if (eConnectionState_Associated ==
+			    sta_ctx->conn_info.connState &&
+			    sta_ctx->conn_info.operationChannel <=
+			    SIR_11B_CHANNEL_END)
+				return true;
+		}
+		status = hdd_get_next_adapter(hdd_ctx, adapter_node, &next);
+		adapter_node = next;
+	}
+	return ret;
 }

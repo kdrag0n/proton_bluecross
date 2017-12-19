@@ -285,12 +285,11 @@ void wlan_hdd_txrx_pause_cb(uint8_t vdev_id,
  * crash debugger can extract them from driver debug symbol and crashdump for
  * post processing
  */
+#ifdef BUILD_TAG
+uint8_t g_wlan_driver_version[] = QWLAN_VERSIONSTR "; " BUILD_TAG;
+#else
 uint8_t g_wlan_driver_version[] = QWLAN_VERSIONSTR;
-
-#ifndef BUILD_TIMESTAMP
-#define BUILD_TIMESTAMP ""
 #endif
-uint8_t g_wlan_driver_timestamp[] = BUILD_TIMESTAMP;
 
 /**
  * hdd_device_mode_to_string() - return string conversion of device mode
@@ -990,10 +989,10 @@ static void hdd_update_vdev_nss(hdd_context_t *hdd_ctx)
 		max_supp_nss = 2;
 
 	sme_update_vdev_type_nss(hdd_ctx->hHal, max_supp_nss,
-			cfg_ini->vdev_type_nss_2g, eCSR_BAND_24);
+			cfg_ini->vdev_type_nss_2g, SIR_BAND_2_4_GHZ);
 
 	sme_update_vdev_type_nss(hdd_ctx->hHal, max_supp_nss,
-			cfg_ini->vdev_type_nss_5g, eCSR_BAND_5G);
+			cfg_ini->vdev_type_nss_5g, SIR_BAND_5_GHZ);
 }
 
 /**
@@ -1596,11 +1595,11 @@ void hdd_update_tgt_cfg(void *context, void *param)
 	 * setting if INI setting is a subset
 	 */
 
-	if ((hdd_ctx->config->nBandCapability == eCSR_BAND_ALL) &&
-	    (temp_band_cap != eCSR_BAND_ALL))
+	if ((hdd_ctx->config->nBandCapability == SIR_BAND_ALL) &&
+	    (temp_band_cap != SIR_BAND_ALL))
 		hdd_ctx->config->nBandCapability = temp_band_cap;
-	else if ((hdd_ctx->config->nBandCapability != eCSR_BAND_ALL) &&
-		 (temp_band_cap != eCSR_BAND_ALL) &&
+	else if ((hdd_ctx->config->nBandCapability != SIR_BAND_ALL) &&
+		 (temp_band_cap != SIR_BAND_ALL) &&
 		 (hdd_ctx->config->nBandCapability != temp_band_cap)) {
 		hdd_warn("ini BandCapability not supported by the target");
 	}
@@ -2068,6 +2067,13 @@ int hdd_wlan_start_modules(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 	qdf_cancel_delayed_work(&hdd_ctx->iface_idle_work);
 
 	mutex_lock(&hdd_ctx->iface_change_lock);
+	if (hdd_ctx->driver_status == DRIVER_MODULES_ENABLED) {
+		mutex_unlock(&hdd_ctx->iface_change_lock);
+		hdd_info("Driver modules already Enabled");
+		EXIT();
+		return 0;
+	}
+
 	hdd_ctx->start_modules_in_progress = true;
 
 	switch (hdd_ctx->driver_status) {
@@ -2178,9 +2184,6 @@ int hdd_wlan_start_modules(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 		hdd_info("Driver Modules Successfully Enabled");
 		hdd_ctx->driver_status = DRIVER_MODULES_ENABLED;
 
-		break;
-	case DRIVER_MODULES_ENABLED:
-		hdd_info("Driver modules already Enabled");
 		break;
 	default:
 		hdd_err("WLAN start invoked in wrong state! :%d\n",
@@ -2664,6 +2667,12 @@ static void __hdd_set_multicast_list(struct net_device *dev)
 	if (status)
 		return;
 
+	if (hdd_ctx->driver_status == DRIVER_MODULES_CLOSED) {
+		hdd_err("Driver Modules are closed, cannot set mc addr list");
+		return;
+	}
+
+
 	if (!hdd_ctx->config->fEnableMCAddrList) {
 		hdd_debug("gMCAddrListEnable ini param not enabled");
 		adapter->mc_addr_list.mc_cnt = 0;
@@ -2894,6 +2903,7 @@ static hdd_adapter_t *hdd_alloc_station_adapter(hdd_context_t *hdd_ctx,
 	struct net_device *pWlanDev = NULL;
 	hdd_adapter_t *adapter = NULL;
 	hdd_station_ctx_t *sta_ctx;
+	QDF_STATUS qdf_status;
 	/*
 	 * cfg80211 initialization and registration....
 	 */
@@ -2920,8 +2930,22 @@ static hdd_adapter_t *hdd_alloc_station_adapter(hdd_context_t *hdd_ctx,
 		adapter->magic = WLAN_HDD_ADAPTER_MAGIC;
 		adapter->sessionId = HDD_SESSION_ID_INVALID;
 
-		init_completion(&adapter->session_open_comp_var);
-		init_completion(&adapter->session_close_comp_var);
+		qdf_status = qdf_event_create(
+				&adapter->qdf_session_open_event);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+			hdd_err("Session open QDF event init failed!");
+			free_netdev(adapter->dev);
+			return NULL;
+		}
+
+		qdf_status = qdf_event_create(
+				&adapter->qdf_session_close_event);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+			hdd_err("Session close QDF event init failed!");
+			free_netdev(adapter->dev);
+			return NULL;
+		}
+
 		init_completion(&adapter->disconnect_comp_var);
 		init_completion(&adapter->roaming_comp_var);
 		init_completion(&adapter->linkup_event_var);
@@ -3051,7 +3075,7 @@ QDF_STATUS hdd_sme_close_session_callback(void *pContext)
 	 * valid, before signaling completion
 	 */
 	if (WLAN_HDD_ADAPTER_MAGIC == adapter->magic)
-		complete(&adapter->session_close_comp_var);
+		qdf_event_set(&adapter->qdf_session_close_event);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3093,10 +3117,13 @@ QDF_STATUS hdd_init_station_mode(hdd_adapter_t *adapter)
 	QDF_STATUS qdf_ret_status = QDF_STATUS_SUCCESS;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	uint32_t type, subType;
-	unsigned long rc;
 	int ret_val;
 
-	INIT_COMPLETION(adapter->session_open_comp_var);
+	status = qdf_event_reset(&adapter->qdf_session_open_event);
+	if (QDF_STATUS_SUCCESS != status) {
+		hdd_err("failed to reinit session open event");
+		goto error_sme_open;
+	}
 	sme_set_curr_device_mode(hdd_ctx->hHal, adapter->device_mode);
 	sme_set_pdev_ht_vht_ies(hdd_ctx->hHal, hdd_ctx->config->enable2x2);
 	status = cds_get_vdev_types(adapter->device_mode, &type, &subType);
@@ -3116,14 +3143,26 @@ QDF_STATUS hdd_init_station_mode(hdd_adapter_t *adapter)
 		goto error_sme_open;
 	}
 	/* Block on a completion variable. Can't wait forever though. */
-	rc = wait_for_completion_timeout(
-		&adapter->session_open_comp_var,
-		msecs_to_jiffies(WLAN_WAIT_TIME_SESSIONOPENCLOSE));
-	if (!rc) {
-		hdd_err("Session is not opened within timeout period code %ld",
-			rc);
-		status = QDF_STATUS_E_FAILURE;
-		goto error_register_wext;
+	status = qdf_wait_for_event_completion(&adapter->qdf_session_open_event,
+			WLAN_WAIT_TIME_SESSIONOPENCLOSE);
+	if (QDF_STATUS_SUCCESS != status) {
+		if (adapter->qdf_session_open_event.force_set) {
+			/*
+			 * SSR/PDR has caused shutdown, which has forcefully
+			 * set the event. Return without the closing session.
+			 */
+			adapter->sessionId = HDD_SESSION_ID_INVALID;
+			hdd_err("Session open event forcefully set");
+			goto error_sme_open;
+		} else {
+			if (QDF_STATUS_E_TIMEOUT == status)
+				hdd_err("Session failed to open within timeout period");
+			else
+				hdd_err("Failed to wait for session open event(status-%d)",
+					status);
+
+			goto error_register_wext;
+		}
 	}
 
 	/*
@@ -3227,7 +3266,7 @@ error_init_txrx:
 	hdd_unregister_wext(pWlanDev);
 error_register_wext:
 	if (adapter->sessionId != HDD_SESSION_ID_INVALID) {
-		INIT_COMPLETION(adapter->session_close_comp_var);
+		qdf_event_reset(&adapter->qdf_session_close_event);
 		if (QDF_STATUS_SUCCESS == sme_close_session(hdd_ctx->hHal,
 						adapter->sessionId, true,
 						hdd_sme_close_session_callback,
@@ -3236,13 +3275,12 @@ error_register_wext:
 			 * Block on a completion variable.
 			 * Can't wait forever though.
 			 */
-			rc = wait_for_completion_timeout(
-				&adapter->session_close_comp_var,
-				msecs_to_jiffies
-					(WLAN_WAIT_TIME_SESSIONOPENCLOSE));
-			if (rc <= 0)
-				hdd_err("Session is not closed within timeout period code %ld",
-				       rc);
+			status = qdf_wait_for_event_completion(
+				&adapter->qdf_session_close_event,
+				WLAN_WAIT_TIME_SESSIONOPENCLOSE);
+			if (QDF_STATUS_SUCCESS != status)
+				hdd_err("Unable to close session (%u)",
+					status);
 		}
 		adapter->sessionId = HDD_SESSION_ID_INVALID;
 	}
@@ -4085,14 +4123,18 @@ static void hdd_wait_for_sme_close_sesion(hdd_context_t *hdd_ctx,
 					hdd_adapter_t *adapter,
 					bool flush_all_sme_cmds)
 {
-	unsigned long rc;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
 	if (!test_bit(SME_SESSION_OPENED, &adapter->event_flags)) {
 		hdd_err("session is not opened:%d", adapter->sessionId);
 		return;
 	}
 
-	INIT_COMPLETION(adapter->session_close_comp_var);
+	status = qdf_event_reset(&adapter->qdf_session_close_event);
+	if (QDF_STATUS_SUCCESS != status) {
+		hdd_err("failed to reinit session_close QDF event");
+		return;
+	}
 	if (QDF_STATUS_SUCCESS ==
 			sme_close_session(hdd_ctx->hHal, adapter->sessionId,
 				flush_all_sme_cmds,
@@ -4102,14 +4144,14 @@ static void hdd_wait_for_sme_close_sesion(hdd_context_t *hdd_ctx,
 		 * Block on a completion variable. Can't wait
 		 * forever though.
 		 */
-		rc = wait_for_completion_timeout(
-				&adapter->session_close_comp_var,
-				msecs_to_jiffies
-				(WLAN_WAIT_TIME_SESSIONOPENCLOSE));
-		if (!rc) {
-			hdd_err("failure waiting for session_close_comp_var");
+		status = qdf_wait_for_event_completion(
+				&adapter->qdf_session_close_event,
+				WLAN_WAIT_TIME_SESSIONOPENCLOSE);
+		if (QDF_STATUS_SUCCESS != status) {
+			hdd_err("failure waiting for session_close QDF event");
 			if (adapter->device_mode == QDF_NDI_MODE)
 				hdd_ndp_session_end_handler(adapter);
+			sme_print_commands(hdd_ctx->hHal);
 			clear_bit(SME_SESSION_OPENED, &adapter->event_flags);
 			return;
 		}
@@ -4169,9 +4211,14 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 					hdd_ctx->hHal,
 					adapter->sessionId,
 					eCSR_DISCONNECT_REASON_IBSS_LEAVE);
-			else if (QDF_STA_MODE == adapter->device_mode)
+			else if (QDF_STA_MODE == adapter->device_mode) {
 				qdf_ret_status =
 					wlan_hdd_try_disconnect(adapter);
+				hdd_debug("Send disconnected event to userspace");
+				wlan_hdd_cfg80211_indicate_disconnect(
+					adapter->dev, true,
+					WLAN_REASON_UNSPECIFIED);
+			}
 			else
 				qdf_ret_status = sme_roam_disconnect(
 					hdd_ctx->hHal,
@@ -4270,8 +4317,8 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 				qdf_event_reset(&hostapd_state->
 						qdf_stop_bss_event);
 				qdf_status =
-					qdf_wait_single_event(&hostapd_state->
-					qdf_stop_bss_event,
+					qdf_wait_for_event_completion(
+					&hostapd_state->qdf_stop_bss_event,
 					SME_CMD_TIMEOUT_VALUE);
 
 				if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -5953,6 +6000,9 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 
 	unregister_netdevice_notifier(&hdd_netdev_notifier);
 
+	/* Free up RoC request queue and flush workqueue */
+	cds_flush_work(&hdd_ctx->roc_req_work);
+
 	hdd_wlan_stop_modules(hdd_ctx, false);
 
 	hdd_driver_memdump_deinit();
@@ -5990,8 +6040,6 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 	hdd_close_all_adapters(hdd_ctx, false);
 	hdd_ipa_cleanup(hdd_ctx);
 
-	/* Free up RoC request queue and flush workqueue */
-	cds_flush_work(&hdd_ctx->roc_req_work);
 
 	wlansap_global_deinit();
 	/*
@@ -6316,7 +6364,7 @@ bool hdd_is_5g_supported(hdd_context_t *hdd_ctx)
 	if (!hdd_ctx || !hdd_ctx->config)
 		return true;
 
-	if (hdd_ctx->curr_band != eCSR_BAND_24)
+	if (hdd_ctx->curr_band != SIR_BAND_2_4_GHZ)
 		return true;
 	else
 		return false;
@@ -8031,6 +8079,34 @@ static int ie_whitelist_attrs_init(hdd_context_t *hdd_ctx)
 	return ret;
 }
 
+
+
+/**
+ * hdd_iface_change_callback() - Function invoked when stop modules expires
+ * @priv: pointer to hdd context
+ *
+ * This function is invoked when the timer waiting for the interface change
+ * expires, it shall cut-down the power to wlan and stop all the modules.
+ *
+ * Return: void
+ */
+static void hdd_iface_change_callback(void *priv)
+{
+	hdd_context_t *hdd_ctx = (hdd_context_t *) priv;
+	int ret;
+	int status = wlan_hdd_validate_context(hdd_ctx);
+
+	if (status)
+		return;
+
+	ENTER();
+	hdd_debug("Interface change timer expired close the modules!");
+	ret = hdd_wlan_stop_modules(hdd_ctx, false);
+	if (ret)
+		hdd_err("Failed to stop modules");
+	EXIT();
+}
+
 /**
  * hdd_context_create() - Allocate and inialize HDD context.
  * @dev:	Device Pointer to the underlying device
@@ -8062,6 +8138,12 @@ static hdd_context_t *hdd_context_create(struct device *dev)
 		ret = -ENOMEM;
 		goto err_out;
 	}
+
+	qdf_create_delayed_work(&hdd_ctx->iface_idle_work,
+				hdd_iface_change_callback,
+				(void *)hdd_ctx);
+
+	mutex_init(&hdd_ctx->iface_change_lock);
 
 	hdd_ctx->pcds_context = p_cds_context;
 	hdd_ctx->parent_dev = dev;
@@ -8136,6 +8218,7 @@ err_free_config:
 err_free_hdd_context:
 	hdd_free_probe_req_ouis(hdd_ctx);
 	wiphy_free(hdd_ctx->wiphy);
+	mutex_destroy(&hdd_ctx->iface_change_lock);
 
 err_out:
 	return ERR_PTR(ret);
@@ -8300,6 +8383,21 @@ int hdd_start_ftm_adapter(hdd_adapter_t *adapter)
 	EXIT();
 }
 
+static int hdd_open_concurrent_interface(hdd_context_t *hdd_ctx, bool rtnl_held)
+{
+	hdd_adapter_t *adapter;
+
+	adapter = hdd_open_adapter(hdd_ctx, QDF_STA_MODE,
+				       hdd_ctx->config->enableConcurrentSTA,
+				       wlan_hdd_get_intf_addr(hdd_ctx),
+				       NET_NAME_UNKNOWN, rtnl_held);
+
+	if (adapter == NULL)
+		return -ENOSPC;
+
+	return 0;
+}
+
 /**
  * hdd_open_interfaces - Open all required interfaces
  * hdd_ctx:	HDD context
@@ -8327,6 +8425,12 @@ static int hdd_open_interfaces(hdd_context_t *hdd_ctx, bool rtnl_held)
 
 	/* fast roaming is allowed only on first STA, i.e. wlan adapter */
 	adapter->fast_roaming_allowed = true;
+
+	if (strlen(hdd_ctx->config->enableConcurrentSTA) != 0) {
+		ret = hdd_open_concurrent_interface(hdd_ctx, rtnl_held);
+		if (ret)
+			pr_err("Cannot create concurrent STA interface");
+	}
 
 	ret = hdd_open_p2p_interface(hdd_ctx, rtnl_held);
 	if (ret)
@@ -9159,8 +9263,12 @@ static int hdd_pre_enable_configure(hdd_context_t *hdd_ctx)
 		goto out;
 	}
 
-	hdd_apply_cached_country_info(hdd_ctx);
+	ret = hdd_apply_cached_country_info(hdd_ctx);
 
+	if (0 != ret) {
+		hdd_err("reg info update failed");
+		goto out;
+	}
 	cds_fill_and_send_ctl_to_fw(&hdd_ctx->reg);
 
 	status = hdd_set_sme_chan_list(hdd_ctx);
@@ -9856,6 +9964,9 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode)
 
 	hdd_info("Present Driver Status: %d", hdd_ctx->driver_status);
 
+	/* free user wowl patterns */
+	hdd_free_user_wowl_ptrns();
+
 	switch (hdd_ctx->driver_status) {
 	case DRIVER_MODULES_UNINITIALIZED:
 		hdd_info("Modules not initialized just return");
@@ -9896,16 +10007,6 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode)
 		ret = -EINVAL;
 		QDF_ASSERT(0);
 	}
-
-	/*
-	 * Close the scheduler before calling cds_close to make sure
-	 * no thread is scheduled after the each module close is
-	 * is called i.e after all the data structures are freed.
-	 */
-	qdf_status = cds_sched_close(hdd_ctx->pcds_context);
-	QDF_ASSERT(QDF_IS_STATUS_SUCCESS(qdf_status));
-	if (QDF_IS_STATUS_ERROR(qdf_status))
-		hdd_alert("Failed to close CDS Scheduler");
 
 	qdf_status = cds_close(hdd_ctx->pcds_context);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -9966,31 +10067,6 @@ done:
 	return ret;
 }
 
-/**
- * hdd_iface_change_callback() - Function invoked when stop modules expires
- * @priv: pointer to hdd context
- *
- * This function is invoked when the timer waiting for the interface change
- * expires, it shall cut-down the power to wlan and stop all the modules.
- *
- * Return: void
- */
-static void hdd_iface_change_callback(void *priv)
-{
-	hdd_context_t *hdd_ctx = (hdd_context_t *) priv;
-	int ret;
-	int status = wlan_hdd_validate_context(hdd_ctx);
-
-	if (status)
-		return;
-
-	ENTER();
-	hdd_debug("Interface change timer expired close the modules!");
-	ret = hdd_wlan_stop_modules(hdd_ctx, false);
-	if (ret)
-		hdd_err("Failed to stop modules");
-	EXIT();
-}
 
 /**
  * hdd_state_info_dump() - prints state information of hdd layer
@@ -10156,13 +10232,7 @@ int hdd_wlan_startup(struct device *dev)
 	if (IS_ERR(hdd_ctx))
 		return PTR_ERR(hdd_ctx);
 
-	qdf_create_delayed_work(&hdd_ctx->iface_idle_work,
-				hdd_iface_change_callback,
-				(void *)hdd_ctx);
-
 	qdf_nbuf_init_replenish_timer();
-
-	mutex_init(&hdd_ctx->iface_change_lock);
 
 	ret = hdd_init_netlink_services(hdd_ctx);
 	if (ret)
@@ -10303,7 +10373,6 @@ err_hdd_free_context:
 		hdd_start_complete(ret);
 
 	qdf_nbuf_deinit_replenish_timer();
-	mutex_destroy(&hdd_ctx->iface_change_lock);
 	hdd_context_destroy(hdd_ctx);
 	return ret;
 
@@ -11174,8 +11243,8 @@ void wlan_hdd_stop_sap(hdd_adapter_t *ap_adapter)
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
 		if (QDF_STATUS_SUCCESS == wlansap_stop_bss(hdd_ap_ctx->
 							sapContext)) {
-			qdf_status = qdf_wait_single_event(&hostapd_state->
-					qdf_stop_bss_event,
+			qdf_status = qdf_wait_for_event_completion(
+					&hostapd_state->qdf_stop_bss_event,
 					SME_CMD_TIMEOUT_VALUE);
 			if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 				mutex_unlock(&hdd_ctx->sap_lock);
@@ -11242,7 +11311,7 @@ void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter, bool reinit)
 		goto end;
 
 	hdd_debug("Waiting for SAP to start");
-	qdf_status = qdf_wait_single_event(&hostapd_state->qdf_event,
+	qdf_status = qdf_wait_for_event_completion(&hostapd_state->qdf_event,
 					SME_CMD_TIMEOUT_VALUE);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		hdd_err("SAP Start failed");
@@ -11388,7 +11457,6 @@ err_out:
  */
 void hdd_deinit(void)
 {
-	hdd_deinit_wowl();
 
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
 	wlan_logging_sock_deinit_svc();
@@ -11517,28 +11585,6 @@ static void wlan_hdd_state_ctrl_param_destroy(void)
 	pr_info("Device node unregistered");
 }
 
-#ifndef MODULE
-static int hdd_wait_for_probe_complete(void)
-{
-	unsigned long rc;
-
-	rc = wait_for_completion_timeout(&wlan_start_comp,
-				msecs_to_jiffies(HDD_WLAN_START_WAIT_TIME));
-
-	if (!rc) {
-		hdd_alert("Timed-out waiting for Probe to complete");
-		return -ETIMEDOUT;
-	}
-
-	return 0;
-}
-#else
-static int hdd_wait_for_probe_complete(void)
-{
-	return 0;
-}
-#endif
-
 /**
  * __hdd_module_init - Module init helper
  *
@@ -11550,10 +11596,9 @@ static int __hdd_module_init(void)
 {
 	int ret = 0;
 
-	pr_err("%s: Loading driver v%s (%s)%s\n",
+	pr_err("%s: Loading driver v%s (%s)\n",
 	       WLAN_MODULE_NAME,
-	       QWLAN_VERSIONSTR,
-	       g_wlan_driver_timestamp,
+	       g_wlan_driver_version,
 	       TIMER_MANAGER_STR MEMORY_DEBUG_STR);
 
 	ret = wlan_hdd_state_ctrl_param_create();
@@ -11578,12 +11623,6 @@ static int __hdd_module_init(void)
 	if (ret) {
 		pr_err("%s: driver load failure, err %d\n", WLAN_MODULE_NAME,
 			ret);
-		goto out;
-	}
-
-	if (hdd_wait_for_probe_complete()) {
-		pr_err("%s: probe of the driver failed!", __func__);
-		wlan_hdd_unregister_driver();
 		goto out;
 	}
 
@@ -11646,7 +11685,6 @@ static ssize_t wlan_boot_cb(struct kobject *kobj,
 		return -EALREADY;
 	}
 
-	init_completion(&wlan_start_comp);
 	if (__hdd_module_init()) {
 		pr_err("%s: wlan driver initialization failed\n", __func__);
 		return -EIO;
@@ -11748,6 +11786,7 @@ static int wlan_deinit_sysfs(void)
 	hdd_sysfs_cleanup();
 	return 0;
 }
+
 #endif /* MODULE */
 
 #ifdef MODULE
@@ -12000,6 +12039,9 @@ static int __con_mode_handler(const char *kmessage, struct kernel_param *kp,
 		ret = 0;
 		goto reset_flags;
 	}
+
+	if (!cds_wait_for_external_threads_completion(__func__))
+		hdd_warn("Waiting for monitor mode: External threads are active");
 
 	/* ensure adapters are stopped */
 	hdd_stop_present_mode(hdd_ctx, curr_mode);
