@@ -12137,7 +12137,7 @@ static void __exit hdd_module_exit(void)
 }
 #endif
 
-static int fwpath_changed_handler(const char *kmessage, struct kernel_param *kp)
+static int fwpath_changed_handler(const char *kmessage, const struct kernel_param *kp)
 {
 	return param_set_copystring(kmessage, kp);
 }
@@ -12309,7 +12309,7 @@ static int hdd_register_req_mode(hdd_context_t *hdd_ctx,
  *
  * Return - 0 on success and failure code on failure
  */
-static int __con_mode_handler(const char *kmessage, struct kernel_param *kp,
+static int __con_mode_handler(const char *kmessage, const struct kernel_param *kp,
 			      hdd_context_t *hdd_ctx)
 {
 	int ret;
@@ -12408,7 +12408,7 @@ reset_flags:
 }
 
 
-static int con_mode_handler(const char *kmessage, struct kernel_param *kp)
+static int con_mode_handler(const char *kmessage, const struct kernel_param *kp)
 {
 	int ret;
 	hdd_context_t *hdd_ctx;
