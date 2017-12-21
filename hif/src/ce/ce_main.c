@@ -132,7 +132,7 @@ void hif_trigger_dump(struct hif_opaque_softc *hif_ctx,
 	}
 }
 
-static void ce_poll_timeout(void *arg)
+static void ce_poll_timeout(unsigned long arg)
 {
 	struct CE_state *CE_state = (struct CE_state *)arg;
 
