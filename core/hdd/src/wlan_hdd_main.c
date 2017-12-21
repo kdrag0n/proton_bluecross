@@ -6930,10 +6930,10 @@ static void __hdd_bus_bw_cbk(void *arg)
  *
  * Return: None.
  */
-static void hdd_bus_bw_cbk(void *arg)
+static void hdd_bus_bw_cbk(unsigned long arg)
 {
 	cds_ssr_protect(__func__);
-	__hdd_bus_bw_cbk(arg);
+	__hdd_bus_bw_cbk((void *)arg);
 	cds_ssr_unprotect(__func__);
 }
 

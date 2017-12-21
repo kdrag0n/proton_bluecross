@@ -124,7 +124,7 @@ void ol_rx_reorder_timeout_update(struct ol_txrx_peer_t *peer, uint8_t tid)
 	ol_rx_reorder_timeout_add(peer, tid);
 }
 
-static void ol_rx_reorder_timeout(void *arg)
+static void ol_rx_reorder_timeout(unsigned long arg)
 {
 	struct ol_txrx_pdev_t *pdev;
 	struct ol_rx_reorder_timeout_list_elem_t *list_elem, *tmp;

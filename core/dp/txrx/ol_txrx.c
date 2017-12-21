@@ -3397,7 +3397,7 @@ QDF_STATUS ol_txrx_clear_peer(uint8_t sta_id)
  *
  * Return: none
  */
-void peer_unmap_timer_handler(void *data)
+void peer_unmap_timer_handler(unsigned long data)
 {
 	ol_txrx_peer_handle peer = (ol_txrx_peer_handle)data;
 
