@@ -47,8 +47,6 @@
 /* timer data type */
 typedef struct timer_list __qdf_timer_t;
 
-typedef void (*qdf_dummy_timer_func_t)(unsigned long arg);
-
 /**
  * __qdf_timer_init() - initialize a softirq timer
  * @hdl: OS handle
@@ -71,21 +69,16 @@ static inline QDF_STATUS __qdf_timer_init(qdf_handle_t hdl,
 {
 	if (type == QDF_TIMER_TYPE_SW) {
 		if (object_is_on_stack(timer))
-			setup_deferrable_timer_on_stack(
-			    timer, (qdf_dummy_timer_func_t)func,
-			    (unsigned long)arg);
+			setup_deferrable_timer_on_stack(timer, func,
+							(unsigned long)arg);
 		else
-			setup_deferrable_timer(timer,
-					       (qdf_dummy_timer_func_t)func,
+			setup_deferrable_timer(timer, func,
 					       (unsigned long)arg);
 	} else {
 		if (object_is_on_stack(timer))
-			setup_timer_on_stack(timer,
-					     (qdf_dummy_timer_func_t)func,
-					     (unsigned long)arg);
+			setup_timer_on_stack(timer, func, (unsigned long)arg);
 		else
-			setup_timer(timer, (qdf_dummy_timer_func_t)func,
-				    (unsigned long)arg);
+			setup_timer(timer, func, (unsigned long)arg);
 	}
 
 	return QDF_STATUS_SUCCESS;
