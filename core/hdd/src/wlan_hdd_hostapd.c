@@ -8029,6 +8029,8 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	wlansap_set_tx_leakage_threshold(hHal,
 		iniConfig->sap_tx_leakage_threshold);
 
+	wlansap_set_etsi_srd_chan_support(hHal,
+			iniConfig->etsi_srd_chan_in_master_mode);
 	capab_info = pMgmt_frame->u.beacon.capab_info;
 
 	pConfig->privacy = (pMgmt_frame->u.beacon.capab_info &
@@ -8339,7 +8341,12 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 			pConfig->ch_width_orig = CH_WIDTH_20MHZ;
 	}
 
-	if (wlan_hdd_setup_driver_overrides(pHostapdAdapter)) {
+	if (cds_is_force_scc() &&
+			cds_mode_specific_get_channel(CDS_STA_MODE)) {
+		pConfig->channel = cds_mode_specific_get_channel(CDS_STA_MODE);
+		hdd_debug("force SCC is enabled and STA is active, override the SAP channel to %d",
+				pConfig->channel);
+	} else if (wlan_hdd_setup_driver_overrides(pHostapdAdapter)) {
 		ret = -EINVAL;
 		goto error;
 	}

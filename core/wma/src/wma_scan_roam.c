@@ -195,6 +195,12 @@ QDF_STATUS wma_get_buf_start_scan_cmd(tp_wma_handle wma_handle,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (scan_req->uIEFieldLen > WLAN_SCAN_PARAMS_MAX_IE_LEN) {
+		WMA_LOGD(FL("scan_ie_len (%d) greater than max (%d)"),
+			scan_req->uIEFieldLen, WLAN_SCAN_PARAMS_MAX_IE_LEN);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	cmd->vdev_id = scan_req->sessionId;
 	/*
 	 * host cycles through the lower 12 bits for scan id generation
@@ -2896,7 +2902,7 @@ cleanup_label:
 		roam_req = qdf_mem_malloc(sizeof(tSirRoamOffloadScanReq));
 		if (roam_req && synch_event) {
 			roam_req->Command = ROAM_SCAN_OFFLOAD_STOP;
-			roam_req->reason = REASON_ROAM_SYNCH_FAILED;
+			roam_req->reason = REASON_ROAM_STOP_ALL;
 			roam_req->sessionId = synch_event->vdev_id;
 			wma_process_roaming_config(wma, roam_req);
 		}
@@ -3585,8 +3591,10 @@ void wma_set_channel(tp_wma_handle wma, tpSwitchChannelParams params)
 	 * true
 	 */
 	if ((wma_is_vdev_in_ap_mode(wma, req.vdev_id) == true) ||
-		(params->restart_on_chan_switch == true))
+	    (params->restart_on_chan_switch == true)) {
 		wma->interfaces[req.vdev_id].is_channel_switch = true;
+		req.hidden_ssid = intr[vdev_id].vdev_restart_params.ssidHidden;
+	}
 
 	if (params->restart_on_chan_switch == true &&
 			wma->interfaces[req.vdev_id].beacon_filter_enabled)

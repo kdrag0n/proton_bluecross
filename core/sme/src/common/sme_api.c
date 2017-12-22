@@ -690,8 +690,9 @@ tListElem *csr_get_cmd_to_process(tpAniSirGlobal pMac, tDblLinkList *pList,
 	pCurEntry = csr_ll_peek_head(pList, LL_ACCESS_LOCK);
 	while (pCurEntry) {
 		pCommand = GET_BASE_ADDR(pCurEntry, tSmeCmd, Link);
-		if (pCommand->sessionId != sessionId) {
-			sme_debug("selected the command with different sessionId");
+		if (pCommand->sessionId != sessionId ||
+		    pCommand->command ==  eSmeCommandSetKey) {
+			sme_debug("selected the command with different sessionId or setkey");
 			return pCurEntry;
 		}
 
@@ -4060,7 +4061,7 @@ QDF_STATUS sme_roam_stop_bss(tHalHandle hHal, uint8_t sessionId)
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		if (CSR_IS_SESSION_VALID(pMac, sessionId))
 			status = csr_roam_issue_stop_bss_cmd(pMac, sessionId,
-							true);
+							false);
 		else
 			status = QDF_STATUS_E_INVAL;
 		sme_release_global_lock(&pMac->sme);
@@ -7564,11 +7565,35 @@ QDF_STATUS sme_get_cfg_valid_channels(tHalHandle hHal, uint8_t *aValidChannels,
 	return status;
 }
 
+static uint8_t *sme_hint_to_str(enum country_src src)
+{
+
+	switch (src) {
+	case SOURCE_CORE:
+		return "WORLD MODE";
+
+	case SOURCE_DRIVER:
+		return "BDF file";
+
+	case SOURCE_USERSPACE:
+		return "user-space";
+
+	case SOURCE_11D:
+		return "80211D IEs in beacons";
+
+	default:
+		return "unknown";
+	}
+}
+
 void sme_set_cc_src(tHalHandle hHal, enum country_src cc_src)
 {
 	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hHal);
 
 	mac_ctx->reg_hint_src = cc_src;
+
+	sme_debug("Country source is %s",
+		  sme_hint_to_str(cc_src));
 }
 
 /*
@@ -12316,8 +12341,7 @@ void active_list_cmd_timeout_handle(void *userData)
 		sme_save_active_cmd_stats(hal);
 		cds_trigger_recovery(CDS_ACTIVE_LIST_TIMEOUT);
 	} else {
-		if (!mac_ctx->roam.configParam.enable_fatal_event &&
-		   !(cds_is_load_or_unload_in_progress() ||
+		if (!(cds_is_load_or_unload_in_progress() ||
 		    cds_is_driver_recovering() || cds_is_driver_in_bad_state()))
 			QDF_BUG(0);
 		else
@@ -17281,6 +17305,9 @@ QDF_STATUS sme_set_default_scan_ie(tHalHandle hal, uint16_t session_id,
 	QDF_STATUS status;
 	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
 	struct hdd_default_scan_ie *set_ie_params;
+
+	if (!ie_data)
+		return QDF_STATUS_E_INVAL;
 
 	status = sme_acquire_global_lock(&mac_ctx->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
