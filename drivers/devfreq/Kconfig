@@ -156,6 +156,12 @@ config DEVFREQ_GOV_MEMLAT
 
 comment "DEVFREQ Drivers"
 
+config SIMPLE_GPU_ALGORITHM
+	bool "Simple GPU algorithm"
+	depends on DEVFREQ_GOV_QCOM_ADRENO_TZ
+	help
+	  Simple user configurable GPU controlling algorithm
+
 config DEVFREQ_GOV_QCOM_ADRENO_TZ
 	tristate "Qualcomm Technologies Inc Adreno Trustzone"
 	depends on QCOM_KGSL && QCOM_SCM
