@@ -78,20 +78,21 @@ struct cirrus_cal_result_t {
 	int32_t atemp;
 };
 
+#define APR_CHUNK_SIZE		256
+#define PAYLOAD_FOLLOWS_CONFIG	4
+
 /* Payload struct for sending an external configuration string to the DSP module
  */
 struct crus_external_config_t {
 	uint32_t total_size;
 	uint32_t chunk_size;
 	int32_t done;
-	const char *config;
+	int32_t reserved;
+	int32_t config;
+	char data[APR_CHUNK_SIZE];
 };
 
 int afe_apr_send_pkt_crus(void *data, int index, int set);
-int crus_afe_get_param(int port, int module, int param, int length, void *data);
-int crus_afe_set_param(int port, int module, int param, int data_size,
-		       void *data_ptr);
-int crus_afe_send_config(const char *string, int32_t module);
 int crus_afe_callback(void *payload, int size);
 void msm_crus_pb_add_controls(struct snd_soc_platform *platform);
 

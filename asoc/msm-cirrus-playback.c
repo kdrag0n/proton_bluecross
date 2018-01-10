@@ -20,7 +20,8 @@
 
 #include <asoc/msm-cirrus-playback.h>
 
-static struct device *crus_sp_device;
+#define CIRRUS_SP_CONFIG_MAX_LEN_FILENAME 256
+
 static atomic_t crus_sp_misc_usage_count;
 
 static struct crus_single_data_t crus_enable;
@@ -33,23 +34,22 @@ struct mutex crus_sp_lock;
 static int cirrus_sp_en;
 static int cirrus_sp_case_ctrl;
 static int cirrus_fb_port_ctl;
+static int cirrus_fb_ext_sel;
 static int cirrus_fb_port = AFE_PORT_ID_QUATERNARY_TDM_TX;
 static int cirrus_ff_port = AFE_PORT_ID_QUATERNARY_TDM_RX;
 
-int crus_afe_get_param(int port, int module, int param, int length, void *data)
+static void *crus_gen_afe_get_header(int length, int port, int module,
+				     int param)
 {
-	int ret = 0;
-	int size = sizeof(struct afe_custom_crus_get_config_t);
 	struct afe_custom_crus_get_config_t *config = NULL;
+	int size = sizeof(struct afe_custom_crus_get_config_t);
 	int index = afe_get_port_index(port);
-	int header_size = sizeof(struct afe_port_param_data_v2);
-	uint16_t payload_size = header_size + length;
-	uint16_t data_size = length;
+	u16 payload_size = sizeof(struct afe_port_param_data_v2) + length;
 
 	/* Allocate memory for the message */
 	config = kzalloc(size, GFP_KERNEL);
 	if (!config)
-		return 1;
+		return NULL;
 
 	/* Set header section */
 	config->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
@@ -67,157 +67,37 @@ int crus_afe_get_param(int port, int module, int param, int length, void *data)
 
 	/* Set param section */
 	config->param.port_id = (uint16_t) port;
-	/* max data size of the param_ID/module_ID combination */
-	config->param.payload_size = payload_size;
 	config->param.payload_address_lsw = 0;
 	config->param.payload_address_msw = 0;
 	config->param.mem_map_handle = 0;
 	config->param.module_id = (uint32_t) module;
 	config->param.param_id = (uint32_t) param;
+	/* max data size of the param_ID/module_ID combination */
+	config->param.payload_size = payload_size;
 
 	/* Set data section */
 	config->data.module_id = (uint32_t) module;
 	config->data.param_id = (uint32_t) param;
+	config->data.reserved = 0; /* Must be set to 0 */
 	/* actual size of the data for the module_ID/param_ID pair */
-	config->data.param_size = data_size;
-	config->data.reserved = 0;	/* Must be set to 0 */
+	config->data.param_size = length;
 
-	mutex_lock(&crus_sp_get_param_lock);
-	atomic_set(&crus_sp_get_param_flag, 0);
-	crus_sp_get_buffer = kzalloc(config->param.payload_size + 16,
-				     GFP_KERNEL);
-
-	ret = afe_apr_send_pkt_crus(config, index, 0);
-
-	if (ret) {
-		pr_err("%s: crus get_param for port %d failed with code %d\n",
-		       __func__, port, ret);
-	}
-
-	/* Wait for afe callback to populate data */
-	while (!atomic_read(&crus_sp_get_param_flag))
-		msleep(20);
-
-	/* copy from dynamic buffer to return buffer */
-	memcpy((u8 *) data, &crus_sp_get_buffer[4], length);
-
-	kfree(crus_sp_get_buffer);
-	mutex_unlock(&crus_sp_get_param_lock);
-
-	kfree(config);
-	return ret;
+	return (void *)config;
 }
 
-int crus_afe_set_param(int port, int module, int param, int data_size,
-		       void *data_ptr)
+static void *crus_gen_afe_set_header(int length, int port, int module,
+				     int param)
 {
-	int result = 0;
-	int packet_size = 0;
-	int payload_size = 0;
 	struct afe_custom_crus_set_config_t *config = NULL;
-
+	int size = sizeof(struct afe_custom_crus_set_config_t) + length;
 	int index = afe_get_port_index(port);
-
-	packet_size = sizeof(struct afe_custom_crus_set_config_t) + data_size;
-	payload_size = sizeof(struct afe_port_param_data_v2) + data_size;
-
-	config = kzalloc(packet_size, GFP_KERNEL);
-	if (!config)
-		return 1;
-
-	memcpy((u8 *) config + sizeof(struct afe_custom_crus_set_config_t),
-	       (u8 *) data_ptr, data_size);
-
-	/* Set header section */
-	config->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					      APR_HDR_LEN(APR_HDR_SIZE),
-					      APR_PKT_VER);
-	config->hdr.pkt_size = packet_size;
-	config->hdr.src_svc = APR_SVC_AFE;
-	config->hdr.src_domain = APR_DOMAIN_APPS;
-	config->hdr.src_port = 0;
-	config->hdr.dest_svc = APR_SVC_AFE;
-	config->hdr.dest_domain = APR_DOMAIN_ADSP;
-	config->hdr.dest_port = 0;
-	config->hdr.token = index;
-	config->hdr.opcode = AFE_PORT_CMD_SET_PARAM_V2;
-
-	/* Set param section */
-	config->param.port_id = (uint16_t) port;
-	/* actual size of the payload in bytes */
-	config->param.payload_size = (uint16_t) payload_size;
-	config->param.payload_address_lsw = 0;
-	config->param.payload_address_msw = 0;
-	config->param.mem_map_handle = 0;
-
-	/* Set data section */
-	config->data.module_id = (uint32_t) module;
-	config->data.param_id = (uint32_t) param;
-	/* actual size of the data for the module_ID/param_ID pair */
-	config->data.param_size = (uint16_t) data_size;
-	config->data.reserved = 0;	/* Must be set to 0 */
-
-	pr_info("%s: Preparing to send apr packet.\n", __func__);
-	result = afe_apr_send_pkt_crus(config, index, 1);
-
-	if (result) {
-		pr_err("%s: crus set_param for port %d failed with code %d\n",
-		       __func__, port, result);
-	}
-
-	kfree(config);
-	return result;
-}
-
-int crus_afe_send_config(const char *string, int32_t module)
-{
-	int result = 0;
-	int index = 0;
-	uint32_t port_id = 0;
-	uint32_t param_id = 0;
-	int size = 0;
-	int mem_size = 0;
-	int sent = 0;
-	int chars_to_send = 0;
-	struct afe_custom_crus_set_config_t *config = NULL;
-	struct crus_external_config_t *payload = NULL;
-	int string_size = strlen(string) + 1;
-
-	pr_debug("%s: called with module_id = %x, string length = %d\n",
-		 __func__, module, string_size);
-
-	/* Destination settings for message */
-	if (module == CRUS_MODULE_ID_RX) {
-		port_id = cirrus_ff_port;
-		param_id = CRUS_PARAM_RX_SET_EXT_CONFIG;
-		index = afe_get_port_index(port_id);
-	} else if (module == CIRRUS_SP) {
-		port_id = cirrus_fb_port;
-		param_id = CRUS_PARAM_TX_SET_EXT_CONFIG;
-		index = afe_get_port_index(port_id);
-	} else {
-		pr_err("%s: Received invalid module parameter %d\n",
-		       __func__, module);
-		return -EINVAL;
-	}
-
-	if (string_size > 4000)
-		mem_size = 4000;
-	else
-		mem_size = string_size;
+	u16 payload_size = sizeof(struct afe_port_param_data_v2) + length;
 
 	/* Allocate memory for the message */
-	size = sizeof(struct afe_custom_crus_set_config_t) +
-	    sizeof(struct crus_external_config_t) + mem_size;
 	config = kzalloc(size, GFP_KERNEL);
 	if (!config)
-		return 1;
+		return NULL;
 
-	payload = (struct crus_external_config_t *)
-		((u8 *) config + sizeof(struct afe_custom_crus_set_config_t));
-	payload->total_size = (uint32_t) string_size;
-
-	/* Initial configuration of message */
 	/* Set header section */
 	config->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
 					      APR_HDR_LEN(APR_HDR_SIZE),
@@ -233,49 +113,181 @@ int crus_afe_send_config(const char *string, int32_t module)
 	config->hdr.opcode = AFE_PORT_CMD_SET_PARAM_V2;
 
 	/* Set param section */
-	config->param.port_id = port_id;
-	config->param.payload_size = sizeof(struct afe_port_param_data_v2) +
-	    sizeof(struct crus_external_config_t) + mem_size;
+	config->param.port_id = (uint16_t)port;
 	config->param.payload_address_lsw = 0;
 	config->param.payload_address_msw = 0;
 	config->param.mem_map_handle = 0;
+	/* max data size of the param_ID/module_ID combination */
+	config->param.payload_size = payload_size;
 
 	/* Set data section */
-	config->data.module_id = module;
-	config->data.param_id = param_id;
-	config->data.param_size =
-	    sizeof(struct crus_external_config_t) + mem_size;
+	config->data.module_id = (uint32_t)module;
+	config->data.param_id = (uint32_t)param;
 	config->data.reserved = 0;	/* Must be set to 0 */
+	/* actual size of the data for the module_ID/param_ID pair */
+	config->data.param_size = length;
 
-	/* Send config string in chunks of maximum 4000 bytes */
-	while (sent < string_size) {
-		chars_to_send = string_size - sent;
-		if (chars_to_send > 4000) {
-			chars_to_send = 4000;
+	return (void *)config;
+}
+
+static int crus_afe_get_param(int port, int module, int param, int length,
+			      void *data)
+{
+	struct afe_custom_crus_get_config_t *config = NULL;
+	int index = afe_get_port_index(port);
+	int ret = 0;
+
+	pr_info("%s: port = %d module = %d param = 0x%x length = %d\n",
+		__func__, port, module, param, length);
+
+	config = (struct afe_custom_crus_get_config_t *)
+		 crus_gen_afe_get_header(length, port, module, param);
+	if (!config) {
+		pr_err("%s: Memory allocation failed!\n", __func__);
+		return -ENOMEM;
+	}
+
+	pr_info("%s: Preparing to send apr packet\n", __func__);
+
+	mutex_lock(&crus_sp_get_param_lock);
+	atomic_set(&crus_sp_get_param_flag, 0);
+	crus_sp_get_buffer = kzalloc(config->param.payload_size + 16,
+				     GFP_KERNEL);
+
+	ret = afe_apr_send_pkt_crus(config, index, 0);
+
+	if (ret)
+		pr_err("%s: crus get_param for port %d failed with code %d\n",
+		       __func__, port, ret);
+	else
+		pr_info("%s: crus get_param sent packet with param id 0x%08x to module 0x%08x.\n",
+			__func__, param, module);
+
+	/* Wait for afe callback to populate data */
+	while (!atomic_read(&crus_sp_get_param_flag))
+		usleep_range(1000, 2000);
+
+	/* Copy from dynamic buffer to return buffer */
+	memcpy((u8 *) data, &crus_sp_get_buffer[4], length);
+
+	kfree(crus_sp_get_buffer);
+	mutex_unlock(&crus_sp_get_param_lock);
+
+	kfree(config);
+	return ret;
+}
+
+static int crus_afe_set_param(int port, int module, int param, int length,
+			      void *data_ptr)
+{
+	struct afe_custom_crus_set_config_t *config = NULL;
+
+	int index = afe_get_port_index(port);
+	int ret = 0;
+
+	pr_info("%s: port = %d module = %d param = 0x%x length = %d\n",
+		__func__, port, module, param, length);
+
+	config = crus_gen_afe_set_header(length, port, module, param);
+	if (!config) {
+		pr_err("%s: Memory allocation failed!\n", __func__);
+		return -ENOMEM;
+	}
+
+	memcpy((u8 *)config + sizeof(struct afe_custom_crus_set_config_t),
+	       (u8 *)data_ptr, length);
+
+	pr_debug("%s: Preparing to send apr packet.\n", __func__);
+
+	ret = afe_apr_send_pkt_crus(config, index, 1);
+	if (ret) {
+		pr_err("%s: crus set_param for port %d failed with code %d\n",
+		       __func__, port, ret);
+	} else {
+		pr_debug("%s: crus set_param sent packet with param id 0x%08x to module 0x%08x.\n",
+			 __func__, param, module);
+	}
+
+	kfree(config);
+	return ret;
+}
+
+static int crus_afe_send_config(const char *data, int32_t length,
+				s32 port, s32 module)
+{
+	struct afe_custom_crus_set_config_t *config = NULL;
+	struct crus_external_config_t *payload = NULL;
+	int size = sizeof(struct crus_external_config_t);
+	int ret = 0;
+	int index = afe_get_port_index(port);
+	u32 param = 0;
+	int mem_size = 0;
+	int sent = 0;
+	int chars_to_send = 0;
+
+	pr_info("%s: called with module_id = %x, string length = %d\n",
+		__func__, module, length);
+
+	/* Destination settings for message */
+	if (port == cirrus_ff_port) {
+		param = CRUS_PARAM_RX_SET_EXT_CONFIG;
+	} else if (port == cirrus_fb_port) {
+		param = CRUS_PARAM_TX_SET_EXT_CONFIG;
+	} else {
+		pr_err("%s: Received invalid port parameter %d\n",
+		       __func__, module);
+		return -EINVAL;
+	}
+
+	if (length > APR_CHUNK_SIZE)
+		mem_size = APR_CHUNK_SIZE;
+	else
+		mem_size = length;
+
+	config = crus_gen_afe_set_header(size, port, module, param);
+	if (!config) {
+		pr_err("%s: Memory allocation failed!\n", __func__);
+		return -ENOMEM;
+	}
+
+	payload = (struct crus_external_config_t *)((u8 *)config +
+			sizeof(struct afe_custom_crus_set_config_t));
+	payload->total_size = (u32)length;
+	payload->reserved = 0;
+	payload->config = PAYLOAD_FOLLOWS_CONFIG;
+	    /* ^ This tells the algorithm to expect array */
+	    /*   immediately following the header */
+
+	/* Send config string in chunks of APR_CHUNK_SIZE bytes */
+	while (sent < length) {
+		chars_to_send = length - sent;
+		if (chars_to_send > APR_CHUNK_SIZE) {
+			chars_to_send = APR_CHUNK_SIZE;
 			payload->done = 0;
 		} else {
 			payload->done = 1;
 		}
 
 		/* Configure per message parameter settings */
-		memcpy(&payload->config, string + sent, chars_to_send);
+		memcpy(payload->data, data + sent, chars_to_send);
 		payload->chunk_size = chars_to_send;
 
 		/* Send the actual message */
 		pr_debug("%s: Preparing to send apr packet.\n", __func__);
-		result = afe_apr_send_pkt_crus(config, index, 1);
+		ret = afe_apr_send_pkt_crus(config, index, 1);
 
-		if (result) {
-			pr_err("%s: crus set_param for port %d failed",
-			       __func__, port_id);
-			pr_err(" with code %d\n", result);
-		}
+		if (ret)
+			pr_err("%s: crus set_param for port %d failed with code %d\n",
+			       __func__, port, ret);
+		else
+			pr_debug("%s: crus set_param sent packet with param id 0x%08x to module 0x%08x.\n",
+				 __func__, param, module);
 
 		sent += chars_to_send;
 	}
 
 	kfree(config);
-	return result;
+	return ret;
 }
 
 int crus_afe_callback(void *payload, int size)
@@ -468,56 +480,76 @@ static int msm_routing_crus_ext_config(struct snd_kcontrol *kcontrol,
 				       struct snd_ctl_elem_value *ucontrol)
 {
 	const int crus_set = ucontrol->value.integer.value[0];
-	int length = 0;
+	int length = 0, rc = 0;
 	char *input = NULL;
+	char *filename;
 	const struct firmware *firmware;
+	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
+	struct msm_pcm_drv_data *pdata = snd_soc_platform_get_drvdata(platform);
+
+	filename = kzalloc(CIRRUS_SP_CONFIG_MAX_LEN_FILENAME, GFP_KERNEL);
+	if (!filename) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	snprintf(filename, CIRRUS_SP_CONFIG_MAX_LEN_FILENAME,
+		 "crus_sp_config_%s", pdata->config_name);
 
 	pr_debug("Starting Cirrus SP EXT Config function call %d\n", crus_set);
 
 	switch (crus_set) {
 	case 0:		/* "Config RX Default" */
-		if (request_firmware(&firmware, "crus_sp_config_rx.txt",
-				     crus_sp_device) != 0) {
+		strlcat(filename, "_rx.bin", CIRRUS_SP_CONFIG_MAX_LEN_FILENAME);
+		if (request_firmware(&firmware, filename, platform->dev) != 0) {
 			pr_err("%s: Request firmware failed\n", __func__);
 		} else {
-			length = firmware->size - 2;
+			length = firmware->size;
 			input = kzalloc(length, GFP_KERNEL);
 			pr_debug("%s: length = %d; dataptr = %lx\n", __func__,
 				 length, (unsigned long)firmware->data);
 			memcpy(input, firmware->data, length);
-			input[length] = '\0';
-			pr_debug("Cirrus SP EXT Config: Config RX Default\n");
-			crus_afe_send_config(input, CRUS_MODULE_ID_RX);
+			pr_info("Cirrus SP EXT Config: Sending RX config\n");
+			crus_afe_send_config(input, length, cirrus_ff_port,
+					     CIRRUS_SP);
+			cirrus_fb_ext_sel = crus_set;
+			kfree(input);
 		}
+		release_firmware(firmware);
 		break;
 	case 1:		/* "Config TX Default" */
-		if (request_firmware(&firmware, "crus_sp_config_tx.txt",
-				     crus_sp_device) != 0) {
+		strlcat(filename, "_tx.bin", CIRRUS_SP_CONFIG_MAX_LEN_FILENAME);
+		if (request_firmware(&firmware, filename, platform->dev) != 0) {
 			pr_err("%s: Request firmware failed\n", __func__);
 		} else {
-			length = firmware->size - 2;
+			length = firmware->size;
 			input = kzalloc(length, GFP_KERNEL);
 			pr_debug("%s: length = %d; dataptr = %lx\n", __func__,
 				 length, (unsigned long)firmware->data);
 			memcpy(input, firmware->data, length);
-			input[length] = '\0';
-			pr_debug("Cirrus SP EXT Config: Config TX Default\n");
-			crus_afe_send_config(input, CIRRUS_SP);
+			pr_info("Cirrus SP EXT Config: Sending TX config\n");
+			crus_afe_send_config(input, length, cirrus_fb_port,
+					     CIRRUS_SP);
+			cirrus_fb_ext_sel = crus_set;
+			kfree(input);
 		}
+		release_firmware(firmware);
 		break;
 	default:
-		return -EINVAL;
+		rc = -EINVAL;
+		break;
 	}
 
-	release_firmware(firmware);
-	kfree(input);
-	return 0;
+out:
+	kfree(filename);
+	return rc;
 }
 
 static int msm_routing_crus_ext_config_get(struct snd_kcontrol *kcontrol,
 					   struct snd_ctl_elem_value *ucontrol)
 {
 	pr_debug("Starting Cirrus SP EXT Config Get function call\n");
+	ucontrol->value.integer.value[0] = cirrus_fb_ext_sel;
 
 	return 0;
 }
@@ -568,14 +600,6 @@ static const struct snd_kcontrol_new crus_mixer_controls[] = {
 
 void msm_crus_pb_add_controls(struct snd_soc_platform *platform)
 {
-	crus_sp_device = platform->dev;
-
-	if (!crus_sp_device)
-		pr_err("%s: platform->dev is NULL!\n", __func__);
-	else
-		pr_debug("%s: platform->dev = %lx\n", __func__,
-			 (unsigned long)crus_sp_device);
-
 	snd_soc_add_platform_controls(platform, crus_mixer_controls,
 				      ARRAY_SIZE(crus_mixer_controls));
 }
