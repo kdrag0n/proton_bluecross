@@ -52,6 +52,7 @@
 #define TAVIL_MBHC_ZDET_CONST         (86 * 16384)
 #define TAVIL_MBHC_MOISTURE_RREF      R_24_KOHM
 
+#if IS_ENABLED(CONFIG_SND_SOC_WCD934X_MBHC)
 static struct wcd_mbhc_register
 	wcd_mbhc_registers[WCD_MBHC_REG_FUNC_MAX] = {
 	WCD_MBHC_REGISTER("WCD_MBHC_L_DET_EN",
@@ -165,6 +166,7 @@ static const struct wcd_mbhc_intr intr_ids = {
 static char on_demand_supply_name[][MAX_ON_DEMAND_SUPPLY_NAME_LENGTH] = {
 	"cdc-vdd-mic-bias",
 };
+#endif
 
 struct tavil_mbhc_zdet_param {
 	u16 ldo_ctl;
@@ -888,6 +890,7 @@ static const struct wcd_mbhc_cb mbhc_cb = {
 	.is_anc_on = tavil_is_anc_on,
 };
 
+#if IS_ENABLED(CONFIG_SND_SOC_WCD934X_MBHC)
 static struct regulator *tavil_codec_find_ondemand_regulator(
 		struct snd_soc_codec *codec, const char *name)
 {
@@ -906,6 +909,7 @@ static struct regulator *tavil_codec_find_ondemand_regulator(
 		name);
 	return NULL;
 }
+#endif
 
 static int tavil_get_hph_type(struct snd_kcontrol *kcontrol,
 			      struct snd_ctl_elem_value *ucontrol)
@@ -961,6 +965,8 @@ static const struct snd_kcontrol_new impedance_detect_controls[] = {
 	SOC_SINGLE_EXT("HPHR Impedance", 0, 1, UINT_MAX, 0,
 		       tavil_hph_impedance_get, NULL),
 };
+
+#if IS_ENABLED(CONFIG_SND_SOC_WCD934X_MBHC)
 
 /*
  * tavil_mbhc_get_impedance: get impedance of headphone left and right channels
@@ -1149,3 +1155,4 @@ void tavil_mbhc_deinit(struct snd_soc_codec *codec)
 	}
 }
 EXPORT_SYMBOL(tavil_mbhc_deinit);
+#endif
