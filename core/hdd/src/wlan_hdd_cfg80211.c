@@ -243,6 +243,11 @@ static const struct ieee80211_channel hdd_channels_5_ghz[] = {
 	HDD5GHZCHAN(5825, 165, 0),
 };
 
+static const struct ieee80211_channel hdd_etsi_srd_chan[] = {
+	HDD5GHZCHAN(5845, 169, 0),
+	HDD5GHZCHAN(5865, 173, 0),
+};
+
 static const struct ieee80211_channel hdd_channels_dot11p[] = {
 	HDD5GHZCHAN(5852, 170, 0),
 	HDD5GHZCHAN(5855, 171, 0),
@@ -652,6 +657,27 @@ static const struct wiphy_wowlan_support wowlan_support_cfg80211_init = {
 	.pattern_max_len = WOWL_PTRN_MAX_SIZE,
 };
 #endif
+
+bool hdd_is_ie_valid(const uint8_t *ie, size_t ie_len)
+{
+	uint8_t elen;
+
+	while (ie_len) {
+		if (ie_len < 2)
+			return false;
+
+		elen = ie[1];
+		ie_len -= 2;
+		ie += 2;
+		if (elen > ie_len)
+			return false;
+
+		ie_len -= elen;
+		ie += elen;
+	}
+
+	return true;
+}
 
 /**
  * hdd_add_channel_switch_support()- Adds Channel Switch flag if supported
@@ -2058,6 +2084,7 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 	fset |= WIFI_FEATURE_RSSI_MONITOR;
 	fset |= WIFI_FEATURE_TX_TRANSMIT_POWER;
 	fset |= WIFI_FEATURE_SET_TX_POWER_LIMIT;
+	fset |= WIFI_FEATURE_CONFIG_NDO;
 
 	if (hdd_link_layer_stats_supported())
 		fset |= WIFI_FEATURE_LINK_LAYER_STATS;
@@ -5463,6 +5490,56 @@ static int wlan_hdd_save_default_scan_ies(hdd_context_t *hdd_ctx,
 	return 0;
 }
 
+static int hdd_config_scan_default_ies(hdd_adapter_t *adapter,
+				       const struct nlattr *attr)
+{
+	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	uint8_t *scan_ie;
+	uint16_t scan_ie_len;
+	QDF_STATUS status;
+
+	if (!attr)
+		return 0;
+
+	scan_ie_len = nla_len(attr);
+	hdd_debug("IE len %d session %d device mode %d",
+		  scan_ie_len, adapter->sessionId, adapter->device_mode);
+
+	if (!scan_ie_len) {
+		hdd_err("zero-length IE prohibited");
+		return -EINVAL;
+	}
+
+	if (scan_ie_len > MAX_DEFAULT_SCAN_IE_LEN) {
+		hdd_err("IE length %d exceeds max of %d",
+			scan_ie_len, MAX_DEFAULT_SCAN_IE_LEN);
+		return -EINVAL;
+	}
+
+	scan_ie = nla_data(attr);
+	if (!hdd_is_ie_valid(scan_ie, scan_ie_len)) {
+		hdd_err("Invalid default scan IEs");
+		return -EINVAL;
+	}
+
+	if (wlan_hdd_save_default_scan_ies(hdd_ctx, adapter,
+					   scan_ie, scan_ie_len))
+		hdd_err("Failed to save default scan IEs");
+
+	if (adapter->device_mode == QDF_STA_MODE) {
+		status = sme_set_default_scan_ie(hdd_ctx->hHal,
+						 adapter->sessionId, scan_ie,
+						 scan_ie_len);
+		if (QDF_STATUS_SUCCESS != status) {
+			hdd_err("failed to set default scan IEs in sme: %d",
+				status);
+			return -EPERM;
+		}
+	}
+
+	return 0;
+}
+
 /**
  * __wlan_hdd_cfg80211_wifi_configuration_set() - Wifi configuration
  * vendor command
@@ -5486,6 +5563,8 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	hdd_context_t *hdd_ctx  = wiphy_priv(wiphy);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1];
+	const struct nlattr *attr;
+	int ret;
 	int ret_val = 0;
 	u32 modulated_dtim, override_li;
 	u16 stats_avg_factor;
@@ -5500,8 +5579,6 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 	int access_policy = 0;
 	char vendor_ie[SIR_MAC_MAX_IE_LENGTH + 2];
 	bool vendor_ie_present = false, access_policy_present = false;
-	uint16_t scan_ie_len = 0;
-	uint8_t *scan_ie;
 	struct sir_set_tx_rx_aggregation_size request;
 	struct sir_set_rx_reorder_timeout_val reorder_timeout;
 	struct sir_peer_set_rx_blocksize rx_blocksize;
@@ -5742,30 +5819,10 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 		ret_val = hdd_enable_disable_ca_event(hdd_ctx, set_value);
 	}
 
-	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_DEFAULT_IES]) {
-		scan_ie_len = nla_len(
-			tb[QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_DEFAULT_IES]);
-		hdd_debug("Received default scan IE of len %d session %d device mode %d",
-						scan_ie_len, adapter->sessionId,
-						adapter->device_mode);
-		if (scan_ie_len && (scan_ie_len <= MAX_DEFAULT_SCAN_IE_LEN)) {
-			scan_ie = (uint8_t *) nla_data(tb
-				[QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_DEFAULT_IES]);
-
-			if (wlan_hdd_save_default_scan_ies(hdd_ctx, adapter,
-							scan_ie, scan_ie_len))
-				hdd_err("Failed to save default scan IEs");
-
-			if (adapter->device_mode == QDF_STA_MODE) {
-				status = sme_set_default_scan_ie(hdd_ctx->hHal,
-						adapter->sessionId, scan_ie,
-						scan_ie_len);
-				if (QDF_STATUS_SUCCESS != status)
-					ret_val = -EPERM;
-			}
-		} else
-			ret_val = -EPERM;
-	}
+	attr = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_DEFAULT_IES];
+	ret = hdd_config_scan_default_ies(adapter, attr);
+	if (ret)
+		ret_val = ret;
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_MPDU_AGGREGATION] ||
 	    tb[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_MPDU_AGGREGATION]) {
@@ -8872,7 +8929,7 @@ int wlan_hdd_request_pre_cac(uint8_t channel)
 		return -EINVAL;
 	}
 
-	mac_addr = wlan_hdd_get_intf_addr(hdd_ctx);
+	mac_addr = wlan_hdd_get_intf_addr(hdd_ctx, QDF_SAP_MODE);
 	if (!mac_addr) {
 		hdd_err("can't add virtual intf: Not getting valid mac addr");
 		return -EINVAL;
@@ -12596,16 +12653,25 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 
 		} else {
 			wiphy->bands[HDD_NL80211_BAND_5GHZ]->channels =
-			qdf_mem_malloc(sizeof(hdd_channels_5_ghz));
+				qdf_mem_malloc(sizeof(hdd_channels_5_ghz) +
+				sizeof(hdd_etsi_srd_chan));
 			if (wiphy->bands[HDD_NL80211_BAND_5GHZ]->channels ==
 								NULL) {
 				hdd_err("Not enough memory to for channels");
 				goto mem_fail;
 			}
+			wiphy->bands[HDD_NL80211_BAND_5GHZ]->n_channels =
+					QDF_ARRAY_SIZE(hdd_channels_5_ghz) +
+					QDF_ARRAY_SIZE(hdd_etsi_srd_chan);
 			qdf_mem_copy(wiphy->
 				bands[HDD_NL80211_BAND_5GHZ]->channels,
 				&hdd_channels_5_ghz[0],
 				sizeof(hdd_channels_5_ghz));
+			len = sizeof(hdd_channels_5_ghz);
+			qdf_mem_copy((char *)
+				wiphy->bands[HDD_NL80211_BAND_5GHZ]->channels +
+				len, &hdd_etsi_srd_chan[0],
+				sizeof(hdd_etsi_srd_chan));
 		}
 	}
 
@@ -18138,13 +18204,7 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 						pAdapter->aStaInfo[i].
 							macAddrSTA.bytes,
 						QDF_MAC_ADDR_SIZE);
-					if (hdd_ipa_uc_is_enabled(pHddCtx)) {
-						hdd_ipa_wlan_evt(pAdapter,
-						    pAdapter->aStaInfo[i].
-						    ucSTAId,
-						    HDD_IPA_CLIENT_DISCONNECT,
-						    mac);
-					}
+
 					hdd_debug("Delete STA with MAC::"
 						  MAC_ADDRESS_STR,
 					       MAC_ADDR_ARRAY(mac));
@@ -18183,11 +18243,6 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 					  MAC_ADDRESS_STR,
 				       MAC_ADDR_ARRAY(mac));
 				return -ENOENT;
-			}
-
-			if (hdd_ipa_uc_is_enabled(pHddCtx)) {
-				hdd_ipa_wlan_evt(pAdapter, staId,
-					HDD_IPA_CLIENT_DISCONNECT, mac);
 			}
 
 			if (pAdapter->aStaInfo[staId].isDeauthInProgress ==

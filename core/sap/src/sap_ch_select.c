@@ -639,6 +639,8 @@ static bool sap_chan_sel_init(tHalHandle halHandle,
 #endif
 	uint32_t dfs_master_cap_enabled;
 	bool include_dfs_ch = true;
+	bool sta_sap_scc_on_dfs_chan =
+		cds_is_sta_sap_scc_allowed_on_dfs_channel();
 
 	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH, "In %s",
 		  __func__);
@@ -688,13 +690,14 @@ static bool sap_chan_sel_init(tHalHandle halHandle,
 			continue;
 		}
 
-		if (include_dfs_ch == false) {
+		if ((include_dfs_ch == false) || sta_sap_scc_on_dfs_chan) {
 			if (CDS_IS_DFS_CH(*pChans)) {
 				chSafe = false;
 				QDF_TRACE(QDF_MODULE_ID_SAP,
 					  QDF_TRACE_LEVEL_INFO_HIGH,
-					  "In %s, DFS Ch %d not considered for ACS",
-					  __func__, *pChans);
+					  "In %s, DFS Ch %d not considered for ACS. include_dfs_ch %u, sta_sap_scc_on_dfs_chan %d",
+					  __func__, *pChans, include_dfs_ch,
+					  sta_sap_scc_on_dfs_chan);
 				continue;
 			}
 		}
@@ -721,6 +724,11 @@ static bool sap_chan_sel_init(tHalHandle halHandle,
 
 		/* Skip DSRC channels */
 		if (cds_is_dsrc_channel(cds_chan_to_freq(*pChans)))
+			continue;
+
+		if (!pSapCtx->enable_etsi_srd_chan_support &&
+				cds_is_etsi13_regdmn_srd_chan(
+				cds_chan_to_freq(*pChans)))
 			continue;
 
 		if (true == chSafe) {

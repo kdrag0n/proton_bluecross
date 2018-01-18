@@ -5122,16 +5122,16 @@ static QDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
 	uint8_t channel_list_24[QDF_MAX_NUM_CHAN] = {0};
 	uint8_t channel_list_5[QDF_MAX_NUM_CHAN] = {0};
 	bool skip_dfs_channel = false;
-	hdd_context_t *hdd_ctx;
+	bool skip_srd_chan = false;
 	uint32_t i = 0, j = 0;
 	bool sta_sap_scc_on_dfs_chan;
+	struct cds_config_info *cds_cfg;
 
-	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx) {
-		cds_err("HDD context is NULL");
+	cds_cfg = cds_get_ini_config();
+	if (!cds_cfg) {
+		cds_err("cds config is NULL");
 		return status;
 	}
-
 	if ((NULL == pcl_channels) || (NULL == len)) {
 		cds_err("pcl_channels or len is NULL");
 		return status;
@@ -5169,6 +5169,10 @@ static QDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
 		skip_dfs_channel = true;
 	}
 
+	if ((mode == CDS_SAP_MODE) || (mode == CDS_P2P_GO_MODE)) {
+		skip_srd_chan = !cds_cfg->etsi_srd_chan_in_master_mode &&
+			cds_is_5g_regdmn_etsi13();
+	}
 	/* Let's divide the list in 2.4 & 5 Ghz lists */
 	while ((chan_index < QDF_MAX_NUM_CHAN) &&
 		(channel_list[chan_index] <= 11) &&
@@ -5195,6 +5199,12 @@ static QDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
 		(chan_index_5 < QDF_MAX_NUM_CHAN)) {
 		if ((true == skip_dfs_channel) &&
 		    CDS_IS_DFS_CH(channel_list[chan_index])) {
+			chan_index++;
+			continue;
+		}
+		if ((true == skip_srd_chan) &&
+				cds_is_etsi13_regdmn_srd_chan(cds_chan_to_freq(
+					channel_list[chan_index]))) {
 			chan_index++;
 			continue;
 		}
@@ -7896,8 +7906,16 @@ static void cds_check_sta_ap_concurrent_ch_intf(void *data)
 
 static bool cds_valid_sta_channel_check(uint8_t sta_channel)
 {
-	if ((CDS_IS_DFS_CH(sta_channel) &&
-			(!cds_is_sta_sap_scc_allowed_on_dfs_channel())) ||
+	bool sta_sap_scc_on_dfs_chan;
+
+	sta_sap_scc_on_dfs_chan = cds_is_sta_sap_scc_allowed_on_dfs_channel();
+	if (CDS_IS_DFS_CH(sta_channel) && sta_sap_scc_on_dfs_chan) {
+		cds_debug("STA, SAP SCC is allowed on DFS chan %u",
+				sta_channel);
+		return true;
+	}
+
+	if (CDS_IS_DFS_CH(sta_channel) ||
 		CDS_IS_PASSIVE_OR_DISABLE_CH(sta_channel) ||
 		!cds_is_safe_channel(sta_channel))
 		if (wma_is_hw_dbs_capable())
@@ -9910,6 +9928,8 @@ QDF_STATUS cds_valid_sap_conc_channel_check(uint8_t *con_ch, uint8_t sap_ch)
 {
 	uint8_t channel = *con_ch;
 	uint8_t temp_channel = 0;
+	bool sta_sap_scc_on_dfs_chan;
+
 	/*
 	 * if force SCC is set, Check if conc channel is DFS
 	 * or passive or part of LTE avoided channel list.
@@ -9929,6 +9949,8 @@ QDF_STATUS cds_valid_sap_conc_channel_check(uint8_t *con_ch, uint8_t sap_ch)
 		return QDF_STATUS_SUCCESS;
 	else if (!channel)
 		channel = sap_ch;
+
+	sta_sap_scc_on_dfs_chan = cds_is_sta_sap_scc_allowed_on_dfs_channel();
 
 	if (cds_valid_sta_channel_check(channel)) {
 		if (CDS_IS_DFS_CH(channel) ||
@@ -9952,13 +9974,21 @@ QDF_STATUS cds_valid_sap_conc_channel_check(uint8_t *con_ch, uint8_t sap_ch)
 					return QDF_STATUS_E_FAILURE;
 				}
 			} else {
+				if (CDS_IS_DFS_CH(channel) &&
+						sta_sap_scc_on_dfs_chan) {
+					cds_debug("STA, SAP SCC is allowed on DFS chan %u",
+							channel);
+					goto update_chan;
+				}
+
 				cds_warn("Can't have concurrency on %d",
-					channel);
+						channel);
 				return QDF_STATUS_E_FAILURE;
 			}
 		}
 	}
 
+update_chan:
 	if (channel != sap_ch)
 		*con_ch = channel;
 

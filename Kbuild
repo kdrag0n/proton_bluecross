@@ -277,6 +277,9 @@ CONFIG_ATH_PERF_PWR_OFFLOAD := 1
 #Disable packet log
 CONFIG_REMOVE_PKT_LOG := 0
 
+#Whether have QMI support
+CONFIG_QMI_SUPPORT := 1
+
 #Enable 11AC TX
 ifeq ($(CONFIG_ROME_IF),pci)
 	CONFIG_ATH_11AC_TXCOMPACT := 1
@@ -436,6 +439,7 @@ HDD_OBJS := 	$(HDD_SRC_DIR)/wlan_hdd_assoc.o \
 		$(HDD_SRC_DIR)/wlan_hdd_regulatory.o \
 		$(HDD_SRC_DIR)/wlan_hdd_scan.o \
 		$(HDD_SRC_DIR)/wlan_hdd_softap_tx_rx.o \
+		$(HDD_SRC_DIR)/wlan_hdd_sysfs.o \
 		$(HDD_SRC_DIR)/wlan_hdd_tx_rx.o \
 		$(HDD_SRC_DIR)/wlan_hdd_trace.o \
 		$(HDD_SRC_DIR)/wlan_hdd_wext.o \
@@ -1260,8 +1264,14 @@ endif
 
 ifeq (y,$(filter y,$(CONFIG_CNSS_ADRASTEA) $(CONFIG_ICNSS)))
 CDEFINES += -DQCA_WIFI_3_0_ADRASTEA
+ifeq ($(CONFIG_QMI_SUPPORT), 1)
 CDEFINES += -DADRASTEA_SHADOW_REGISTERS
+endif
 CDEFINES += -DADRASTEA_RRI_ON_DDR
+endif
+
+ifeq ($(CONFIG_QMI_SUPPORT), 0)
+CDEFINES += -DCONFIG_BYPASS_QMI
 endif
 
 ifeq ($(CONFIG_WLAN_FASTPATH), y)
@@ -1558,6 +1568,10 @@ endif
 
 ifeq ($(CONFIG_ARCH_SDX20), y)
 CDEFINES += -DSYNC_IPA_READY
+endif
+
+ifeq ($(CONFIG_ARCH_SDX20), y)
+CDEFINES += -DWLAN_DFS_FALSE_DETECT
 endif
 
 ifeq ($(CONFIG_ARCH_MSM8996), y)
