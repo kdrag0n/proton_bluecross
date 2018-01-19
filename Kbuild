@@ -437,6 +437,7 @@ HDD_OBJS := 	$(HDD_SRC_DIR)/wlan_hdd_assoc.o \
 		$(HDD_SRC_DIR)/wlan_hdd_packet_filter.o \
 		$(HDD_SRC_DIR)/wlan_hdd_power.o \
 		$(HDD_SRC_DIR)/wlan_hdd_regulatory.o \
+		$(HDD_SRC_DIR)/wlan_hdd_request_manager.o \
 		$(HDD_SRC_DIR)/wlan_hdd_scan.o \
 		$(HDD_SRC_DIR)/wlan_hdd_softap_tx_rx.o \
 		$(HDD_SRC_DIR)/wlan_hdd_sysfs.o \
@@ -1835,7 +1836,6 @@ ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
 EXTRA_CFLAGS += -Wmaybe-uninitialized
 endif
 EXTRA_CFLAGS += -Wmissing-prototypes
-EXTRA_CFLAGS += -Wno-error-enum-conversion
 
 ifeq ($(call cc-option-yn, -Wheader-guard),y)
 EXTRA_CFLAGS += -Wheader-guard

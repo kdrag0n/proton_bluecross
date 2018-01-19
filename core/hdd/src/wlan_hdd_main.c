@@ -54,6 +54,7 @@
 #include "wlan_hdd_power.h"
 #include "wlan_hdd_stats.h"
 #include "wlan_hdd_scan.h"
+#include "wlan_hdd_request_manager.h"
 #include "qdf_types.h"
 #include "qdf_trace.h"
 #include <cdp_txrx_peer_ops.h>
@@ -165,6 +166,7 @@ static struct attribute *attrs[] = {
 
 #define HDD_OPS_INACTIVITY_TIMEOUT (120000)
 #define MAX_OPS_NAME_STRING_SIZE 20
+#define RATE_LIMIT_ERROR_LOG (256)
 
 static qdf_timer_t hdd_drv_ops_inactivity_timer;
 static struct task_struct *hdd_drv_ops_task;
@@ -2139,6 +2141,10 @@ int hdd_wlan_start_modules(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 		}
 
 		hdd_ctx->hHal = cds_get_context(QDF_MODULE_ID_SME);
+		if (NULL == hdd_ctx->hHal) {
+			hdd_err("HAL context is null");
+			goto close;
+		}
 
 		status = cds_pre_enable(hdd_ctx->pcds_context);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -2205,6 +2211,7 @@ int hdd_wlan_start_modules(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 	return 0;
 
 post_disable:
+	sme_destroy_config(hdd_ctx->hHal);
 	cds_post_disable();
 
 close:
@@ -2225,7 +2232,10 @@ power_down:
 release_lock:
 	hdd_ctx->start_modules_in_progress = false;
 	mutex_unlock(&hdd_ctx->iface_change_lock);
-
+	if (hdd_ctx->target_hw_name) {
+		qdf_mem_free(hdd_ctx->target_hw_name);
+		hdd_ctx->target_hw_name = NULL;
+	}
 	/* many adapter resources are not freed by design in SSR case */
 	if (!reinit)
 		hdd_check_for_leaks();
@@ -3285,8 +3295,8 @@ QDF_STATUS hdd_init_station_mode(hdd_adapter_t *adapter)
 		sizeof(pHddStaCtx->conn_info.staId), HDD_WLAN_INVALID_STA_ID);
 
 	/* set fast roaming capability in sme session */
-	status = sme_config_fast_roaming(hdd_ctx->hHal, adapter->sessionId,
-					 adapter->fast_roaming_allowed);
+	status = sme_config_fast_roaming(hdd_ctx->hHal,
+					 adapter->sessionId, true);
 	/* Set the default operation channel */
 	pHddStaCtx->conn_info.operationChannel =
 		hdd_ctx->config->OperatingChannel;
@@ -5104,7 +5114,8 @@ static void hdd_connect_done(struct net_device *dev, const u8 *bssid,
 	} else {
 		fils_params.status = status;
 		fils_params.bssid = bssid;
-		fils_params.timeout_reason = timeout_reason;
+		fils_params.timeout_reason =
+				hdd_convert_timeout_reason(timeout_reason);
 		fils_params.req_ie = req_ie;
 		fils_params.req_ie_len = req_ie_len;
 		fils_params.resp_ie = resp_ie;
@@ -5518,8 +5529,6 @@ hdd_adapter_t *hdd_get_adapter_by_vdev(hdd_context_t *hdd_ctx,
 			hdd_get_next_adapter(hdd_ctx, adapterNode, &pNext);
 		adapterNode = pNext;
 	}
-
-	hdd_err("vdev_id %d does not exist with host", vdev_id);
 
 	return NULL;
 }
@@ -6219,6 +6228,7 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 	 */
 
 	hdd_green_ap_deinit(hdd_ctx);
+	hdd_request_manager_deinit();
 
 	hdd_runtime_suspend_context_deinit(hdd_ctx);
 	hdd_close_all_adapters(hdd_ctx, false);
@@ -8400,8 +8410,8 @@ err_free_config:
 
 err_free_hdd_context:
 	hdd_free_probe_req_ouis(hdd_ctx);
-	wiphy_free(hdd_ctx->wiphy);
 	mutex_destroy(&hdd_ctx->iface_change_lock);
+	wiphy_free(hdd_ctx->wiphy);
 
 err_out:
 	return ERR_PTR(ret);
@@ -8625,9 +8635,6 @@ static int hdd_open_interfaces(hdd_context_t *hdd_ctx, bool rtnl_held)
 
 	if (adapter == NULL)
 		return -ENOSPC;
-
-	/* fast roaming is allowed only on first STA, i.e. wlan adapter */
-	adapter->fast_roaming_allowed = true;
 
 	if (strlen(hdd_ctx->config->enableConcurrentSTA) != 0) {
 		ret = hdd_open_concurrent_interface(hdd_ctx, rtnl_held);
@@ -10490,7 +10497,7 @@ void hdd_dp_trace_init(struct hdd_config *config)
 		live_mode = config_params[0];
 		/* fall through */
 	default:
-		hdd_info("live_mode %u thresh %u time_limit %u verbosity %u bitmap 0x%x",
+		hdd_debug("live_mode %u thresh %u time_limit %u verbosity %u bitmap 0x%x",
 			live_mode, thresh, thresh_time_limit,
 			verbosity, proto_bitmap);
 		break;
@@ -10529,6 +10536,7 @@ int hdd_wlan_startup(struct device *dev)
 	if (ret)
 		goto err_hdd_free_context;
 
+	hdd_request_manager_init();
 	hdd_green_ap_init(hdd_ctx);
 
 	hdd_init_spectral_scan(hdd_ctx);
@@ -10659,6 +10667,7 @@ err_exit_nl_srv:
 	qdf_mc_timer_destroy(&hdd_ctx->tdls_source_timer);
 
 	hdd_green_ap_deinit(hdd_ctx);
+	hdd_request_manager_deinit();
 	hdd_exit_netlink_services(hdd_ctx);
 
 err_hdd_free_context:
@@ -10746,6 +10755,15 @@ static void hdd_get_nud_stats_cb(void *data, struct rsp_stats *rsp)
 	adapter->hdd_stats.hdd_arp_stats.rx_fw_cnt = rsp->arp_rsp_recvd;
 	adapter->dad |= rsp->dad_detected;
 	adapter->con_status = rsp->connect_status;
+
+	/* Flag true indicates connectivity check stats present. */
+	if (rsp->connect_stats_present) {
+		hdd_notice("rsp->tcp_ack_recvd :%x", rsp->tcp_ack_recvd);
+		hdd_notice("rsp->icmpv4_rsp_recvd :%x", rsp->icmpv4_rsp_recvd);
+		adapter->hdd_stats.hdd_tcp_stats.rx_fw_cnt = rsp->tcp_ack_recvd;
+		adapter->hdd_stats.hdd_icmpv4_stats.rx_fw_cnt =
+							rsp->icmpv4_rsp_recvd;
+	}
 
 	spin_lock(&hdd_context_lock);
 	context = &hdd_ctx->nud_stats_context;
@@ -12667,7 +12685,11 @@ hdd_adapter_t *hdd_get_adapter_by_rand_macaddr(hdd_context_t *hdd_ctx,
 	status = hdd_get_front_adapter(hdd_ctx, &adapter_node);
 	while (adapter_node && status == QDF_STATUS_SUCCESS) {
 		adapter = adapter_node->pAdapter;
-		if (adapter && hdd_check_random_mac(adapter, mac_addr))
+		if (adapter &&
+		    (adapter->device_mode == QDF_STA_MODE ||
+		     adapter->device_mode == QDF_P2P_CLIENT_MODE ||
+		     adapter->device_mode == QDF_P2P_DEVICE_MODE) &&
+		    hdd_check_random_mac(adapter, mac_addr))
 			return adapter;
 		status = hdd_get_next_adapter(hdd_ctx, adapter_node, &next);
 		adapter_node = next;
@@ -12873,6 +12895,11 @@ void hdd_drv_ops_inactivity_handler(void)
 	if (0 == qdf_mem_cmp(&drv_ops_string[0], "shutdown",
 		sizeof("shutdown")))
 		QDF_BUG(0);
+
+	if (cds_is_fw_down()) {
+		hdd_err("FW is down");
+		return;
+	}
 
 	if (cds_is_self_recovery_enabled())
 		cds_trigger_recovery(false);

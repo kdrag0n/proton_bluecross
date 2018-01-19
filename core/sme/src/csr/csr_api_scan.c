@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -595,9 +595,14 @@ QDF_STATUS csr_scan_request(tpAniSirGlobal pMac, uint16_t sessionId,
 	 * achieve reliable results, Adaptive dwell scan is
 	 * disabled using the dwell_mode.
 	 */
-	if (scan_req->requestType != eCSR_SCAN_RRM)
-		scan_req->scan_adaptive_dwell_mode =
-			cfg_prm->scan_adaptive_dwell_mode;
+	if (scan_req->requestType != eCSR_SCAN_RRM) {
+		if (csr_is_conn_state_disconnected(pMac, sessionId))
+			scan_req->scan_adaptive_dwell_mode =
+				cfg_prm->scan_adaptive_dwell_mode_nc;
+		else
+			scan_req->scan_adaptive_dwell_mode =
+				cfg_prm->scan_adaptive_dwell_mode;
+	}
 
 	status = csr_scan_copy_request(pMac, &scan_cmd->u.scanCmd.u.scanRequest,
 				       scan_req);
@@ -5360,10 +5365,14 @@ static bool csr_scan_validate_scan_result(tpAniSirGlobal pMac,
 			return false;
 
 		valid = csr_scan_is_bss_allowed(pMac, pBssDesc, pIes);
-		if (valid)
+		if (valid) {
 			*ppIes = pIes;
-		else
+		} else {
 			qdf_mem_free(pIes);
+			sme_debug("Scan result invalid due to dot11 mode mismatch");
+		}
+	} else {
+		sme_debug("Scan result invalid");
 	}
 	return valid;
 }
@@ -6589,8 +6598,7 @@ QDF_STATUS csr_scan_copy_request(tpAniSirGlobal mac_ctx,
 	 */
 	if (cds_is_ibss_conn_exist(&channel)) {
 		sme_debug("Conc IBSS exist, channel list will be modified");
-	} else if (cds_is_any_dfs_beaconing_session_present(&channel) &&
-			!cds_is_sta_sap_scc_allowed_on_dfs_channel()) {
+	} else if (cds_is_any_dfs_beaconing_session_present(&channel)) {
 		/*
 		 * 1) if agile & DFS scans are supported
 		 * 2) if hardware is DBS capable
@@ -6598,9 +6606,10 @@ QDF_STATUS csr_scan_copy_request(tpAniSirGlobal mac_ctx,
 		 * if all above 3 conditions are true then don't skip any
 		 * channel from scan list
 		 */
-		if (true != wma_is_current_hwmode_dbs() &&
+		if ((true != wma_is_current_hwmode_dbs() &&
 		    wma_get_dbs_plus_agile_scan_config() &&
-		    wma_get_single_mac_scan_with_dfs_config())
+		    wma_get_single_mac_scan_with_dfs_config()) ||
+		    cds_is_sta_sap_scc_allowed_on_dfs_channel())
 			channel = 0;
 		else
 			sme_debug(
