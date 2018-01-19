@@ -481,7 +481,7 @@ drop_pkt_accounting:
  *
  * Return: Always returns NETDEV_TX_OK
  */
-int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
+netdev_tx_t hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	int ret;
 
@@ -489,7 +489,7 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	ret = __hdd_softap_hard_start_xmit(skb, dev);
 	cds_ssr_unprotect(__func__);
 
-	return ret;
+	return (netdev_tx_t)ret;
 }
 
 /**

@@ -144,7 +144,7 @@ end:
 
 }
 
-static int epping_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
+static netdev_tx_t epping_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	epping_adapter_t *pAdapter;
 	int ret = 0;
@@ -158,7 +158,7 @@ static int epping_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 	ret = epping_tx_send(skb, pAdapter);
 end:
-	return ret;
+	return (netdev_tx_t)ret;
 }
 
 static struct net_device_stats *epping_get_stats(struct net_device *dev)
