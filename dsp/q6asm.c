@@ -544,15 +544,20 @@ static int q6asm_session_alloc(struct audio_client *ac)
 	return -ENOMEM;
 }
 
-static bool q6asm_is_valid_audio_client(struct audio_client *ac)
+static int q6asm_get_session_id_from_audio_client(struct audio_client *ac)
 {
 	int n;
 
 	for (n = 1; n <= ASM_ACTIVE_STREAMS_ALLOWED; n++) {
 		if (session[n].ac == ac)
-			return 1;
+			return n;
 	}
 	return 0;
+}
+
+static bool q6asm_is_valid_audio_client(struct audio_client *ac)
+{
+	return q6asm_get_session_id_from_audio_client(ac) ? 1 : 0;
 }
 
 static void q6asm_session_free(struct audio_client *ac)
@@ -1747,10 +1752,10 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 		return -EINVAL;
 	}
 
-	session_id = ac->session;
-	if (ac->session <= 0 || ac->session > ASM_ACTIVE_STREAMS_ALLOWED) {
+	session_id = q6asm_get_session_id_from_audio_client(ac);
+	if (session_id <= 0 || session_id > ASM_ACTIVE_STREAMS_ALLOWED) {
 		pr_err("%s: Session ID is invalid, session = %d\n", __func__,
-			ac->session);
+			session_id);
 		return -EINVAL;
 	}
 	spin_lock(&(session[session_id].session_lock));
@@ -3411,7 +3416,6 @@ int q6asm_set_shared_circ_buff(struct audio_client *ac,
 	if (ac->port[dir].buf) {
 		pr_err("%s: Buffer already allocated\n", __func__);
 		rc = -EINVAL;
-		mutex_unlock(&ac->cmd_lock);
 		goto done;
 	}
 
@@ -3434,7 +3438,6 @@ int q6asm_set_shared_circ_buff(struct audio_client *ac,
 		pr_err("%s: Audio ION alloc is failed, rc = %d\n", __func__,
 				rc);
 		kfree(buf_circ);
-		mutex_unlock(&ac->cmd_lock);
 		goto done;
 	}
 
@@ -3460,8 +3463,8 @@ int q6asm_set_shared_circ_buff(struct audio_client *ac,
 			msm_audio_populate_upper_32_bits(buf_circ->phys);
 	open->map_region_circ_buf.mem_size_bytes = bytes_to_alloc;
 
-	mutex_unlock(&ac->cmd_lock);
 done:
+	mutex_unlock(&ac->cmd_lock);
 	return rc;
 }
 
