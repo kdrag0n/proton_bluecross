@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -999,7 +999,6 @@ typedef struct tagCsrRoamProfile {
 	struct qdf_mac_addr bssid_hint;
 	bool force_24ghz_in_ht20;
 	bool supplicant_disabled_roaming;
-	bool roaming_allowed_on_iface;
 #ifdef WLAN_FEATURE_FILS_SK
 	bool fils_connection;
 	uint8_t *hlp_ie;
@@ -1341,6 +1340,7 @@ typedef struct tagCsrConfigParam {
 	uint32_t edca_be_aifs;
 	bool enable_fatal_event;
 	enum wmi_dwelltime_adaptive_mode scan_adaptive_dwell_mode;
+	enum wmi_dwelltime_adaptive_mode scan_adaptive_dwell_mode_nc;
 	enum wmi_dwelltime_adaptive_mode roamscan_adaptive_dwell_mode;
 	struct csr_sta_roam_policy_params sta_roam_policy_params;
 	uint32_t tx_aggregation_size;
