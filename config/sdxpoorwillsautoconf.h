@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,6 +23,9 @@
 #define CONFIG_SND_SOC_WCD934X_DSD 1
 #define CONFIG_MSM_QDSP6V2_CODECS 1
 #define CONFIG_MSM_QDSP6_APRV3_GLINK 1
+#define CONFIG_MSM_QDSP6_NOTIFIER 1
+#define CONFIG_MSM_QDSP6_SSR 1
+#define CONFIG_MSM_QDSP6_PDR 1
 #define CONFIG_SND_SOC_MSM_QDSP6V2_INTF 1
 #define CONFIG_MSM_ADSP_LOADER 1
 #define CONFIG_REGMAP_SWR 1
@@ -37,6 +40,6 @@
 #define CONFIG_WCD9XXX_CODEC_CORE 1
 #define CONFIG_SND_SOC_WCD_MBHC_ADC 1
 #define CONFIG_QTI_PP 1
-#define CONFIG_SND_HWDEP 1
+#define CONFIG_SND_HWDEP_ROUTING 1
 #define CONFIG_SND_SOC_MACHINE_SDXPOORWILLS 1
 #define CONFIG_SND_SOC_MSM_STUB 1
