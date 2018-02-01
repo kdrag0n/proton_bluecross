@@ -2530,11 +2530,11 @@ static void cds_update_hw_mode_conn_info(uint32_t num_vdev_mac_entries,
  *
  * Return: None
  */
-void cds_soc_set_dual_mac_cfg_cb(enum set_hw_mode_status status,
+void cds_soc_set_dual_mac_cfg_cb(uint32_t status,
 		uint32_t scan_config,
 		uint32_t fw_mode_config)
 {
-	cds_debug("Status:%d for scan_config:%x fw_mode_config:%x",
+	cds_debug("Status:%u for scan_config:%x fw_mode_config:%x",
 			status, scan_config, fw_mode_config);
 }
 
