@@ -5997,6 +5997,26 @@ static struct snd_soc_dai_link msm_tavil_be_dai_links[] = {
 
 static struct snd_soc_dai_link msm_wcn_be_dai_links[] = {
 	{
+		.name = LPASS_BE_SLIMBUS_7_RX,
+		.stream_name = "Slimbus7 Playback",
+		.cpu_dai_name = "msm-dai-q6-dev.16398",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "btfmslim_slave",
+		/* BT codec driver determines capabilities based on
+		 * dai name, bt codecdai name should always contains
+		 * supported usecase information
+		 */
+		.codec_dai_name = "btfm_bt_sco_a2dp_slim_rx",
+		.no_pcm = 1,
+		.dpcm_playback = 1,
+		.id = MSM_BACKEND_DAI_SLIMBUS_7_RX,
+		.be_hw_params_fixup = msm_be_hw_params_fixup,
+		.ops = &msm_wcn_ops,
+		/* dai link has playback support */
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+	},
+	{
 		.name = LPASS_BE_SLIMBUS_7_TX,
 		.stream_name = "Slimbus7 Capture",
 		.cpu_dai_name = "msm-dai-q6-dev.16399",
