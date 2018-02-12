@@ -259,7 +259,6 @@ static struct schedtune *allocated_group[BOOSTGROUPS_COUNT] = {
  * maximum per-CPU boosting value.
  */
 struct boost_groups {
-	bool idle;
 	/* Maximum boost value for all RUNNABLE tasks on a CPU */
 	int boost_max;
 	struct {
