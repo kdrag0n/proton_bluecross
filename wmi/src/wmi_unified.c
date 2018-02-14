@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1710,7 +1710,7 @@ end:
 
 }
 
-#define WMI_WQ_WD_TIMEOUT (10 * 1000) /* 10s */
+#define WMI_WQ_WD_TIMEOUT (30 * 1000) /* 30s */
 
 static inline void wmi_workqueue_watchdog_warn(uint32_t msg_type_id)
 {
@@ -1720,9 +1720,9 @@ static inline void wmi_workqueue_watchdog_warn(uint32_t msg_type_id)
 }
 
 #ifdef CONFIG_SLUB_DEBUG_ON
-static void wmi_workqueue_watchdog_bite(unsigned long arg)
+static void wmi_workqueue_watchdog_bite(void *arg)
 {
-	struct wmi_wq_dbg_info *info = (struct wmi_wq_dbg_info *)arg;
+	struct wmi_wq_dbg_info *info = arg;
 
 	wmi_workqueue_watchdog_warn(info->wd_msg_type_id);
 	qdf_print_thread_trace(info->task);
@@ -1732,9 +1732,9 @@ static void wmi_workqueue_watchdog_bite(unsigned long arg)
 	QDF_BUG(0);
 }
 #else
-static inline void wmi_workqueue_watchdog_bite(unsigned long arg)
+static inline void wmi_workqueue_watchdog_bite(void *arg)
 {
-	struct wmi_wq_dbg_info *info = (struct wmi_wq_dbg_info *)arg;
+	struct wmi_wq_dbg_info *info = arg;
 
 	wmi_workqueue_watchdog_warn(info->wd_msg_type_id);
 }
