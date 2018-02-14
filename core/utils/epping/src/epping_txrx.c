@@ -54,7 +54,7 @@
 static int epping_start_adapter(epping_adapter_t *pAdapter);
 static void epping_stop_adapter(epping_adapter_t *pAdapter);
 
-static void epping_timer_expire(unsigned long data)
+static void epping_timer_expire(void *data)
 {
 	struct net_device *dev = (struct net_device *)data;
 	epping_adapter_t *pAdapter;
@@ -144,7 +144,7 @@ end:
 
 }
 
-static netdev_tx_t epping_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
+static int epping_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	epping_adapter_t *pAdapter;
 	int ret = 0;
@@ -158,7 +158,7 @@ static netdev_tx_t epping_hard_start_xmit(struct sk_buff *skb, struct net_device
 	}
 	ret = epping_tx_send(skb, pAdapter);
 end:
-	return (netdev_tx_t)ret;
+	return ret;
 }
 
 static struct net_device_stats *epping_get_stats(struct net_device *dev)

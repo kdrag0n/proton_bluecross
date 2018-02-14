@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -434,8 +434,35 @@ QDF_STATUS sap_open_session(tHalHandle hHal, ptSapContext sapContext,
 QDF_STATUS sap_close_session(tHalHandle hHal,
 			     ptSapContext sapContext,
 			     csr_roamSessionCloseCallback callback, bool valid);
+
+/**
+ * sap_select_default_oper_chan() - Select AP mode default operating channel
+ * @acs_cfg: pointer to ACS config info
+ *
+ * Select AP mode default operating channel based on ACS hw mode and channel
+ * range configuration when ACS scan fails due to some reasons, such as scan
+ * timeout, etc.
+ *
+ * Return: Selected operating channel number
+ */
+uint8_t sap_select_default_oper_chan(struct sap_acs_cfg *acs_cfg);
+
+/**
+ * sap_channel_in_acs_channel_list() - check if channel in acs channel list
+ * @channel_num: channel to check
+ * @sap_ctx: struct ptSapContext
+ * @spect_info_params: strcut tSapChSelSpectInfo
+ *
+ * This function checks if specified channel is in the configured ACS channel
+ * list.
+ *
+ * Return: channel number if in acs channel list or SAP_CHANNEL_NOT_SELECTED
+ */
+uint8_t sap_channel_in_acs_channel_list(uint8_t channel_num,
+					ptSapContext sap_ctx,
+					tSapChSelSpectInfo *spect_info_params);
+
 #ifdef __cplusplus
 }
 #endif
-uint8_t sap_select_default_oper_chan(tHalHandle hal, uint32_t acs_hwmode);
 #endif

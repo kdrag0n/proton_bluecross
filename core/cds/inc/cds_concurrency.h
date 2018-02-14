@@ -830,7 +830,7 @@ void cds_set_dual_mac_scan_config(uint8_t dbs_val,
 		uint8_t single_mac_scan_with_dbs_val);
 void cds_set_dual_mac_fw_mode_config(uint8_t dbs,
 		uint8_t dfs);
-void cds_soc_set_dual_mac_cfg_cb(uint32_t status,
+void cds_soc_set_dual_mac_cfg_cb(enum set_hw_mode_status status,
 		uint32_t scan_config,
 		uint32_t fw_mode_config);
 bool cds_map_concurrency_mode(enum tQDF_ADAPTER_MODE *old_mode,
