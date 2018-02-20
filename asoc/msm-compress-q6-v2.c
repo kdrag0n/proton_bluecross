@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -541,7 +541,7 @@ static int msm_compr_read_buffer(struct msm_compr_audio *prtd)
 		return ret;
 	}
 	prtd->bytes_read += buffer_length;
-	prtd->bytes_read_offset += buffer_length;
+	prtd->bytes_read_offset += buffer_length + prtd->ts_header_offset;
 	if (prtd->bytes_read_offset >= prtd->buffer_size)
 		prtd->bytes_read_offset -= prtd->buffer_size;
 
@@ -2658,12 +2658,10 @@ static int msm_compr_pointer(struct snd_compr_stream *cstream,
 				rc = q6asm_get_session_time(
 				prtd->audio_client, &prtd->marker_timestamp);
 			if (rc < 0) {
-				pr_err("%s: Get Session Time return =%lld\n",
-					__func__, timestamp);
 				if (atomic_read(&prtd->error))
 					return -ENETRESET;
 				else
-					return -EAGAIN;
+					return rc;
 			}
 		}
 	} else {
