@@ -37,7 +37,10 @@
 #include "codecs/msm-cdc-pinctrl.h"
 #include "codecs/wcd934x/wcd934x.h"
 #include "codecs/wcd934x/wcd934x-mbhc.h"
+
+#if IS_ENABLED(CONFIG_SND_SOC_WSA881X)
 #include "codecs/wsa881x.h"
+#endif
 
 #define DRV_NAME "sdm845-asoc-snd"
 
