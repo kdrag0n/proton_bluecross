@@ -6394,7 +6394,7 @@ err:
 #if IS_ENABLED(CONFIG_SND_SOC_CS35L36)
 static struct snd_soc_codec_conf spk_codec_right_ch_conf[] = {
 	{
-		.dev_name		= "cs35l36.4-0041",
+		.dev_name		= "cs35l36.4-0040",
 		.name_prefix	= "R",
 	}
 };
