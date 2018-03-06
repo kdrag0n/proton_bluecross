@@ -778,6 +778,7 @@ static int cs35l36_codec_probe(struct snd_soc_codec *codec)
 {
 	struct cs35l36_private *cs35l36 = snd_soc_codec_get_drvdata(codec);
 	struct asp_tx_cfg *asp_config = &cs35l36->pdata.asp_tx_config;
+	struct snd_soc_dapm_context *dapm = snd_soc_codec_get_dapm(codec);
 	int ret = 0;
 
 	if (cs35l36->pdata.sclk_frc)
@@ -963,6 +964,17 @@ static int cs35l36_codec_probe(struct snd_soc_codec *codec)
 					   1 << CS35L36_ASP_TX6_EN_SHIFT);
 		}
 	}
+
+	if (cs35l36->pdata.right_channel) {
+		snd_soc_dapm_ignore_suspend(dapm, "R SPK");
+		snd_soc_dapm_ignore_suspend(dapm, "R AMP Enable");
+		snd_soc_dapm_ignore_suspend(dapm, "R AMP Playback");
+	} else {
+		snd_soc_dapm_ignore_suspend(dapm, "SPK");
+		snd_soc_dapm_ignore_suspend(dapm, "AMP Enable");
+		snd_soc_dapm_ignore_suspend(dapm, "AMP Playback");
+	}
+	snd_soc_dapm_sync(dapm);
 
 	return 0;
 }
