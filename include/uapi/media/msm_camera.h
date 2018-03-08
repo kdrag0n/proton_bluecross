@@ -1393,6 +1393,7 @@ struct msm_camera_csiphy_params {
 	uint8_t combo_mode;
 	uint8_t csid_core;
 	uint64_t data_rate;
+	unsigned long data_rate;
 };
 
 struct msm_camera_csi2_params {
