@@ -2960,6 +2960,11 @@ static int __tavil_codec_enable_swr(struct snd_soc_dapm_widget *w, int event)
 		return -EFAULT;
 	}
 
+	if (!tavil->swr.ctrl_data)
+		return -EINVAL;
+	if (!tavil->swr.ctrl_data[0].swr_pdev)
+		return -EINVAL;
+
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		if (!pdev) {
