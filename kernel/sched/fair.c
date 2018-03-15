@@ -7149,7 +7149,8 @@ retry:
 				 * IOW, prefer a deep IDLE LITTLE CPU vs a
 				 * shallow idle big CPU.
 				 */
-				if (sysctl_sched_cstate_aware &&
+				if (capacity_orig == target_capacity &&
+				    sysctl_sched_cstate_aware &&
 				    best_idle_cstate <= idle_idx)
 					continue;
 
@@ -7188,7 +7189,8 @@ retry:
 			active_cpus_count++;
 
 			/* Favor CPUs with maximum spare capacity */
-			if ((capacity_orig - new_util) < target_max_spare_cap)
+			if (capacity_orig == target_capacity &&
+			    (capacity_orig - new_util) < target_max_spare_cap)
 				continue;
 
 			target_max_spare_cap = capacity_orig - new_util;
