@@ -245,6 +245,42 @@ static int32_t cam_sensor_handle_continuous_write(
 	return rc;
 }
 
+static int cam_sensor_handle_slave_info(
+	struct camera_io_master *io_master,
+	uint32_t *cmd_buf)
+{
+	int rc = 0;
+	struct cam_cmd_i2c_info *i2c_info = (struct cam_cmd_i2c_info *)cmd_buf;
+
+	if (io_master == NULL || cmd_buf == NULL) {
+		CAM_ERR(CAM_SENSOR, "Invalid args");
+		return -EINVAL;
+	}
+
+	switch (io_master->master_type) {
+	case CCI_MASTER:
+		io_master->cci_client->sid = (i2c_info->slave_addr >> 1);
+		io_master->cci_client->i2c_freq_mode = i2c_info->i2c_freq_mode;
+		break;
+
+	case I2C_MASTER:
+		io_master->client->addr = i2c_info->slave_addr;
+		break;
+
+	case SPI_MASTER:
+		break;
+
+	default:
+		CAM_ERR(CAM_SENSOR, "Invalid master type: %d",
+			io_master->master_type);
+		rc = -EINVAL;
+		break;
+	}
+
+	return rc;
+}
+
+
 int32_t cam_sensor_handle_read(
 	struct cam_cmd_i2c_continuous_rd *cam_cmd,
 	struct i2c_settings_array *i2c_reg_settings,
@@ -291,12 +327,16 @@ int32_t cam_sensor_handle_read(
  * WAIT + n x RND_WR with num_cmd_buf = 1. Do not exepect RD/WR
  * with different cmd_type and op_code in one command buffer.
  */
-int cam_sensor_i2c_command_parser(struct i2c_settings_array *i2c_reg_settings,
-	struct cam_cmd_buf_desc   *cmd_desc, int32_t num_cmd_buffers)
+int cam_sensor_i2c_command_parser(
+	struct camera_io_master *io_master,
+	struct i2c_settings_array *i2c_reg_settings,
+	struct cam_cmd_buf_desc   *cmd_desc,
+	int32_t num_cmd_buffers)
 {
 	int16_t                   rc = 0, i = 0;
 	size_t                    len_of_buff = 0;
 	uint64_t                  generic_ptr;
+	uint16_t                  cmd_length_in_bytes = 0;
 
 	for (i = 0; i < num_cmd_buffers; i++) {
 		uint32_t                  *cmd_buf = NULL;
@@ -310,7 +350,6 @@ int cam_sensor_i2c_command_parser(struct i2c_settings_array *i2c_reg_settings,
 		 * It is not expected the same settings to
 		 * be spread across multiple cmd buffers
 		 */
-
 		CAM_DBG(CAM_SENSOR, "Total cmd Buf in Bytes: %d",
 			cmd_desc[i].length);
 
@@ -411,6 +450,23 @@ int cam_sensor_i2c_command_parser(struct i2c_settings_array *i2c_reg_settings,
 				}
 				break;
 			}
+			case CAMERA_SENSOR_CMD_TYPE_I2C_INFO: {
+				rc = cam_sensor_handle_slave_info(
+					io_master, cmd_buf);
+				if (rc) {
+					CAM_ERR(CAM_SENSOR,
+						"Handle slave info failed with rc: %d",
+						rc);
+					return rc;
+				}
+				cmd_length_in_bytes =
+					sizeof(struct cam_cmd_i2c_info);
+				cmd_buf +=
+					cmd_length_in_bytes / sizeof(uint32_t);
+				byte_cnt += cmd_length_in_bytes;
+				break;
+			}
+
 			case CAMERA_SENSOR_CMD_TYPE_I2C_CONT_RD:
 				rc = cam_sensor_handle_read(
 					(struct cam_cmd_i2c_continuous_rd *)
