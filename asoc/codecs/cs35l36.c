@@ -1328,7 +1328,6 @@ static int cs35l36_pac(struct cs35l36_private *cs35l36)
 			     CS35L36_TEST_UNLOCK1);
 		regmap_write(cs35l36->regmap, CS35L36_TESTKEY_CTRL,
 			     CS35L36_TEST_UNLOCK2);
-		msleep(200);
 		regmap_write(cs35l36->regmap, CS35L36_INT4_MASK,
 			     CS35L36_MCU_CONFIG_UNMASK);
 		regmap_write(cs35l36->regmap, CS35L36_PAD_INTERFACE,
@@ -1345,11 +1344,11 @@ static int cs35l36_pac(struct cs35l36_private *cs35l36)
 			     CS35L36_PAC_MEM_ACCESS_CLR);
 		regmap_write(cs35l36->regmap, CS35L36_PAC_CTL1,
 			     CS35L36_PAC_ENABLE_MASK);
-		msleep(200);
+		msleep(100);
 
 		regmap_write(cs35l36->regmap, CS35L36_INT4_MASK,
 			     CS35L36_MCU_CONFIG_MASK);
-		msleep(200);
+		msleep(100);
 
 		regmap_write(cs35l36->regmap, CS35L36_INT4_STATUS,
 			     CS35L36_MUC_CONFIG_CLR);
