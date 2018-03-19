@@ -484,8 +484,8 @@
 #define WMA_REMOVE_BCN_FILTER_CMDID          SIR_HAL_REMOVE_BCN_FILTER_CMDID
 #define WMA_SET_ADAPT_DWELLTIME_CONF_PARAMS  SIR_HAL_SET_ADAPT_DWELLTIME_PARAMS
 
-#define WDA_BPF_GET_CAPABILITIES_REQ         SIR_HAL_BPF_GET_CAPABILITIES_REQ
-#define WDA_BPF_SET_INSTRUCTIONS_REQ         SIR_HAL_BPF_SET_INSTRUCTIONS_REQ
+#define WDA_APF_GET_CAPABILITIES_REQ         SIR_HAL_APF_GET_CAPABILITIES_REQ
+#define WDA_APF_SET_INSTRUCTIONS_REQ         SIR_HAL_APF_SET_INSTRUCTIONS_REQ
 
 #define WMA_SET_PDEV_IE_REQ                  SIR_HAL_SET_PDEV_IE_REQ
 #define WMA_UPDATE_WEP_DEFAULT_KEY           SIR_HAL_UPDATE_WEP_DEFAULT_KEY
@@ -508,6 +508,8 @@
 
 #define WMA_SET_LIMIT_OFF_CHAN               SIR_HAL_SET_LIMIT_OFF_CHAN
 #define WMA_INVOKE_NEIGHBOR_REPORT           SIR_HAL_INVOKE_NEIGHBOR_REPORT
+
+#define WMA_GET_ROAM_SCAN_STATS              SIR_HAL_GET_ROAM_SCAN_STATS
 
 /* Bit 6 will be used to control BD rate for Management frames */
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40
@@ -794,7 +796,8 @@ QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
 			enum sir_roam_op_code reason),
 		QDF_STATUS (*pe_roam_synch_cb)(tpAniSirGlobal mac,
 			roam_offload_synch_ind *roam_synch_data,
-			tpSirBssDescription  bss_desc_ptr));
+			tpSirBssDescription  bss_desc_ptr,
+			enum sir_roam_op_code reason));
 #else
 static inline QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
 		QDF_STATUS (*csr_roam_synch_cb)(tpAniSirGlobal mac,
@@ -803,7 +806,8 @@ static inline QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
 			enum sir_roam_op_code reason),
 		QDF_STATUS (*pe_roam_synch_cb)(tpAniSirGlobal mac,
 			roam_offload_synch_ind *roam_synch_data,
-			tpSirBssDescription  bss_desc_ptr))
+			tpSirBssDescription  bss_desc_ptr,
+			enum sir_roam_op_code reason))
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

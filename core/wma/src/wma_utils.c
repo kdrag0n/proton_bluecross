@@ -2520,6 +2520,12 @@ static void wma_vdev_stats_lost_link_helper(tp_wma_handle wma,
 	static const uint8_t zero_mac[QDF_MAC_ADDR_SIZE] = {0};
 	int32_t bcn_snr, dat_snr;
 
+	if (vdev_stats->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("%s: Invalid vdev_id %hu",
+			__func__, vdev_stats->vdev_id);
+		return;
+	}
+
 	node = &wma->interfaces[vdev_stats->vdev_id];
 	if (node->vdev_up &&
 	    !qdf_mem_cmp(node->bssid, zero_mac, QDF_MAC_ADDR_SIZE)) {
@@ -2568,6 +2574,12 @@ static void wma_update_vdev_stats(tp_wma_handle wma,
 	tAniGetRssiReq *pGetRssiReq = (tAniGetRssiReq *) wma->pGetRssiReq;
 	cds_msg_t sme_msg = { 0 };
 	int32_t bcn_snr, dat_snr;
+
+	if (vdev_stats->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("%s: Invalid vdev_id %hu",
+			__func__, vdev_stats->vdev_id);
+		return;
+	}
 
 	bcn_snr = vdev_stats->vdev_snr.bcn_snr;
 	dat_snr = vdev_stats->vdev_snr.dat_snr;
@@ -2840,6 +2852,12 @@ static void wma_update_rssi_stats(tp_wma_handle wma,
 	uint8_t *stats_buf;
 	uint32_t temp_mask;
 	uint8_t vdev_id;
+
+	if (rssi_stats->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("%s: Invalid vdev_id %hu",
+			__func__, rssi_stats->vdev_id);
+		return;
+	}
 
 	vdev_id = rssi_stats->vdev_id;
 	node = &wma->interfaces[vdev_id];
@@ -5082,7 +5100,8 @@ QDF_STATUS wma_get_updated_scan_config(uint32_t *scan_config,
 }
 
 QDF_STATUS wma_get_updated_scan_and_fw_mode_config(uint32_t *scan_config,
-			uint32_t *fw_mode_config, uint32_t dual_mac_disable_ini)
+			uint32_t *fw_mode_config, uint32_t dual_mac_disable_ini,
+			uint32_t channel_select_logic_conc)
 {
 	tp_wma_handle wma;
 
@@ -5121,6 +5140,11 @@ QDF_STATUS wma_get_updated_scan_and_fw_mode_config(uint32_t *scan_config,
 	default:
 		break;
 	}
+
+	WMI_DBS_FW_MODE_CFG_DBS_FOR_STA_PLUS_STA_SET(*fw_mode_config,
+	       WMA_CHANNEL_SELECT_LOGIC_STA_STA_GET(channel_select_logic_conc));
+	WMI_DBS_FW_MODE_CFG_DBS_FOR_STA_PLUS_P2P_SET(*fw_mode_config,
+	       WMA_CHANNEL_SELECT_LOGIC_STA_P2P_GET(channel_select_logic_conc));
 	WMA_LOGD("%s: *scan_config:%x ", __func__, *scan_config);
 	WMA_LOGD("%s: *fw_mode_config:%x ", __func__, *fw_mode_config);
 
@@ -5657,7 +5681,7 @@ QDF_STATUS wma_get_rcpi_req(WMA_HANDLE handle,
 }
 
 int wma_rcpi_event_handler(void *handle, uint8_t *cmd_param_info,
-			    uint32_t len)
+			   uint32_t len)
 {
 	WMI_UPDATE_RCPI_EVENTID_param_tlvs *param_buf;
 	wmi_update_rcpi_event_fixed_param *event;
@@ -6245,3 +6269,130 @@ void wma_set_sap_wow_bitmask(uint32_t *bitmask, uint32_t wow_bitmap_size)
 
 	/* Add further SAP wakeup events above this line. */
 }
+
+int wma_roam_scan_stats_event_handler(void *handle, uint8_t *event,
+				      uint32_t len)
+{
+	tp_wma_handle wma_handle;
+	wmi_unified_t wmi_handle;
+	struct sir_roam_scan_stats *roam_scan_stats_req;
+	struct wma_txrx_node *iface;
+	struct wmi_roam_scan_stats_res *res;
+	int ret;
+	uint32_t vdev_id;
+	QDF_STATUS status;
+
+	wma_handle = handle;
+	if (!wma_handle) {
+		WMA_LOGE(FL("NULL wma_handle"));
+		return -EINVAL;
+	}
+
+	wmi_handle = wma_handle->wmi_handle;
+	if (!wmi_handle) {
+		WMA_LOGE(FL("NULL wmi_handle"));
+		return -EINVAL;
+	}
+
+	status = wmi_extract_roam_scan_stats_res_evt(wmi_handle, event,
+						     &vdev_id,
+						     &res);
+	if (status == QDF_STATUS_E_INVAL)
+		return -EINVAL;
+
+	if (status != QDF_STATUS_SUCCESS) {
+		if (vdev_id >= wma_handle->max_bssid) {
+			WMI_LOGE("Invalid vdev_id for roam_scan_stats evt");
+			return -EINVAL;
+		}
+
+		iface = &wma_handle->interfaces[vdev_id];
+		if (iface && !iface->roam_scan_stats_req) {
+			WMI_LOGE("roam_scan_stats buffer not available");
+			return 0;
+		}
+
+		roam_scan_stats_req = iface->roam_scan_stats_req;
+		iface->roam_scan_stats_req = NULL;
+		qdf_mem_free(roam_scan_stats_req);
+
+		return 0;
+	}
+
+	if (vdev_id >= wma_handle->max_bssid) {
+		WMA_LOGE(FL("received invalid vdev_id %d"), vdev_id);
+		qdf_mem_free(res);
+		res = NULL;
+		return -EINVAL;
+	}
+
+	iface = &wma_handle->interfaces[vdev_id];
+	if (iface && !iface->roam_scan_stats_req) {
+		WMI_LOGE("roam_scan_stats buffer not available");
+		qdf_mem_free(res);
+		return 0;
+	}
+
+	roam_scan_stats_req = iface->roam_scan_stats_req;
+	if (!roam_scan_stats_req->cb ||
+	    vdev_id != roam_scan_stats_req->vdev_id) {
+		iface->roam_scan_stats_req = NULL;
+		qdf_mem_free(roam_scan_stats_req);
+		qdf_mem_free(res);
+		return 0;
+	}
+
+	iface->roam_scan_stats_req = NULL;
+
+	ret = (roam_scan_stats_req->cb)(roam_scan_stats_req->context, res);
+	if (ret) {
+		qdf_mem_free(res);
+		res = NULL;
+	}
+
+	qdf_mem_free(roam_scan_stats_req);
+
+	return 0;
+}
+
+QDF_STATUS wma_get_roam_scan_stats(WMA_HANDLE handle,
+				   struct sir_roam_scan_stats *req)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	struct wmi_roam_scan_stats_req cmd = {0};
+	struct wma_txrx_node *iface;
+	struct sir_roam_scan_stats *node_req = NULL;
+
+	WMA_LOGD("%s: Enter", __func__);
+	iface = &wma_handle->interfaces[req->vdev_id];
+	/* command is in progress */
+	if (iface->roam_scan_stats_req) {
+		WMA_LOGE("%s : previous roam scan stats req is pending",
+			__func__);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	node_req = qdf_mem_malloc(sizeof(*node_req));
+	if (!node_req) {
+		WMA_LOGE("Failed to allocate memory for roam scan stats req");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	*node_req = *req;
+	iface->roam_scan_stats_req = node_req;
+	cmd.vdev_id = req->vdev_id;
+
+	if (wmi_unified_send_roam_scan_stats_cmd(wma_handle->wmi_handle,
+						 &cmd)) {
+		WMA_LOGE("%s: Failed to send WMI_REQUEST_ROAM_SCAN_STATS_CMDID",
+			 __func__);
+		iface->roam_scan_stats_req = NULL;
+		qdf_mem_free(node_req);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	WMA_LOGD("%s: Exit", __func__);
+
+	return QDF_STATUS_SUCCESS;
+}
+

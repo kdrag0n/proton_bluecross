@@ -163,10 +163,11 @@
 #define WLAN_WAIT_TIME_ANTENNA_MODE_REQ 3000
 #define WLAN_WAIT_TIME_SET_DUAL_MAC_CFG 1500
 
-#define WLAN_WAIT_TIME_BPF     1000
-
 /* rcpi request timeout in milli seconds */
 #define WLAN_WAIT_TIME_RCPI 500
+
+#define WLAN_WAIT_TIME_FW_ROAM_STATS 1000
+
 /* Maximum time(ms) to wait for RSO CMD status event */
 #define WAIT_TIME_RSO_CMD_STATUS 2000
 
@@ -182,6 +183,15 @@
 /** Mac Address string **/
 #define MAC_ADDRESS_STR "%02x:%02x:%02x:%02x:%02x:%02x"
 #define MAC_ADDRESS_STR_LEN 18  /* Including null terminator */
+
+#define IPV6_MAC_ADDR_ARRAY(a) (a)[0], (a)[1], (a)[2], (a)[3], (a)[4],\
+				(a)[5], (a)[6], (a)[7], (a)[8], (a)[9],\
+				(a)[10], (a)[11], (a)[12], (a)[13],\
+				(a)[14], (a)[15]
+/* IPv6 Mac Address string */
+#define IPV6_MAC_ADDRESS_STR "%02x%02x::%02x%02x::%02x%02x::%02x%02x::%02x%02x::%02x%02x::%02x%02x::%02x%02x"
+#define IPV6_MAC_ADDRESS_STR_LEN 47  /* Including null terminator */
+
 /* Max and min IEs length in bytes */
 #define MAX_GENIE_LEN (512)
 #define MIN_GENIE_LEN (2)
@@ -444,7 +454,7 @@ extern struct mutex hdd_init_deinit_lock;
 #define LINK_CONTEXT_MAGIC  0x4C494E4B  /* LINKSPEED */
 #define LINK_STATUS_MAGIC   0x4C4B5354  /* LINKSTATUS(LNST) */
 #define TEMP_CONTEXT_MAGIC  0x74656d70   /* TEMP (temperature) */
-#define BPF_CONTEXT_MAGIC 0x4575354    /* BPF */
+#define APF_CONTEXT_MAGIC 0x4575354    /* APF */
 #define POWER_STATS_MAGIC 0x14111990
 #define RCPI_CONTEXT_MAGIC  0x7778888  /* RCPI */
 #define ACTION_FRAME_RANDOM_CONTEXT_MAGIC 0x87878787
@@ -1199,6 +1209,30 @@ typedef struct multicast_addr_list {
 } t_multicast_add_list;
 #endif
 
+/**
+ * struct hdd_arp_offload_info - arp offloads set in firmware
+ * @offload: currently enabled or disabled
+ * @ipv4: IPv4 address set
+ */
+struct hdd_arp_offload_info {
+	bool offload;
+	uint8_t ipv4[SIR_IPV4_ADDR_LEN];
+};
+
+#ifdef WLAN_NS_OFFLOAD
+/**
+ * struct hdd_ns_offload_info - ns offloads set in firmware
+ * @offload: currently enabled or disabled
+ * @num_ns_offload_count: count of addresses configured
+ * @nsOffloadInfo: addresses are formatted using @tSirNsOffloadReq
+ */
+struct hdd_ns_offload_info {
+	bool offload;
+	uint32_t num_ns_offload_count;
+	tSirNsOffloadReq nsOffloadInfo;
+};
+#endif
+
 #define WLAN_HDD_MAX_HISTORY_ENTRY		10
 
 /**
@@ -1280,6 +1314,36 @@ struct hdd_runtime_pm_context {
 struct rcpi_info {
 	int32_t rcpi;
 	struct qdf_mac_addr mac_addr;
+};
+
+#define HDD_DEBUGFS_FILE_NAME_MAX 24
+
+/**
+ * enum hdd_debugfs_file_id - Debugfs file Identifier
+ * @HDD_DEBUFS_FILE_ID_CONNECT_INFO: connect_info file
+ * @HDD_DEBUFS_FILE_ID_ROAM_SCAN_STATS_INFO: roam_scan_stats file
+ * @HDD_DEBUFS_FILE_ID_OFFLOAD_INFO:
+ * @HDD_DEBUGFS_FILE_ID_MAX:
+ */
+enum hdd_debugfs_file_id {
+	HDD_DEBUFS_FILE_ID_CONNECT_INFO = 0,
+	HDD_DEBUFS_FILE_ID_ROAM_SCAN_STATS_INFO = 1,
+	HDD_DEBUFS_FILE_ID_OFFLOAD_INFO = 2,
+
+	HDD_DEBUGFS_FILE_ID_MAX,
+};
+
+/**
+ * struct hdd_debugfs_file_info - Debugfs file info
+ * @name: name of debugfs file
+ * @id: id from enum hdd_debugfs_file_id used to identify file
+ * @buf_max_size: max size of buffer from which debugfs file is updated
+ */
+struct hdd_debugfs_file_info {
+	uint8_t name[HDD_DEBUGFS_FILE_NAME_MAX];
+	enum hdd_debugfs_file_id id;
+	ssize_t buf_max_size;
+	struct dentry *entry;
 };
 
 struct hdd_adapter_s {
@@ -1554,6 +1618,14 @@ struct hdd_adapter_s {
 	uint32_t mon_chan;
 	uint32_t mon_bandwidth;
 	uint8_t active_ac;
+	struct hdd_debugfs_file_info csr_file[HDD_DEBUGFS_FILE_ID_MAX];
+	struct hdd_arp_offload_info arp_offload_info;
+	qdf_spinlock_t arp_offload_info_lock;
+#ifdef WLAN_NS_OFFLOAD
+	struct hdd_ns_offload_info ns_offload_info;
+	qdf_spinlock_t ns_offload_info_lock;
+#endif
+	bool apf_enabled;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.station)
@@ -1678,18 +1750,6 @@ struct hdd_offloaded_packets_ctx {
 	struct mutex op_lock;
 };
 #endif
-
-/**
- * struct hdd_bpf_context - hdd Context for bpf
- * @magic: magic number
- * @completion: Completion variable for BPF Get Capability
- * @capability_response: capabilities response received from fw
- */
-struct hdd_bpf_context {
-	unsigned int magic;
-	struct completion completion;
-	struct sir_bpf_get_offload capability_response;
-};
 
 /**
  * enum driver_status: Driver Modules status
@@ -2071,7 +2131,7 @@ struct hdd_context_s {
 	struct completion set_antenna_mode_cmpl;
 	/* Current number of TX X RX chains being used */
 	enum antenna_mode current_antenna_mode;
-	bool bpf_enabled;
+	bool apf_enabled;
 
 	/* the radio index assigned by cnss_logger */
 	int radio_index;
@@ -2137,6 +2197,7 @@ struct hdd_context_s {
 	hdd_adapter_t *cap_tsf_context;
 #endif
 	struct sta_ap_intf_check_work_ctx *sta_ap_intf_check_work_info;
+	bool force_rsne_override;
 	qdf_wake_lock_t monitor_mode_wakelock;
 	bool lte_coex_ant_share;
 
@@ -2151,6 +2212,7 @@ struct hdd_context_s {
 	/* mutex lock to block concurrent access */
 	struct mutex power_stats_lock;
 #endif
+	qdf_atomic_t is_acs_allowed;
 };
 
 int hdd_validate_channel_and_bandwidth(hdd_adapter_t *adapter,
@@ -2248,6 +2310,18 @@ void hdd_cleanup_actionframe_no_wait(hdd_context_t *pHddCtx,
 void crda_regulatory_entry_default(uint8_t *countryCode, int domain_id);
 void wlan_hdd_reset_prob_rspies(hdd_adapter_t *pHostapdAdapter);
 void hdd_prevent_suspend(uint32_t reason);
+
+/*
+ * hdd_get_first_valid_adapter() - Get the first valid adapter from adapter list
+ *
+ * This function is used to fetch the first valid adapter from the adapter
+ * list. If there is no valid adapter then it returns NULL
+ *
+ * Return: NULL if no valid adapter found in the adapter list
+ *
+ */
+hdd_adapter_t *hdd_get_first_valid_adapter(void);
+
 void hdd_allow_suspend(uint32_t reason);
 void hdd_prevent_suspend_timeout(uint32_t timeout, uint32_t reason);
 

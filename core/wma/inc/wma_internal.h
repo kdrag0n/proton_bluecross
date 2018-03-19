@@ -1134,12 +1134,12 @@ QDF_STATUS wma_enable_arp_ns_offload(tp_wma_handle wma,
 /**
  * wma_conf_hw_filter_mode() - configure hw filter to the given mode
  * @wma: wma handle
- * @req: hardware filter request
+ * @req: hardware filter request parameters
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS wma_conf_hw_filter_mode(tp_wma_handle wma,
-				   struct hw_filter_request *req);
+				   struct wmi_hw_filter_req_params *req);
 
 QDF_STATUS wma_process_cesium_enable_ind(tp_wma_handle wma);
 
@@ -1569,5 +1569,26 @@ int wma_rx_aggr_failure_event_handler(void *handle, u_int8_t *event_buf,
  * Return: 'true' on valid vdev else 'false'
  */
 bool wma_is_vdev_valid(uint32_t vdev_id);
+
+/**
+ * wma_get_roam_scan_stats() - Get roam scan stats request
+ * @handle: wma handle
+ * @req: request details
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_get_roam_scan_stats(WMA_HANDLE handle,
+				   struct sir_roam_scan_stats *req);
+
+/**
+ * wma_roam_scan_stats_event_handler() - roam scan stats event handler
+ * @handle: wma handle
+ * @event: event data
+ * @len: length of data
+ *
+ * Return: Success or Failure status
+ */
+int wma_roam_scan_stats_event_handler(void *handle, uint8_t *event,
+				      uint32_t len);
 
 #endif
