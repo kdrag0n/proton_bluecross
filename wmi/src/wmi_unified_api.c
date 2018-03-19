@@ -3283,17 +3283,16 @@ QDF_STATUS wmi_unified_enable_arp_ns_offload_cmd(void *wmi_hdl,
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_conf_hw_filter_mode_cmd(void *wmi_hdl,
-					       uint8_t vdev_id,
-					       uint8_t mode_bitmap)
+QDF_STATUS
+wmi_unified_conf_hw_filter_mode_cmd(void *wmi_hdl,
+				    struct wmi_hw_filter_req_params *req)
 {
 	wmi_unified_t wmi = wmi_hdl;
 
 	if (!wmi->ops->send_conf_hw_filter_mode_cmd)
 		return QDF_STATUS_E_FAILURE;
 
-	return wmi->ops->send_conf_hw_filter_mode_cmd(wmi, vdev_id,
-						      mode_bitmap);
+	return wmi->ops->send_conf_hw_filter_mode_cmd(wmi, req);
 }
 
 /**
@@ -3651,21 +3650,64 @@ QDF_STATUS wmi_unified_get_buf_extscan_hotlist_cmd(void *wmi_hdl,
 }
 
 QDF_STATUS
-wmi_unified_set_active_bpf_mode_cmd(void *wmi_hdl,
+wmi_unified_set_active_apf_mode_cmd(wmi_unified_t wmi,
 				    uint8_t vdev_id,
 				    FW_ACTIVE_BPF_MODE ucast_mode,
 				    FW_ACTIVE_BPF_MODE mcast_bcast_mode)
 {
-	wmi_unified_t wmi = (wmi_unified_t)wmi_hdl;
 
-	if (!wmi->ops->send_set_active_bpf_mode_cmd) {
-		WMI_LOGD("send_set_active_bpf_mode_cmd op is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
+	if (wmi->ops->send_set_active_apf_mode_cmd)
+		return wmi->ops->send_set_active_apf_mode_cmd(wmi, vdev_id,
+							      ucast_mode,
+							      mcast_bcast_mode);
+	return QDF_STATUS_E_FAILURE;
+}
 
-	return wmi->ops->send_set_active_bpf_mode_cmd(wmi, vdev_id,
-						      ucast_mode,
-						      mcast_bcast_mode);
+QDF_STATUS
+wmi_unified_send_apf_enable_cmd(wmi_unified_t wmi,
+				uint32_t vdev_id, bool enable)
+{
+	if (wmi->ops->send_apf_enable_cmd)
+		return wmi->ops->send_apf_enable_cmd(wmi, vdev_id, enable);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_unified_send_apf_write_work_memory_cmd(wmi_unified_t wmi,
+					   struct wmi_apf_write_memory_params
+								  *write_params)
+{
+	if (wmi->ops->send_apf_write_work_memory_cmd)
+		return wmi->ops->send_apf_write_work_memory_cmd(wmi,
+								write_params);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_unified_send_apf_read_work_memory_cmd(wmi_unified_t wmi,
+					  struct wmi_apf_read_memory_params
+								   *read_params)
+{
+	if (wmi->ops->send_apf_read_work_memory_cmd)
+		return wmi->ops->send_apf_read_work_memory_cmd(wmi,
+							       read_params);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_apf_read_memory_resp_event(wmi_unified_t wmi, void *evt_buf,
+				struct wmi_apf_read_memory_resp_event_params
+								*read_mem_evt)
+{
+	if (wmi->ops->extract_apf_read_memory_resp_event)
+		return wmi->ops->extract_apf_read_memory_resp_event(wmi,
+								evt_buf,
+								read_mem_evt);
+
+	return QDF_STATUS_E_FAILURE;
 }
 
 /**
@@ -6479,6 +6521,19 @@ QDF_STATUS wmi_unified_send_limit_off_chan_cmd(void *wmi_hdl,
 	return QDF_STATUS_E_FAILURE;
 }
 
+QDF_STATUS
+wmi_unified_send_roam_scan_stats_cmd(void *wmi_hdl,
+				     struct wmi_roam_scan_stats_req *params)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
+	if (wmi_handle->ops->send_roam_scan_stats_cmd)
+		return wmi_handle->ops->send_roam_scan_stats_cmd(wmi_handle,
+								 params);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 QDF_STATUS wmi_unified_offload_11k_cmd(void *wmi_hdl,
 				struct wmi_11k_offload_params *params)
 {
@@ -6499,6 +6554,19 @@ QDF_STATUS wmi_unified_invoke_neighbor_report_cmd(void *wmi_hdl,
 	if (wmi_handle->ops->send_invoke_neighbor_report_cmd)
 		return wmi_handle->ops->send_invoke_neighbor_report_cmd(
 				wmi_handle, params);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_roam_scan_stats_res_evt(wmi_unified_t wmi, void *evt_buf,
+				    uint32_t *vdev_id,
+				    struct wmi_roam_scan_stats_res **res_param)
+{
+	if (wmi->ops->extract_roam_scan_stats_res_evt)
+		return wmi->ops->extract_roam_scan_stats_res_evt(wmi,
+							evt_buf,
+							vdev_id, res_param);
 
 	return QDF_STATUS_E_FAILURE;
 }

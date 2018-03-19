@@ -70,7 +70,7 @@ static inline QDF_STATUS __qdf_timer_init(qdf_handle_t hdl,
 	if (type == QDF_TIMER_TYPE_SW) {
 		if (object_is_on_stack(timer))
 			setup_deferrable_timer_on_stack(timer, func,
-							(unsigned long)arg);
+			    (unsigned long)arg);
 		else
 			setup_deferrable_timer(timer, func,
 					       (unsigned long)arg);
