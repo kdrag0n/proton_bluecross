@@ -46,7 +46,7 @@
 /*
  * CRUS_PARAM_RX/TX_SET_EXT_CONFIG
  * config string loaded from libfirmware
- * max of 7K parameters
+ * max of 7K paramters
  *
  * uses crus_external_config_t apr pckt
  */
@@ -63,6 +63,20 @@
  */
 #define CRUS_PARAM_RX_GET_TEMP		0x00A1AF07
 #define CRUS_PARAM_TX_GET_TEMP_CAL	0x00A1BF06
+/*
+ * CRUS_PARAM_RX_SET_DELTA_CONFIG
+ * load seamless transition config string
+ *
+ * CRUS_PARAM_RX_RUN_DELTA_CONFIG
+ * execute the loaded seamless transition
+ */
+#define CRUS_PARAM_RX_SET_DELTA_CONFIG	0x00A1AF0D
+#define CRUS_PARAM_RX_RUN_DELTA_CONFIG	0x00A1AF0E
+/*
+ * CRUS_PARAM_RX_CHANNEL_SWAP
+ * initiate l/r channel swap transition
+ */
+#define CRUS_PARAM_RX_CHANNEL_SWAP	0x00A1AF12
 
 #define CRUS_AFE_PARAM_ID_ENABLE	0x00010203
 
