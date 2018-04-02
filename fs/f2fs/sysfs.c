@@ -150,13 +150,13 @@ static ssize_t f2fs_sbi_show(struct f2fs_attr *a,
 		int len = 0, i;
 
 		len += snprintf(buf + len, PAGE_SIZE - len,
-						"cold file extenstion:\n");
+						"cold file extensions:\n");
 		for (i = 0; i < cold_count; i++)
 			len += snprintf(buf + len, PAGE_SIZE - len, "%s\n",
 								extlist[i]);
 
 		len += snprintf(buf + len, PAGE_SIZE - len,
-						"hot file extenstion:\n");
+						"hot file extensions:\n");
 		for (i = cold_count; i < cold_count + hot_count; i++)
 			len += snprintf(buf + len, PAGE_SIZE - len, "%s\n",
 								extlist[i]);
