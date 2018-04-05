@@ -79,7 +79,7 @@ struct kmem_cache {
 	void (*ctor)(void *);
 	int inuse;		/* Offset to metadata */
 	int align;		/* Alignment */
-	int reserved;		/* Reserved bytes at the end of slabs */
+	unsigned int reserved;		/* Reserved bytes at the end of slabs */
 	const char *name;	/* Name (only for display!) */
 	struct list_head list;	/* List of slab caches */
 	int red_left_pad;	/* Left redzone padding size */
