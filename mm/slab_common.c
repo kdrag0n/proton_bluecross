@@ -89,7 +89,7 @@ static int kmem_cache_sanity_check(const char *name, size_t size)
 		 */
 		res = probe_kernel_address(s->name, tmp);
 		if (res) {
-			pr_err("Slab cache with size %d has lost its name\n",
+			pr_err("Slab cache with size %u has lost its name\n",
 			       s->object_size);
 			continue;
 		}
