@@ -14552,13 +14552,13 @@ extract_roam_scan_stats_res_evt_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		num_channels = param_buf->num_channels;
 
 	if (param_buf->num_num_channels) {
-		uint32_t count, sum = 0;
+		uint32_t count, chan_info_sum = 0;
 
 		for (count = 0; count < param_buf->num_num_channels; count++)
-			sum += param_buf->num_channels[count];
+			chan_info_sum += param_buf->num_channels[count];
 
 		if (param_buf->chan_info &&
-		    param_buf->num_chan_info == sum)
+		    param_buf->num_chan_info == chan_info_sum)
 			chan_info = param_buf->chan_info;
 	}
 
@@ -14567,26 +14567,26 @@ extract_roam_scan_stats_res_evt_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		num_roam_candidates = param_buf->num_roam_candidates;
 
 	if (param_buf->num_num_roam_candidates) {
-		uint32_t count, sum = 0;
+		uint32_t count, roam_cand_sum = 0;
 
 		for (count = 0; count < param_buf->num_num_roam_candidates;
 			count++)
-			sum += param_buf->num_roam_candidates[count];
+			roam_cand_sum += param_buf->num_roam_candidates[count];
 
 		if (param_buf->bssid &&
-		    param_buf->num_bssid == sum)
+		    param_buf->num_bssid == roam_cand_sum)
 			bssid = param_buf->bssid;
 
 		if (param_buf->score &&
-		    param_buf->num_score == sum)
-		score = param_buf->score;
+		    param_buf->num_score == roam_cand_sum)
+			score = param_buf->score;
 
 		if (param_buf->channel &&
-		    param_buf->num_channel == sum)
+		    param_buf->num_channel == roam_cand_sum)
 			channel = param_buf->channel;
 
 		if (param_buf->rssi &&
-		    param_buf->num_rssi == sum)
+		    param_buf->num_rssi == roam_cand_sum)
 			rssi = param_buf->rssi;
 	}
 
@@ -15444,7 +15444,7 @@ static void populate_tlv_events_id(uint32_t *event_ids)
 	event_ids[wmi_get_arp_stats_req_id] = WMI_VDEV_GET_ARP_STATS_EVENTID;
 	event_ids[wmi_sar_get_limits_event_id] = WMI_SAR_GET_LIMITS_EVENTID;
 	event_ids[wmi_roam_scan_stats_event_id] = WMI_ROAM_SCAN_STATS_EVENTID;
-}
+	event_ids[wmi_wlan_sar2_result_event_id] = WMI_SAR2_RESULT_EVENTID;
 }
 
 /**
