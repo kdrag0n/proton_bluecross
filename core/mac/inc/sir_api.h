@@ -8373,7 +8373,7 @@ struct sir_limit_off_chan {
 	bool skip_dfs_chans;
 };
 
-typedef int (*roam_scan_stats_cb)(void *context,
+typedef void (*roam_scan_stats_cb)(void *context,
 				  struct wmi_roam_scan_stats_res *res);
 
 /**

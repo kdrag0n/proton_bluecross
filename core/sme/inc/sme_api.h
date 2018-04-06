@@ -60,6 +60,26 @@
 #define SME_GLOBAL_CLASSD_STATS   (1 << eCsrGlobalClassDStats)
 #define SME_PER_CHAIN_RSSI_STATS  (1 << csr_per_chain_rssi_stats)
 
+#define sme_log_rate_limited(rate, level, args...) \
+		QDF_TRACE_RATE_LIMITED(rate, QDF_MODULE_ID_SME, level, ## args)
+#define sme_log_rate_limited_fl(rate, level, format, args...) \
+			sme_log_rate_limited(rate, level, FL(format), ## args)
+#define sme_alert_rate_limited(rate, format, args...) \
+			sme_log_rate_limited_fl(rate, QDF_TRACE_LEVEL_FATAL,\
+				format, ## args)
+#define sme_err_rate_limited(rate, format, args...) \
+			sme_log_rate_limited_fl(rate, QDF_TRACE_LEVEL_ERROR,\
+				format, ## args)
+#define sme_warn_rate_limited(rate, format, args...) \
+			sme_log_rate_limited_fl(rate, QDF_TRACE_LEVEL_WARN,\
+				format, ## args)
+#define sme_info_rate_limited(rate, format, args...) \
+			sme_log_rate_limited_fl(rate, QDF_TRACE_LEVEL_INFO,\
+				format, ## args)
+#define sme_debug_rate_limited(rate, format, args...) \
+			sme_log_rate_limited_fl(rate, QDF_TRACE_LEVEL_DEBUG,\
+				format, ## args)
+
 #define sme_log(level, args...) QDF_TRACE(QDF_MODULE_ID_SME, level, ## args)
 #define sme_logfl(level, format, args...) sme_log(level, FL(format), ## args)
 
@@ -84,6 +104,7 @@
 #define SME_SCAN_DBS_POLICY_FORCE_NONDBS        0x1
 #define SME_SCAN_DBS_POLICY_IGNORE_DUTY         0x2
 #define SME_SCAN_DBS_POLICY_MAX                 0x3
+#define SME_SCAN_REJECT_RATE_LIMIT              5
 
 #define SME_SESSION_ID_ANY        50
 
@@ -1608,6 +1629,18 @@ QDF_STATUS sme_update_short_retry_limit_threshold(tHalHandle hal_handle,
 		struct sme_short_retry_limit *short_retry_limit_th);
 QDF_STATUS sme_update_long_retry_limit_threshold(tHalHandle hal_handle,
 		struct sme_long_retry_limit  *long_retry_limit_th);
+/**
+ * sme_set_etsi_srd_ch_in_master_mode() - master mode UNI-III band ch support
+ * @hal: HAL pointer
+ * @srd_chan_support: ETSI SRD channel support
+ *
+ * This function set master ETSI SRD channel support
+ *
+ * Return: None
+ */
+void sme_set_etsi_srd_ch_in_master_mode(tHalHandle hal,
+					bool etsi_srd_chan_support);
+
 /**
  * sme_roam_is_ese_assoc() - Check if association type is ESE
  * @roam_info: Pointer to roam info

@@ -35,6 +35,9 @@
 #include "wmi_unified_param.h"
 #include "wlan_hdd_request_manager.h"
 
+/* IPv6 address string */
+#define IPV6_MAC_ADDRESS_STR_LEN 47  /* Including null terminator */
+
 /**
  * wlan_hdd_mc_addr_list_info_debugfs() - Populate mc addr list info
  * @hdd_ctx: pointer to hdd context
@@ -73,7 +76,7 @@ wlan_hdd_mc_addr_list_info_debugfs(hdd_context_t *hdd_ctx,
 	}
 
 	ret_val = scnprintf(buf, buf_avail_len,
-			    "\nMC addr list with mc_cnt = %u\n",
+			    "\nMC ADDR LIST DETAILS (mc_cnt = %u)\n",
 			    mc_addr_list->mc_cnt);
 	if (ret_val <= 0)
 		return length;
@@ -123,22 +126,22 @@ wlan_hdd_arp_offload_info_debugfs(hdd_context_t *hdd_ctx,
 {
 	ssize_t length = 0;
 	int ret_val;
-	struct hdd_arp_offload_info *offload;
+	struct hdd_arp_offload_info info = {0};
 
-	qdf_spin_lock(&adapter->arp_offload_info_lock);
-	offload = &adapter->arp_offload_info;
-	qdf_spin_unlock(&adapter->arp_offload_info_lock);
+	qdf_mutex_acquire(&adapter->arp_offload_info_lock);
+	info = adapter->arp_offload_info;
+	qdf_mutex_release(&adapter->arp_offload_info_lock);
 
-	if (offload->offload == false)
+	if (!info.offload)
 		ret_val = scnprintf(buf, buf_avail_len,
-			    "ARP OFFLOAD: DISABLED\n");
+			    "\nARP OFFLOAD: DISABLED\n");
 	else
 		ret_val = scnprintf(buf, buf_avail_len,
-			    "ARP OFFLOAD: ENABLED (%u.%u.%u.%u)\n",
-			    offload->ipv4[0],
-			    offload->ipv4[1],
-			    offload->ipv4[2],
-			    offload->ipv4[3]);
+			    "\nARP OFFLOAD: ENABLED (%u.%u.%u.%u)\n",
+			    info.ipv4[0],
+			    info.ipv4[1],
+			    info.ipv4[2],
+			    info.ipv4[3]);
 
 	if (ret_val <= 0)
 		return length;
@@ -148,6 +151,25 @@ wlan_hdd_arp_offload_info_debugfs(hdd_context_t *hdd_ctx,
 }
 
 #ifdef WLAN_NS_OFFLOAD
+/**
+ * ipv6_addr_string() - Get IPv6 addr string from array of octets
+ * @buffer: output buffer to hold string, caller should ensure size of
+ *          buffer is atleast IPV6_MAC_ADDRESS_STR_LEN
+ * @IPv6_addr: IPv6 address array
+ *
+ * Return: None
+ */
+static void ipv6_addr_string(uint8_t *buffer, uint8_t *IPv6_addr)
+{
+	uint8_t *a = IPv6_addr;
+
+	scnprintf(buffer, IPV6_MAC_ADDRESS_STR_LEN,
+		 "%02x%02x::%02x%02x::%02x%02x::%02x%02x::%02x%02x::%02x%02x::%02x%02x::%02x%02x",
+		 (a)[0], (a)[1], (a)[2], (a)[3], (a)[4], (a)[5], (a)[6],
+		 (a)[7], (a)[8], (a)[9], (a)[10], (a)[11], (a)[12], (a)[13],
+		 (a)[14], (a)[15]);
+}
+
 /**
  * wlan_hdd_ns_offload_info_debugfs() - Populate ns offload info
  * @hdd_ctx: pointer to hdd context
@@ -164,16 +186,16 @@ wlan_hdd_ns_offload_info_debugfs(hdd_context_t *hdd_ctx,
 {
 	ssize_t length = 0;
 	int ret_val;
-	struct hdd_ns_offload_info *offload;
+	struct hdd_ns_offload_info info = {0};
 	tSirNsOffloadReq *ns_info;
 	uint32_t i;
 
-	qdf_spin_lock(&adapter->ns_offload_info_lock);
-	offload = &adapter->ns_offload_info;
-	qdf_spin_unlock(&adapter->ns_offload_info_lock);
+	qdf_mutex_acquire(&adapter->ns_offload_info_lock);
+	info = adapter->ns_offload_info;
+	qdf_mutex_release(&adapter->ns_offload_info_lock);
 
 	ret_val = scnprintf(buf, buf_avail_len,
-			    "\n********* NS OFFLOAD DETAILS *******\n");
+			    "\nNS OFFLOAD DETAILS\n");
 	if (ret_val <= 0)
 		return length;
 	length += ret_val;
@@ -183,7 +205,7 @@ wlan_hdd_ns_offload_info_debugfs(hdd_context_t *hdd_ctx,
 		return buf_avail_len;
 	}
 
-	if (offload->offload != true) {
+	if (!info.offload) {
 		ret_val = scnprintf(buf + length, buf_avail_len - length,
 				    "NS offload is not enabled\n");
 		if (ret_val <= 0)
@@ -195,24 +217,32 @@ wlan_hdd_ns_offload_info_debugfs(hdd_context_t *hdd_ctx,
 
 	ret_val = scnprintf(buf + length, buf_avail_len - length,
 			    "NS offload enabled, %u ns addresses offloaded\n",
-			    offload->num_ns_offload_count);
+			    info.num_ns_offload_count);
 	if (ret_val <= 0)
 		return length;
 	length += ret_val;
 
-	ns_info = &offload->nsOffloadInfo;
-	for (i = 0; i < offload->num_ns_offload_count; i++) {
+	ns_info = &info.nsOffloadInfo;
+	for (i = 0; i < info.num_ns_offload_count; i++) {
+		uint8_t ipv6_str[IPV6_MAC_ADDRESS_STR_LEN];
+		uint8_t cast_string[12];
+
 		if (length >= buf_avail_len) {
 			hdd_err("No sufficient buf_avail_len");
 			return buf_avail_len;
 		}
 
+		ipv6_addr_string(ipv6_str, ns_info->targetIPv6Addr[i]);
+
+		if (ns_info->target_ipv6_addr_ac_type[i] ==
+		    SIR_IPV6_ADDR_AC_TYPE)
+			strlcpy(cast_string, "(ANY CAST)", 12);
+		else
+			strlcpy(cast_string, "(UNI CAST)", 12);
+
 		ret_val = scnprintf(buf + length, buf_avail_len - length,
-				"%u. " IPV6_MAC_ADDRESS_STR " %s\n", i + 1,
-				IPV6_MAC_ADDR_ARRAY(ns_info->targetIPv6Addr[i]),
-				(ns_info->target_ipv6_addr_ac_type[i] ==
-				 SIR_IPV6_ADDR_AC_TYPE) ?
-				 " (ANY CAST)" : " (UNI CAST)");
+				    "%u. %s %s\n",
+				    (i + 1), ipv6_str, cast_string);
 		if (ret_val <= 0)
 			return length;
 		length += ret_val;
@@ -260,7 +290,7 @@ wlan_hdd_apf_info_debugfs(hdd_context_t *hdd_ctx,
 	apf_enabled = adapter->apf_enabled;
 
 	ret_val = scnprintf(buf, buf_avail_len,
-			    "\n APF OFFLOAD DETAILS, offload_applied: %u\n",
+			    "\nAPF OFFLOAD DETAILS, offload_applied: %u\n\n",
 			    apf_enabled);
 	if (ret_val <= 0)
 		return length;

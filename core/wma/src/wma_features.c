@@ -8166,6 +8166,55 @@ QDF_STATUS wma_set_led_flashing(tp_wma_handle wma_handle,
 }
 #endif /* WLAN_FEATURE_GPIO_LED_FLASHING */
 
+/**
+ * wma_sar_rsp_evt_handler() -  process sar response event from FW.
+ * @handle: wma handle
+ * @event: event buffer
+ * @len: buffer length
+ *
+ * Return: 0 for success or error code
+ */
+int wma_sar_rsp_evt_handler(void *handle, uint8_t *event, uint32_t len)
+{
+	wmi_sar2_result_event_fixed_param *sar2_fixed_param;
+
+	WMI_SAR2_RESULT_EVENTID_param_tlvs *param_buf =
+		(WMI_SAR2_RESULT_EVENTID_param_tlvs *) event;
+
+	if (!param_buf) {
+		WMA_LOGE("Invalid sar2 result event buffer");
+		return -EINVAL;
+	}
+
+	sar2_fixed_param = param_buf->fixed_param;
+	if (!sar2_fixed_param) {
+		WMA_LOGE("Invalid sar2 result event fixed param buffer");
+		return -EINVAL;
+	}
+
+	switch (sar2_fixed_param->result) {
+	case WMI_SAR2_SUCCESS:
+		WMA_LOGI("WMI_SAR2_SUCCESS ");
+		break;
+	case WMI_SAR2_INVALID_ANTENNA_INDEX:
+		WMA_LOGI("WMI_SAR2_INVALID_ANTENNA_INDEX ");
+		break;
+	case WMI_SAR2_INVALID_TABLE_INDEX:
+		WMA_LOGI("WMI_SAR2_INVALID_TABLE_INDEX ");
+		break;
+	case WMI_SAR2_STATE_ERROR:
+		WMA_LOGI("WMI_SAR2_STATE_ERROR ");
+		break;
+	case WMI_SAR2_BDF_NO_TABLE:
+		WMA_LOGI("WMI_SAR2_BDF_NO_TABLE ");
+		break;
+	default:
+		WMA_LOGI("Invalid result ");
+		break;
+	}
+	return 0;
+}
+
 #ifdef FEATURE_WLAN_CH_AVOID
 /**
  * wma_channel_avoid_evt_handler() -  process channel to avoid event from FW.

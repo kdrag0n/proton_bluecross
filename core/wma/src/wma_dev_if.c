@@ -476,6 +476,14 @@ static void wma_vdev_detach_callback(void *ctx)
 	if (iface->stats_rsp)
 		qdf_mem_free(iface->stats_rsp);
 
+	if (iface->roam_scan_stats_req) {
+		struct sir_roam_scan_stats *roam_scan_stats_req =
+						iface->roam_scan_stats_req;
+
+		iface->roam_scan_stats_req = NULL;
+		qdf_mem_free(roam_scan_stats_req);
+	}
+
 	wma_vdev_deinit(iface);
 	qdf_mem_zero(iface, sizeof(*iface));
 	wma_vdev_init(iface);
@@ -2553,6 +2561,7 @@ QDF_STATUS wma_vdev_start(tp_wma_handle wma,
 		CFG_TGT_DEFAULT_GTX_BW_MASK;
 	intr[params.vdev_id].mhz = params.chan_freq;
 	intr[params.vdev_id].chan_width = ch_width;
+	intr[params.vdev_id].channel = req->chan;
 
 	temp_chan_info &= 0xffffffc0;
 	temp_chan_info |= params.chan_mode;

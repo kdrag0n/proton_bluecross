@@ -78,6 +78,14 @@ struct hdd_roam_scan_stats_debugfs_priv {
 void wlan_hdd_debugfs_csr_init(hdd_adapter_t *adapter);
 
 /**
+ * wlan_hdd_debugfs_csr_deinit() - Remove wifi diagnostic debugfs files
+ * @adapter: pointer to adapter for which debugfs files are to be removed
+ *
+ * Return: None
+ */
+void wlan_hdd_debugfs_csr_deinit(hdd_adapter_t *adapter);
+
+/**
  * wlan_hdd_current_time_info_debugfs() - API to get time into user buffer
  * @buf: output buffer to hold current time when queried
  * @buf_avail_len: available buffer length
@@ -86,14 +94,6 @@ void wlan_hdd_debugfs_csr_init(hdd_adapter_t *adapter);
  */
 ssize_t
 wlan_hdd_current_time_info_debugfs(uint8_t *buf, ssize_t buf_avail_len);
-
-/**
- * wlan_hdd_debugfs_csr_deinit() - Remove wifi diagnostic debugfs files
- * @adapter: pointer to adapter for which debugfs files are to be removed
- *
- * Return: None
- */
-void wlan_hdd_debugfs_csr_deinit(hdd_adapter_t *adapter);
 
 /**
  * wlan_hdd_debugfs_update_connect_info() - API to get connect info
@@ -153,6 +153,67 @@ static inline void wlan_hdd_debugfs_csr_init(hdd_adapter_t *adapter)
  */
 static inline void wlan_hdd_debugfs_csr_deinit(hdd_adapter_t *adapter)
 {
+}
+
+/**
+ * wlan_hdd_current_time_info_debugfs() - API to get time into user buffer
+ * @buf: output buffer to hold current time when queried
+ * @buf_avail_len: available buffer length
+ *
+ * Return: No.of bytes copied
+ */
+static inline ssize_t
+wlan_hdd_current_time_info_debugfs(uint8_t *buf, ssize_t buf_avail_len)
+{
+	return 0;
+}
+
+/**
+ * wlan_hdd_debugfs_update_connect_info() - API to get connect info
+ * into user buffer
+ * @buf: output buffer to hold connect info
+ * @buf_avail_len: available buffer length
+ *
+ * Return: No.of bytes copied
+ */
+static inline ssize_t
+wlan_hdd_debugfs_update_connect_info(hdd_context_t *hdd_ctx,
+				     hdd_adapter_t *adapter,
+				     uint8_t *buf, ssize_t buf_avail_len)
+{
+	return 0;
+}
+
+/**
+ * wlan_hdd_debugfs_update_filters_info() - API to get offload info
+ * into user buffer
+ * @buf: output buffer to hold offload info
+ * @buf_avail_len: available buffer length
+ *
+ * Return: No.of bytes copied
+ */
+static inline ssize_t
+wlan_hdd_debugfs_update_filters_info(hdd_context_t *hdd_ctx,
+				     hdd_adapter_t *adapter,
+				     uint8_t *buf, ssize_t buf_avail_len)
+{
+	return 0;
+}
+
+/**
+ * wlan_hdd_debugfs_update_roam_stats() - API to get roam scan stats info
+ * into user buffer
+ * @buf: output buffer to hold roam scan stats info
+ * @buf_avail_len: available buffer length
+ *
+ * Return: No.of bytes copied
+ */
+static inline ssize_t
+wlan_hdd_debugfs_update_roam_stats(hdd_context_t *hdd_ctx,
+				   hdd_adapter_t *adapter,
+				   uint8_t *buf, ssize_t buf_avail_len)
+{
+	return 0;
 }
 
 #endif

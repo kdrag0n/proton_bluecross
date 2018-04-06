@@ -183,15 +183,6 @@
 /** Mac Address string **/
 #define MAC_ADDRESS_STR "%02x:%02x:%02x:%02x:%02x:%02x"
 #define MAC_ADDRESS_STR_LEN 18  /* Including null terminator */
-
-#define IPV6_MAC_ADDR_ARRAY(a) (a)[0], (a)[1], (a)[2], (a)[3], (a)[4],\
-				(a)[5], (a)[6], (a)[7], (a)[8], (a)[9],\
-				(a)[10], (a)[11], (a)[12], (a)[13],\
-				(a)[14], (a)[15]
-/* IPv6 Mac Address string */
-#define IPV6_MAC_ADDRESS_STR "%02x%02x::%02x%02x::%02x%02x::%02x%02x::%02x%02x::%02x%02x::%02x%02x::%02x%02x"
-#define IPV6_MAC_ADDRESS_STR_LEN 47  /* Including null terminator */
-
 /* Max and min IEs length in bytes */
 #define MAX_GENIE_LEN (512)
 #define MIN_GENIE_LEN (2)
@@ -1320,10 +1311,10 @@ struct rcpi_info {
 
 /**
  * enum hdd_debugfs_file_id - Debugfs file Identifier
- * @HDD_DEBUFS_FILE_ID_CONNECT_INFO: connect_info file
- * @HDD_DEBUFS_FILE_ID_ROAM_SCAN_STATS_INFO: roam_scan_stats file
- * @HDD_DEBUFS_FILE_ID_OFFLOAD_INFO:
- * @HDD_DEBUGFS_FILE_ID_MAX:
+ * @HDD_DEBUFS_FILE_ID_CONNECT_INFO: connect_info file id
+ * @HDD_DEBUFS_FILE_ID_ROAM_SCAN_STATS_INFO: roam_scan_stats file id
+ * @HDD_DEBUFS_FILE_ID_OFFLOAD_INFO: offload_info file id
+ * @HDD_DEBUGFS_FILE_ID_MAX: maximum id of csr debugfs file
  */
 enum hdd_debugfs_file_id {
 	HDD_DEBUFS_FILE_ID_CONNECT_INFO = 0,
@@ -1338,6 +1329,7 @@ enum hdd_debugfs_file_id {
  * @name: name of debugfs file
  * @id: id from enum hdd_debugfs_file_id used to identify file
  * @buf_max_size: max size of buffer from which debugfs file is updated
+ * @entry: dentry pointer to debugfs file
  */
 struct hdd_debugfs_file_info {
 	uint8_t name[HDD_DEBUGFS_FILE_NAME_MAX];
@@ -1620,10 +1612,10 @@ struct hdd_adapter_s {
 	uint8_t active_ac;
 	struct hdd_debugfs_file_info csr_file[HDD_DEBUGFS_FILE_ID_MAX];
 	struct hdd_arp_offload_info arp_offload_info;
-	qdf_spinlock_t arp_offload_info_lock;
+	qdf_mutex_t arp_offload_info_lock;
 #ifdef WLAN_NS_OFFLOAD
 	struct hdd_ns_offload_info ns_offload_info;
-	qdf_spinlock_t ns_offload_info_lock;
+	qdf_mutex_t ns_offload_info_lock;
 #endif
 	bool apf_enabled;
 };

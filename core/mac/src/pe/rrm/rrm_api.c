@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -269,7 +269,7 @@ rrm_process_link_measurement_request(tpAniSirGlobal pMac,
 	}
 	pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
 
-	LinkReport.txPower = lim_get_max_tx_power(pSessionEntry->maxTxPower,
+	LinkReport.txPower = lim_get_max_tx_power(pSessionEntry->def_max_tx_pwr,
 						pLinkReq->MaxTxPower.maxTxPower,
 						  pMac->roam.configParam.
 						  nTxPowerCap);
@@ -1253,6 +1253,7 @@ tSirRetStatus rrm_initialize(tpAniSirGlobal pMac)
 	pMac->rrm.rrmPEContext.DialogToken = 0;
 
 	pMac->rrm.rrmPEContext.rrmEnable = 0;
+	pMac->rrm.rrmPEContext.prev_rrm_report_seq_num = 0xFFFF;
 
 	qdf_mem_set(pRRMCaps, sizeof(tRRMCaps), 0);
 	pRRMCaps->LinkMeasurement = 1;

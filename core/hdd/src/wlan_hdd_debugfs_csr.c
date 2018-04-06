@@ -44,7 +44,7 @@ wlan_hdd_current_time_info_debugfs(uint8_t *buf, ssize_t buf_avail_len)
 	qdf_get_time_of_the_day_in_hr_min_sec_usec(time_buffer,
 						   sizeof(time_buffer));
 	ret_val = scnprintf(buf, buf_avail_len,
-			    "Time at which this file generated = %s\n",
+			    "\nTime at which this file generated = %s\n",
 			    time_buffer);
 	if (ret_val < 0)
 		return 0;
@@ -129,10 +129,8 @@ __wlan_hdd_read_debugfs_csr(struct file *file, char __user *buf,
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (ret) {
-		hdd_err("hdd ctx validation failed");
+	if (ret)
 		return 0;
-	}
 
 	if (*pos == 0) {
 		info->length =

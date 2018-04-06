@@ -1526,8 +1526,8 @@ static int wma_unified_radio_tx_power_level_stats_event_handler(void *handle,
 		return -EINVAL;
 	}
 
-	if (fixed_param->radio_id > link_stats_results->num_radio) {
-		WMA_LOGD("%s: Invalid radio_id %d num_radio %d",
+	if (fixed_param->radio_id >= link_stats_results->num_radio) {
+		WMA_LOGE("%s: Invalid radio_id %d num_radio %d",
 			 __func__, fixed_param->radio_id,
 			 link_stats_results->num_radio);
 		return -EINVAL;
@@ -1691,6 +1691,13 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 	}
 	link_stats_results_size = sizeof(*link_stats_results) +
 				  fixed_param->num_radio * radio_stats_size;
+
+	if (radio_stats->radio_id >= fixed_param->num_radio) {
+		WMA_LOGE("%s: Invalid radio_id %d num_radio %d",
+			 __func__, radio_stats->radio_id,
+			 fixed_param->num_radio);
+		return -EINVAL;
+	}
 
 	if (!wma_handle->link_stats_results) {
 		wma_handle->link_stats_results = qdf_mem_malloc(
@@ -6275,10 +6282,10 @@ int wma_roam_scan_stats_event_handler(void *handle, uint8_t *event,
 {
 	tp_wma_handle wma_handle;
 	wmi_unified_t wmi_handle;
-	struct sir_roam_scan_stats *roam_scan_stats_req;
-	struct wma_txrx_node *iface;
-	struct wmi_roam_scan_stats_res *res;
-	int ret;
+	struct sir_roam_scan_stats *roam_scan_stats_req = NULL;
+	struct wma_txrx_node *iface = NULL;
+	struct wmi_roam_scan_stats_res *res = NULL;
+	int ret = 0;
 	uint32_t vdev_id;
 	QDF_STATUS status;
 
@@ -6297,62 +6304,50 @@ int wma_roam_scan_stats_event_handler(void *handle, uint8_t *event,
 	status = wmi_extract_roam_scan_stats_res_evt(wmi_handle, event,
 						     &vdev_id,
 						     &res);
-	if (status == QDF_STATUS_E_INVAL)
-		return -EINVAL;
 
-	if (status != QDF_STATUS_SUCCESS) {
+	/* vdev_id can be invalid though status is success, hence validate */
 		if (vdev_id >= wma_handle->max_bssid) {
-			WMI_LOGE("Invalid vdev_id for roam_scan_stats evt");
-			return -EINVAL;
+		WMA_LOGE(FL("Received invalid vdev_id: %d"), vdev_id);
+		ret  = -EINVAL;
+		goto free_res;
 		}
 
+	/* Get interface for valid vdev_id */
 		iface = &wma_handle->interfaces[vdev_id];
-		if (iface && !iface->roam_scan_stats_req) {
-			WMI_LOGE("roam_scan_stats buffer not available");
-			return 0;
+	if (!iface) {
+		WMI_LOGE(FL("Interface not available for vdev_id: %d"),
+			 vdev_id);
+		ret  = -EINVAL;
+		goto free_res;
 		}
 
 		roam_scan_stats_req = iface->roam_scan_stats_req;
 		iface->roam_scan_stats_req = NULL;
-		qdf_mem_free(roam_scan_stats_req);
-
-		return 0;
+	if (!roam_scan_stats_req) {
+		WMI_LOGE(FL("No pending request vdev_id: %d"), vdev_id);
+		ret  = -EINVAL;
+		goto free_res;
 	}
 
-	if (vdev_id >= wma_handle->max_bssid) {
-		WMA_LOGE(FL("received invalid vdev_id %d"), vdev_id);
+	if (!QDF_IS_STATUS_SUCCESS(status) ||
+	    !roam_scan_stats_req->cb ||
+	    roam_scan_stats_req->vdev_id != vdev_id) {
+		WMI_LOGE(FL("roam_scan_stats buffer not available"));
+		ret = -EINVAL;
+		goto free_roam_scan_stats_req;
+	}
+
+	(roam_scan_stats_req->cb)(roam_scan_stats_req->context, res);
+
+free_roam_scan_stats_req:
+		qdf_mem_free(roam_scan_stats_req);
+	roam_scan_stats_req = NULL;
+
+free_res:
 		qdf_mem_free(res);
 		res = NULL;
-		return -EINVAL;
-	}
 
-	iface = &wma_handle->interfaces[vdev_id];
-	if (iface && !iface->roam_scan_stats_req) {
-		WMI_LOGE("roam_scan_stats buffer not available");
-		qdf_mem_free(res);
-		return 0;
-	}
-
-	roam_scan_stats_req = iface->roam_scan_stats_req;
-	if (!roam_scan_stats_req->cb ||
-	    vdev_id != roam_scan_stats_req->vdev_id) {
-		iface->roam_scan_stats_req = NULL;
-		qdf_mem_free(roam_scan_stats_req);
-		qdf_mem_free(res);
-		return 0;
-	}
-
-	iface->roam_scan_stats_req = NULL;
-
-	ret = (roam_scan_stats_req->cb)(roam_scan_stats_req->context, res);
-	if (ret) {
-		qdf_mem_free(res);
-		res = NULL;
-	}
-
-	qdf_mem_free(roam_scan_stats_req);
-
-	return 0;
+	return ret;
 }
 
 QDF_STATUS wma_get_roam_scan_stats(WMA_HANDLE handle,

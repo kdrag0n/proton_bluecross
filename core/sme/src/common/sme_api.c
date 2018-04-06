@@ -3303,13 +3303,15 @@ QDF_STATUS sme_scan_request(tHalHandle hal, uint8_t session_id,
 	}
 
 	if (!mac_ctx->scan.fScanEnable) {
-		sme_err("fScanEnable false");
+		sme_err_rate_limited(SME_SCAN_REJECT_RATE_LIMIT,
+				     "fScanEnable false");
 		return status;
 	}
 
 	scan_count = csr_ll_count(&mac_ctx->sme.smeScanCmdActiveList);
 	if (scan_count >= mac_ctx->scan.max_scan_count) {
-		sme_err("Max scan reached");
+		sme_err_rate_limited(SME_SCAN_REJECT_RATE_LIMIT,
+				     "Max scan reached");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -11693,6 +11695,22 @@ void sme_set_prefer_80MHz_over_160MHz(tHalHandle hal,
 	mac_ctx->sta_prefer_80MHz_over_160MHz = sta_prefer_80MHz_over_160MHz;
 }
 
+void sme_set_etsi_srd_ch_in_master_mode(tHalHandle hal,
+					bool etsi_srd_chan_support)
+{
+	tpAniSirGlobal mac;
+
+	if (NULL == hal) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+			"%s: Invalid hal pointer", __func__);
+		return;
+	}
+
+	mac = PMAC_STRUCT(hal);
+	mac->sap.enable_etsi_srd_chan_support = etsi_srd_chan_support;
+	sme_debug("srd_ch_support %d", mac->sap.enable_etsi_srd_chan_support);
+}
+
 /**
  * sme_set_allow_adj_ch_bcn() - API to set allow_adj_ch_bcn
  * @hal:           The handle returned by macOpen
@@ -19072,6 +19090,45 @@ QDF_STATUS sme_destroy_config(tHalHandle hal)
 	return status;
 }
 
+QDF_STATUS
+sme_get_roam_scan_stats(tHalHandle hal, roam_scan_stats_cb cb, void *context,
+			uint32_t vdev_id)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	tpAniSirGlobal mac = PMAC_STRUCT(hal);
+	cds_msg_t cds_msg;
+	struct sir_roam_scan_stats *req;
+
+	req = qdf_mem_malloc(sizeof(*req));
+	if (!req) {
+		hdd_err("Failed allocate memory for roam scan stats req");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	req->vdev_id = vdev_id;
+	req->cb = cb;
+	req->context = context;
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		cds_msg.bodyptr = req;
+		cds_msg.type = WMA_GET_ROAM_SCAN_STATS;
+		status = cds_mq_post_message(QDF_MODULE_ID_WMA, &cds_msg);
+		sme_release_global_lock(&mac->sme);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+				  FL("post roam scan stats req failed"));
+			status = QDF_STATUS_E_FAILURE;
+			qdf_mem_free(req);
+		}
+	} else {
+		hdd_err("sme_acquire_global_lock failed");
+		qdf_mem_free(req);
+	}
+
+	return status;
+}
+
 QDF_STATUS sme_fast_reassoc(tHalHandle hal, tCsrRoamProfile *profile,
 			    const tSirMacAddr bssid, int channel,
 			    uint8_t vdev_id, const tSirMacAddr connected_bssid)
@@ -19179,41 +19236,3 @@ bool sme_is_sta_key_exchange_in_progress(tHalHandle hal, uint8_t session_id)
 	return CSR_IS_WAIT_FOR_KEY(mac_ctx, session_id);
 }
 
-QDF_STATUS
-sme_get_roam_scan_stats(tHalHandle hal, roam_scan_stats_cb cb, void *context,
-			uint32_t vdev_id)
-{
-	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-	tpAniSirGlobal mac = PMAC_STRUCT(hal);
-	cds_msg_t cds_msg;
-	struct sir_roam_scan_stats *req;
-
-	req = qdf_mem_malloc(sizeof(*req));
-	if (!req) {
-		hdd_err("Failed allocate memory for roam scan stats req");
-		return QDF_STATUS_E_NOMEM;
-	}
-
-	req->vdev_id = vdev_id;
-	req->cb = cb;
-	req->context = context;
-
-	status = sme_acquire_global_lock(&mac->sme);
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		cds_msg.bodyptr = req;
-		cds_msg.type = WMA_GET_ROAM_SCAN_STATS;
-		status = cds_mq_post_message(QDF_MODULE_ID_WMA, &cds_msg);
-		sme_release_global_lock(&mac->sme);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				  FL("post roam scan stats req failed"));
-			status = QDF_STATUS_E_FAILURE;
-			qdf_mem_free(req);
-		}
-	} else {
-		hdd_err("sme_acquire_global_lock failed");
-		qdf_mem_free(req);
-	}
-
-	return status;
-}

@@ -3542,6 +3542,18 @@ QDF_STATUS wma_start(void *cds_ctx)
 		goto end;
 	}
 #endif /* FEATURE_WLAN_CH_AVOID */
+	WMA_LOGD("Registering SAR2 to avoid handler");
+
+	status = wmi_unified_register_event_handler(wma_handle->wmi_handle,
+						WMI_SAR2_RESULT_EVENTID,
+						wma_sar_rsp_evt_handler,
+						WMA_RX_SERIALIZER_CTX);
+	if (status) {
+		WMA_LOGE("Failed to register sar response event cb");
+		qdf_status = QDF_STATUS_E_FAILURE;
+		goto end;
+	}
+
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 	WMA_LOGD("Registering auto shutdown handler");
 	status = wmi_unified_register_event_handler(wma_handle->wmi_handle,
@@ -3863,6 +3875,14 @@ QDF_STATUS wma_wmi_service_close(void *cds_ctx)
 			qdf_mem_free(wma_handle->
 				     interfaces[i].action_frame_filter);
 			wma_handle->interfaces[i].action_frame_filter = NULL;
+		}
+
+		if (wma_handle->interfaces[i].roam_scan_stats_req) {
+			struct sir_roam_scan_stats *req;
+
+			req = wma_handle->interfaces[i].roam_scan_stats_req;
+			wma_handle->interfaces[i].roam_scan_stats_req = NULL;
+			qdf_mem_free(req);
 		}
 
 		if (wma_handle->interfaces[i].roam_synch_frame_ind.
@@ -5496,6 +5516,11 @@ QDF_STATUS wma_get_caps_for_phyidx_hwmode(struct wma_caps_per_phy *caps_per_phy,
 	caps_per_phy->he_2g = phy_cap->he_cap_info_2G;
 	caps_per_phy->he_5g = phy_cap->he_cap_info_5G;
 
+	caps_per_phy->tx_chain_mask_2G = phy_cap->tx_chain_mask_2G;
+	caps_per_phy->rx_chain_mask_2G = phy_cap->rx_chain_mask_2G;
+	caps_per_phy->tx_chain_mask_5G = phy_cap->tx_chain_mask_5G;
+	caps_per_phy->rx_chain_mask_5G = phy_cap->rx_chain_mask_5G;
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -5981,6 +6006,16 @@ static void wma_populate_soc_caps(t_wma_handle *wma_handle,
 		wma_cleanup_dbs_phy_caps(wma_handle);
 		return;
 	}
+
+	qdf_mem_copy(&phy_caps->sar_capability,
+		     param_buf->sar_caps,
+		     sizeof(WMI_SAR_CAPABILITIES));
+	if (phy_caps->sar_capability.active_version > SAR_VERSION_2) {
+		WMA_LOGE("%s: incorrect SAR version", __func__);
+		wma_cleanup_dbs_phy_caps(wma_handle);
+		return;
+	}
+
 	phy_caps->each_phy_hal_reg_cap =
 		qdf_mem_malloc(phy_caps->num_phy_for_hal_reg_cap.num_phy *
 				sizeof(WMI_HAL_REG_CAPABILITIES_EXT));

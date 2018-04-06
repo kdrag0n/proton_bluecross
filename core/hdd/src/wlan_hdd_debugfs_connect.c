@@ -55,6 +55,17 @@ wlan_hdd_version_info_debugfs(hdd_context_t *hdd_ctx, uint8_t *buf,
 	sub_id = (hdd_ctx->target_fw_vers_ext & 0xf0000000) >> 28;
 
 	ret_val = scnprintf(buf, buf_avail_len,
+			    "\nVERSION DETAILS\n");
+	if (ret_val <= 0)
+		return length;
+	length += ret_val;
+
+	if (length >= buf_avail_len) {
+		hdd_err("No sufficient buf_avail_len");
+		return buf_avail_len;
+	}
+
+	ret_val = scnprintf(buf + length, buf_avail_len - length,
 			   "Host Driver Version: %s\n"
 			   "Firmware Version: %d.%d.%d.%d.%d\n"
 			   "Hardware Version: %s\n",
@@ -64,7 +75,8 @@ wlan_hdd_version_info_debugfs(hdd_context_t *hdd_ctx, uint8_t *buf,
 	if (ret_val <= 0)
 		return length;
 
-	length = ret_val;
+	length += ret_val;
+
 	return length;
 }
 
@@ -89,7 +101,7 @@ wlan_hdd_add_ht_cap_info(connection_info_t *conn_info,
 
 	ht_caps = &conn_info->ht_caps;
 	ret_val = scnprintf(buf, buf_avail_len,
-			"\nht_cap_info = %x\n"
+			"ht_cap_info = %x\n"
 			"ampdu_params_info = %x\n"
 			"extended_ht_cap_info = %x\n"
 			"tx_BF_cap_info = %x\n"
@@ -131,7 +143,7 @@ wlan_hdd_add_vht_cap_info(connection_info_t *conn_info,
 
 	vht_caps = &conn_info->vht_caps;
 	ret_val = scnprintf(buf, buf_avail_len,
-			"\nvht_cap_info = %x\n"
+			"vht_cap_info = %x\n"
 			"rx_mcs_map = %x\n"
 			"rx_highest = %x\n"
 			"tx_mcs_map = %x\n"
@@ -258,7 +270,7 @@ wlan_hdd_connect_info_debugfs(hdd_adapter_t *adapter, uint8_t *buf,
 	}
 
 	ret_val = scnprintf(buf, buf_avail_len,
-			    "\n********* CONNECTION RELATED DETAILS *******\n");
+			    "\nCONNECTION DETAILS\n");
 	if (ret_val <= 0)
 		return length;
 	length += ret_val;
@@ -296,7 +308,7 @@ wlan_hdd_connect_info_debugfs(hdd_adapter_t *adapter, uint8_t *buf,
 			    "bit_rate_compat = %u\n"
 			    "nss = %u\n"
 			    "last_auth_type = %s\n"
-			    "dot11Mode = %s",
+			    "dot11Mode = %s\n",
 			    conn_info->last_ssid.SSID.ssId,
 			    MAC_ADDR_ARRAY(conn_info->bssId.bytes),
 			    conn_info->connect_time,

@@ -3293,6 +3293,17 @@ QDF_STATUS hdd_init_station_mode(hdd_adapter_t *adapter)
 		}
 	}
 
+	if (adapter->device_mode == QDF_STA_MODE) {
+		hdd_debug("setting RTT mac randomization param: %d",
+			hdd_ctx->config->enable_rtt_mac_randomization);
+		ret_val = sme_cli_set_command(adapter->sessionId,
+			WMI_VDEV_PARAM_ENABLE_DISABLE_RTT_INITIATOR_RANDOM_MAC,
+			hdd_ctx->config->enable_rtt_mac_randomization,
+			VDEV_CMD);
+		if (0 != ret_val)
+			hdd_err("RTT mac randomization param set failed %d",
+				ret_val);
+	}
 	/*
 	 * 1) When DBS hwmode is disabled from INI then send HT/VHT IE as per
 	 *    non-dbs hw mode, so that there is no limitation applied for 2G/5G.
@@ -3382,8 +3393,6 @@ QDF_STATUS hdd_init_station_mode(hdd_adapter_t *adapter)
 
 	/* rcpi info initialization */
 	qdf_mem_zero(&adapter->rcpi, sizeof(adapter->rcpi));
-
-	wlan_hdd_debugfs_csr_init(adapter);
 
 	return QDF_STATUS_SUCCESS;
 
@@ -3727,6 +3736,50 @@ static void hdd_set_fw_log_params(hdd_context_t *hdd_ctx,
 
 #endif
 
+#ifdef WLAN_NS_OFFLOAD
+/**
+ * hdd_ns_offload_info_lock_create() - Create mutex lock for ns offload info
+ * @adapter: pointer to adapter for which lock is to be created
+ *
+ * Return: None
+ */
+static void hdd_ns_offload_info_lock_create(hdd_adapter_t *adapter)
+{
+	qdf_mutex_create(&adapter->ns_offload_info_lock);
+}
+
+/**
+ * hdd_ns_offload_info_lock_destroy() - Destroy mutex lock for ns offload info
+ * @adapter: pointer to adapter for which lock is to be destroyed
+ *
+ * Return: None
+ */
+static void hdd_ns_offload_info_lock_destroy(hdd_adapter_t *adapter)
+{
+	qdf_mutex_destroy(&adapter->ns_offload_info_lock);
+}
+#else
+/**
+ * hdd_ns_offload_info_lock_create() - Create mutex lock for ns offload info
+ * @adapter: pointer to adapter for which lock is to be created
+ *
+ * Return: None
+ */
+static void hdd_ns_offload_info_lock_create(hdd_adapter_t *adapter)
+{
+}
+
+/**
+ * hdd_ns_offload_info_lock_destroy() - Destroy mutex lock for ns offload info
+ * @adapter: pointer to adapter for which lock is to be destroyed
+ *
+ * Return: None
+ */
+static void hdd_ns_offload_info_lock_destroy(hdd_adapter_t *adapter)
+{
+}
+#endif
+
 /**
  * hdd_configure_chain_mask() - programs chain mask to firmware
  * @adapter: HDD adapter
@@ -3736,6 +3789,8 @@ static void hdd_set_fw_log_params(hdd_context_t *hdd_ctx,
 static int hdd_configure_chain_mask(hdd_adapter_t *adapter)
 {
 	int ret_val;
+	QDF_STATUS status;
+	struct wma_caps_per_phy non_dbs_phy_cap;
 	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	hdd_debug("enable2x2: %d, lte_coex: %d, ChainMask1x1: tx: %d rx: %d",
@@ -3750,7 +3805,18 @@ static int hdd_configure_chain_mask(hdd_adapter_t *adapter)
 		  hdd_ctx->config->tx_chain_mask_5g,
 		  hdd_ctx->config->rx_chain_mask_5g);
 
-	if (hdd_ctx->num_rf_chains < 2) {
+	status = wma_get_caps_for_phyidx_hwmode(&non_dbs_phy_cap,
+						HW_MODE_DBS_NONE,
+						CDS_BAND_ALL);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_info("couldn't get phy caps. skip chain mask programming");
+		return 0;
+	}
+
+	if (non_dbs_phy_cap.tx_chain_mask_2G < 3 ||
+	    non_dbs_phy_cap.rx_chain_mask_2G < 3 ||
+	    non_dbs_phy_cap.tx_chain_mask_5G < 3 ||
+	    non_dbs_phy_cap.rx_chain_mask_5G < 3) {
 		hdd_info("firmware not capable. skip chain mask programming");
 		return 0;
 	}
@@ -4234,10 +4300,8 @@ hdd_adapter_t *hdd_open_adapter(hdd_context_t *hdd_ctx, uint8_t session_type,
 	hdd_info("%s interface created. iftype: %d", netdev_name(adapter->dev),
 		 session_type);
 
-	qdf_spinlock_create(&adapter->arp_offload_info_lock);
-#ifdef WLAN_NS_OFFLOAD
-	qdf_spinlock_create(&adapter->ns_offload_info_lock);
-#endif
+	qdf_mutex_create(&adapter->arp_offload_info_lock);
+	hdd_ns_offload_info_lock_create(adapter);
 
 	return adapter;
 
@@ -4276,10 +4340,8 @@ QDF_STATUS hdd_close_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 		hdd_bus_bw_compute_timer_stop(hdd_ctx);
 		cancel_work_sync(&hdd_ctx->bus_bw_work);
 
-		qdf_spinlock_destroy(&adapter->arp_offload_info_lock);
-#ifdef WLAN_NS_OFFLOAD
-		qdf_spinlock_destroy(&adapter->ns_offload_info_lock);
-#endif
+		qdf_mutex_destroy(&adapter->arp_offload_info_lock);
+		hdd_ns_offload_info_lock_destroy(adapter);
 
 		/* cleanup adapter */
 		cds_clear_concurrency_mode(adapter->device_mode);
@@ -4504,8 +4566,6 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 		return -ENODEV;
 	}
 
-	wlan_hdd_debugfs_csr_deinit(adapter);
-
 	scan_info = &adapter->scan_info;
 	hdd_info("Disabling queues");
 	wlan_hdd_netif_queue_control(adapter,
@@ -4517,6 +4577,12 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 	case QDF_IBSS_MODE:
 	case QDF_P2P_DEVICE_MODE:
 	case QDF_NDI_MODE:
+
+		if (adapter->device_mode == QDF_STA_MODE) {
+			hdd_debug("Destroy CSR debugfs files");
+			wlan_hdd_debugfs_csr_deinit(adapter);
+		}
+
 		if ((QDF_NDI_MODE == adapter->device_mode) ||
 			hdd_conn_is_connected(
 				WLAN_HDD_GET_STATION_CTX_PTR(adapter)) ||
@@ -8683,6 +8749,11 @@ int hdd_start_station_adapter(hdd_adapter_t *adapter)
 		hdd_tx_resume_cb,
 		hdd_tx_flow_control_is_pause);
 
+	if (adapter->device_mode == QDF_STA_MODE) {
+		hdd_debug("Create CSR debugfs files");
+		wlan_hdd_debugfs_csr_init(adapter);
+	}
+
 	EXIT();
 	return 0;
 }
@@ -10012,6 +10083,9 @@ static int hdd_features_init(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 	sme_set_prefer_80MHz_over_160MHz(hdd_ctx->hHal,
 			hdd_ctx->config->sta_prefer_80MHz_over_160MHz);
 
+	sme_set_etsi_srd_ch_in_master_mode(hdd_ctx->hHal,
+			hdd_ctx->config->etsi_srd_chan_in_master_mode);
+
 	sme_set_allow_adj_ch_bcn(hdd_ctx->hHal,
 			hdd_ctx->config->allow_adj_ch_bcn);
 
@@ -10352,7 +10426,6 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode)
 	qdf_device_t qdf_ctx;
 	QDF_STATUS qdf_status;
 	int ret = 0;
-	p_cds_sched_context cds_sched_context = NULL;
 	bool is_unload_stop = cds_is_driver_unloading();
 	bool is_recover_stop = cds_is_driver_recovering();
 	bool is_idle_stop = !is_unload_stop && !is_recover_stop;
@@ -10447,13 +10520,6 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode)
 		hdd_warn("Failed to stop CDS: %d", qdf_status);
 		ret = -EINVAL;
 		QDF_ASSERT(0);
-	}
-
-	/* Clean up message queues of TX, RX and MC thread */
-	if (!is_recover_stop) {
-		cds_sched_context = get_cds_sched_ctxt();
-		if (cds_sched_context)
-			cds_sched_flush_mc_mqs(cds_sched_context);
 	}
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);

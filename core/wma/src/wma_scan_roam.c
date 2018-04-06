@@ -170,6 +170,25 @@ static inline int wma_get_burst_duration(int max_ch_time, int miracast_value)
 }
 
 /**
+ * wma_valid_bssid_in_scan_req() - Check if scan req has valid bssid
+ * @scan_req: scan request
+ *
+ * Return: true if bssid is valid else false
+ */
+static bool wma_valid_bssid_in_scan_req(tSirScanOffloadReq *scan_req)
+{
+	uint8_t i = 0;
+
+	while (i < QDF_MAC_ADDR_SIZE && scan_req->bssId.bytes[i] == 0xFF)
+		i += 1;
+
+	if (i == QDF_MAC_ADDR_SIZE)
+		return false;
+	else
+		return true;
+}
+
+/**
  * wma_get_buf_start_scan_cmd() - Fill start scan command
  * @wma_handle: wma handle
  * @scan_req: scan request
@@ -312,7 +331,8 @@ QDF_STATUS wma_get_buf_start_scan_cmd(tp_wma_handle wma_handle,
 	if (!scan_req->p2pScanType) {
 		WMA_LOGD("Normal Scan request");
 		cmd->scan_ctrl_flags |= WMI_SCAN_ADD_CCK_RATES;
-		if (!scan_req->numSsid)
+		if (!scan_req->numSsid &&
+		    !wma_valid_bssid_in_scan_req(scan_req))
 			cmd->scan_ctrl_flags |= WMI_SCAN_ADD_BCAST_PROBE_REQ;
 		if (scan_req->scanType == eSIR_PASSIVE_SCAN)
 			cmd->scan_ctrl_flags |= WMI_SCAN_FLAG_PASSIVE;
@@ -1931,7 +1951,11 @@ QDF_STATUS wma_send_offload_11k_params(WMA_HANDLE handle,
 		return QDF_STATUS_E_NOSUPPORT;
 	}
 
-	if (!params->neighbor_report_params.ssid.length) {
+	/*
+	 * If 11k enable command and ssid length is 0, drop it
+	 */
+	if (params->offload_11k_bitmask &&
+	    !params->neighbor_report_params.ssid.length) {
 		WMA_LOGD("%s: SSID Len 0", __func__);
 		return QDF_STATUS_E_INVAL;
 	}
@@ -2083,11 +2107,14 @@ QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
 			break;
 		}
 
+		/*
+		 * Send 11k offload enable to FW as part of RSO Start
+		 */
 		if (roam_req->reason == REASON_CTX_INIT) {
 			qdf_status = wma_send_offload_11k_params(wma_handle,
 						&roam_req->offload_11k_params);
 			if (qdf_status != QDF_STATUS_SUCCESS) {
-				WMA_LOGE("11k offload params not sent, status %d",
+				WMA_LOGE("11k offload enable not sent, status %d",
 					 qdf_status);
 				break;
 			}
@@ -2122,6 +2149,20 @@ QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
 				WMA_LOGD("Dont send RSO stop during roam sync");
 				break;
 		}
+
+		/*
+		 * Send 11k offload disable command to FW as part of RSO Stop
+		 */
+		if (roam_req->reason == REASON_DISCONNECTED) {
+			qdf_status = wma_send_offload_11k_params(wma_handle,
+						&roam_req->offload_11k_params);
+			if (qdf_status != QDF_STATUS_SUCCESS) {
+				WMA_LOGE("11k offload disable not sent, status %d",
+					 qdf_status);
+				break;
+			}
+		}
+
 		wma_handle->suitable_ap_hb_failure = false;
 		if (wma_handle->roam_offload_enabled) {
 			uint32_t mode;
@@ -5272,6 +5313,8 @@ int wma_passpoint_match_event_handler(void *handle,
 	struct wifi_passpoint_match  *dest_match;
 	tSirWifiScanResult      *dest_ap;
 	uint8_t *buf_ptr;
+	uint32_t buf_len = 0;
+	bool excess_data = false;
 	tpAniSirGlobal mac = cds_get_context(QDF_MODULE_ID_PE);
 
 	if (!mac) {
@@ -5291,13 +5334,26 @@ int wma_passpoint_match_event_handler(void *handle,
 	event = param_buf->fixed_param;
 	buf_ptr = (uint8_t *)param_buf->fixed_param;
 
-	/*
-	 * All the below lengths are UINT32 and summing up and checking
-	 * against a constant should not be an issue.
-	 */
-	if ((sizeof(*event) + event->ie_length + event->anqp_length) >
-	     WMI_SVC_MSG_MAX_SIZE ||
-	     (event->ie_length + event->anqp_length) > param_buf->num_bufp) {
+	do {
+		if (event->ie_length > (WMI_SVC_MSG_MAX_SIZE)) {
+			excess_data = true;
+			break;
+		} else {
+			buf_len = event->ie_length;
+		}
+
+		if (event->anqp_length > (WMI_SVC_MSG_MAX_SIZE)) {
+			excess_data = true;
+			break;
+		} else {
+			buf_len += event->anqp_length;
+		}
+
+	} while (0);
+
+	if (excess_data || buf_len > (WMI_SVC_MSG_MAX_SIZE - sizeof(*event)) ||
+	    buf_len > (WMI_SVC_MSG_MAX_SIZE - sizeof(*dest_match)) ||
+	    (event->ie_length + event->anqp_length) > param_buf->num_bufp) {
 		WMA_LOGE("IE Length: %u or ANQP Length: %u is huge, num_bufp: %u",
 			event->ie_length, event->anqp_length,
 			param_buf->num_bufp);
@@ -5310,8 +5366,8 @@ int wma_passpoint_match_event_handler(void *handle,
 		event->ssid.ssid_len = SIR_MAC_MAX_SSID_LENGTH;
 	}
 
-	dest_match = qdf_mem_malloc(sizeof(*dest_match) +
-				event->ie_length + event->anqp_length);
+	dest_match = qdf_mem_malloc(sizeof(*dest_match) + buf_len);
+
 	if (!dest_match) {
 		WMA_LOGE("%s: qdf_mem_malloc failed", __func__);
 		return -EINVAL;

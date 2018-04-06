@@ -4529,7 +4529,7 @@ static int iw_get_name(struct net_device *dev,
 	int ret;
 
 	cds_ssr_protect(__func__);
-	ret = __iw_get_name(dev, info, (char *)wrqu, extra);
+	ret = __iw_get_name(dev, info, wrqu->name, extra);
 	cds_ssr_unprotect(__func__);
 
 	return ret;
@@ -4915,7 +4915,7 @@ static int iw_get_freq(struct net_device *dev, struct iw_request_info *info,
 	int ret;
 
 	cds_ssr_protect(__func__);
-	ret = __iw_get_freq(dev, info, (struct iw_freq *)fwrq, extra);
+	ret = __iw_get_freq(dev, info, &fwrq->freq, extra);
 	cds_ssr_unprotect(__func__);
 
 	return ret;
@@ -5595,7 +5595,7 @@ static int iw_get_encode(struct net_device *dev, struct iw_request_info *info,
 	int ret;
 
 	cds_ssr_protect(__func__);
-	ret = __iw_get_encode(dev, info, (struct iw_point *)dwrq, extra);
+	ret = __iw_get_encode(dev, info, &dwrq->encoding, extra);
 	cds_ssr_unprotect(__func__);
 
 	return ret;
@@ -6798,7 +6798,7 @@ static int iw_get_encodeext(struct net_device *dev,
 	int ret;
 
 	cds_ssr_protect(__func__);
-	ret = __iw_get_encodeext(dev, info, (struct iw_point *)dwrq, extra);
+	ret = __iw_get_encodeext(dev, info, &dwrq->encoding, extra);
 	cds_ssr_unprotect(__func__);
 
 	return ret;

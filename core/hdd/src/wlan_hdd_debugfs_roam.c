@@ -58,34 +58,50 @@ static void hdd_roam_scan_stats_debugfs_dealloc(void *priv)
 /**
  * hdd_roam_scan_stats_cb() - Call back invoked from roam scan stats evt
  * @context: cookie to get request object
- * @res: roam scan stats response from firmware, in successful case, final user
- *	 of this pointer has to free it.
+ * @res: roam scan stats response from firmware
  *
- * Return: if success zero else negative value
+ * Return: None
  */
-static int
+static void
 hdd_roam_scan_stats_cb(void *context, struct wmi_roam_scan_stats_res *res)
 {
 	struct hdd_request *request;
 	struct hdd_roam_scan_stats_debugfs_priv *priv;
+	struct wmi_roam_scan_stats_res *stats_res;
+	uint32_t total_len;
 
 	ENTER();
 
 	request = hdd_request_get(context);
 	if (!request) {
 		hdd_err("Obsolete roam scan stats request");
-		return -EINVAL;
+		return;
+	}
+
+	if (!res) {
+		hdd_err("Invalid response");
+		goto end;
 	}
 
 	priv = hdd_request_priv(request);
-	priv->roam_scan_stats_res = res;
 
+	total_len = sizeof(*res) + res->num_roam_scans *
+		    sizeof(struct wmi_roam_scan_stats_params);
+
+	stats_res = qdf_mem_malloc(total_len);
+	if (!stats_res) {
+		hdd_err("No memory for response");
+		goto end;
+	}
+
+	qdf_mem_copy(stats_res, res, total_len);
+	priv->roam_scan_stats_res = stats_res;
+
+end:
 	hdd_request_complete(request);
 	hdd_request_put(request);
 
 	EXIT();
-
-	return 0;
 }
 
 /**
@@ -100,7 +116,8 @@ static struct
 wmi_roam_scan_stats_res *hdd_get_roam_scan_stats(hdd_context_t *hdd_ctx,
 						 hdd_adapter_t *adapter)
 {
-	struct wmi_roam_scan_stats_res *roam_scan_stats_res = NULL;
+	struct wmi_roam_scan_stats_res *res;
+	struct wmi_roam_scan_stats_res *stats_res = NULL;
 	void *context;
 	struct hdd_request *request;
 	struct hdd_roam_scan_stats_debugfs_priv *priv;
@@ -111,6 +128,7 @@ wmi_roam_scan_stats_res *hdd_get_roam_scan_stats(hdd_context_t *hdd_ctx,
 	};
 	QDF_STATUS status;
 	int32_t ret;
+	uint32_t total_len;
 
 	ENTER();
 
@@ -140,18 +158,27 @@ wmi_roam_scan_stats_res *hdd_get_roam_scan_stats(hdd_context_t *hdd_ctx,
 	}
 
 	priv = hdd_request_priv(request);
-	roam_scan_stats_res = priv->roam_scan_stats_res;
-	if (!roam_scan_stats_res) {
+	res = priv->roam_scan_stats_res;
+	if (!res) {
 		hdd_err("Failure of roam scan stats response retrieval");
 		goto cleanup;
 	}
 
-	priv->roam_scan_stats_res = NULL;
+	total_len = sizeof(*res) + res->num_roam_scans *
+		    sizeof(struct wmi_roam_scan_stats_params);
+
+	stats_res = qdf_mem_malloc(total_len);
+	if (!stats_res) {
+		hdd_err("No memory for response");
+		goto cleanup;
+	}
+
+	qdf_mem_copy(stats_res, res, total_len);
 
 cleanup:
 	hdd_request_put(request);
 
-	return roam_scan_stats_res;
+	return stats_res;
 }
 
 /**

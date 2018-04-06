@@ -6193,7 +6193,7 @@ int iw_get_essid(struct net_device *dev,
 	int ret;
 
 	cds_ssr_protect(__func__);
-	ret = __iw_get_essid(dev, info, (struct iw_point *)wrqu, extra);
+	ret = __iw_get_essid(dev, info, &wrqu->essid, extra);
 	cds_ssr_unprotect(__func__);
 
 	return ret;

@@ -4702,7 +4702,7 @@ static int __iw_get_channel_list(struct net_device *dev,
 		if (hdd_ctx->config->dot11p_mode)
 			band_end_channel = CHAN_ENUM_184;
 		else
-			band_end_channel = CHAN_ENUM_165;
+			band_end_channel = CHAN_ENUM_173;
 	}
 
 	if (hostapd_adapter->device_mode == QDF_STA_MODE &&
@@ -8169,8 +8169,6 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	wlansap_set_tx_leakage_threshold(hHal,
 		iniConfig->sap_tx_leakage_threshold);
 
-	wlansap_set_etsi_srd_chan_support(hHal,
-			iniConfig->etsi_srd_chan_in_master_mode);
 	capab_info = pMgmt_frame->u.beacon.capab_info;
 
 	pConfig->privacy = (pMgmt_frame->u.beacon.capab_info &
@@ -9073,6 +9071,10 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	channel_width = wlan_hdd_get_channel_bw(params->chandef.width);
 	channel = ieee80211_frequency_to_channel(
 				params->chandef.chan->center_freq);
+	pAdapter->sessionCtx.ap.sapConfig.ch_params.center_freq_seg0 =
+				cds_freq_to_chan(params->chandef.center_freq1);
+	pAdapter->sessionCtx.ap.sapConfig.ch_params.center_freq_seg1 =
+				cds_freq_to_chan(params->chandef.center_freq2);
 
 	sta_sap_scc_on_dfs_chan = cds_is_sta_sap_scc_allowed_on_dfs_channel();
 	sta_cnt = cds_mode_specific_connection_count(CDS_STA_MODE, NULL);
@@ -9231,6 +9233,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		}
 		pAdapter->sessionCtx.ap.sapConfig.ch_width_orig =
 						params->chandef.width;
+
 		status =
 			wlan_hdd_cfg80211_start_bss(pAdapter,
 				&params->beacon,

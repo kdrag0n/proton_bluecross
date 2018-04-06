@@ -1083,6 +1083,7 @@ struct roam_synch_frame_ind {
  * @vdev_start_wakelock: wakelock to protect vdev start op with firmware
  * @vdev_stop_wakelock: wakelock to protect vdev stop op with firmware
  * @vdev_set_key_wakelock: wakelock to protect vdev set key op with firmware
+ * @channel: channel
  * @roam_scan_stats_req: cached roam scan stats request
  */
 struct wma_txrx_node {
@@ -1174,6 +1175,7 @@ struct wma_txrx_node {
 	qdf_wake_lock_t vdev_set_key_wakelock;
 	struct roam_synch_frame_ind roam_synch_frame_ind;
 	bool is_waiting_for_key;
+	uint8_t channel;
 	struct sir_roam_scan_stats *roam_scan_stats_req;
 };
 
@@ -1363,6 +1365,7 @@ struct extended_caps {
 	WMI_SOC_HAL_REG_CAPABILITIES num_phy_for_hal_reg_cap;
 	WMI_HAL_REG_CAPABILITIES_EXT *each_phy_hal_reg_cap;
 	struct hw_mode_idx_to_mac_cap_idx *hw_mode_to_mac_cap_map;
+	WMI_SAR_CAPABILITIES sar_capability;
 };
 
 /**
