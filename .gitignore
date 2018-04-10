@@ -69,6 +69,7 @@ Module.symvers
 !.gitignore
 !.mailmap
 !.cocciconfig
+!.clang-format
 
 #
 # Generated include files
