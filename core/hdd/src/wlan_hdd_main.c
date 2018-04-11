@@ -9327,7 +9327,7 @@ QDF_STATUS hdd_register_for_sap_restart_with_channel_switch(void)
 	QDF_STATUS status;
 
 	status = cds_register_sap_restart_channel_switch_cb(
-			(void *)hdd_sap_restart_with_channel_switch);
+			hdd_sap_restart_with_channel_switch);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("restart cb registration failed");
 
@@ -10938,7 +10938,7 @@ int hdd_register_cb(hdd_context_t *hdd_ctx)
 				       wlan_hdd_cfg80211_extscan_callback);
 
 	status = cds_register_sap_restart_channel_switch_cb(
-			(void *)hdd_sap_restart_with_channel_switch);
+			hdd_sap_restart_with_channel_switch);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("restart cb registration failed");
 		ret = -EINVAL;
