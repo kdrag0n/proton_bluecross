@@ -1366,12 +1366,26 @@ static int hdd_ipa_wdi_dereg_intf(struct hdd_ipa_priv *hdd_ipa,
 
 static int hdd_ipa_wdi_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 {
+	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	int ret;
+
+	/* Map IPA SMMU for all Rx hash table */
+	ret = ol_txrx_rx_hash_smmu_map(pdev, true);
+	if (ret) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+			    "IPA SMMU map failed ret=%d", ret);
+		return ret;
+	}
 
 	ret = ipa_wdi_enable_pipes();
 	if (ret) {
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
-				"ipa_wdi_enable_pipes failed ret=%d", ret);
+			    "ipa_wdi_enable_pipes failed ret=%d", ret);
+
+		if (ol_txrx_rx_hash_smmu_map(pdev, false)) {
+			HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+				    "IPA SMMU unmap failed");
+		}
 		return ret;
 	}
 
@@ -1380,12 +1394,21 @@ static int hdd_ipa_wdi_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 
 static int hdd_ipa_wdi_disable_pipes(struct hdd_ipa_priv *hdd_ipa)
 {
+	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	int ret;
 
 	ret = ipa_wdi_disable_pipes();
 	if (ret) {
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
-				"ipa_wdi_disable_pipes failed ret=%d", ret);
+			    "ipa_wdi_disable_pipes failed ret=%d", ret);
+		return ret;
+	}
+
+	/* Unmap IPA SMMU for all Rx hash table */
+	ret = ol_txrx_rx_hash_smmu_map(pdev, false);
+	if (ret) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+			    "IPA SMMU unmap failed");
 		return ret;
 	}
 
@@ -2179,8 +2202,16 @@ static int hdd_ipa_wdi_dereg_intf(struct hdd_ipa_priv *hdd_ipa,
 
 static int hdd_ipa_wdi_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 {
+	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	int result;
 
+	/* Map IPA SMMU for all Rx hash table */
+	result = ol_txrx_rx_hash_smmu_map(pdev, true);
+	if (result) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+			    "IPA SMMU map failed ret=%d", result);
+		return result;
+	}
 	/* ACTIVATE TX PIPE */
 	HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG,
 			"Enable TX PIPE(tx_pipe_handle=%d)",
@@ -2190,7 +2221,7 @@ static int hdd_ipa_wdi_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
 			    "Enable TX PIPE fail, code %d",
 			     result);
-		return result;
+		goto smmu_unmap;
 	}
 
 	result = ipa_resume_wdi_pipe(hdd_ipa->tx_pipe_handle);
@@ -2198,7 +2229,7 @@ static int hdd_ipa_wdi_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
 			    "Resume TX PIPE fail, code %d",
 			     result);
-		return result;
+		goto smmu_unmap;
 	}
 
 	/* ACTIVATE RX PIPE */
@@ -2210,7 +2241,7 @@ static int hdd_ipa_wdi_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
 			    "Enable RX PIPE fail, code %d",
 			     result);
-		return result;
+		goto smmu_unmap;
 	}
 
 	result = ipa_resume_wdi_pipe(hdd_ipa->rx_pipe_handle);
@@ -2218,14 +2249,23 @@ static int hdd_ipa_wdi_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
 			    "Resume RX PIPE fail, code %d",
 			     result);
-		return result;
+		goto smmu_unmap;
 	}
 
 	return 0;
+
+smmu_unmap:
+	if (ol_txrx_rx_hash_smmu_map(pdev, false)) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+			    "IPA SMMU unmap failed");
+	}
+
+	return result;
 }
 
 static int hdd_ipa_wdi_disable_pipes(struct hdd_ipa_priv *hdd_ipa)
 {
+	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	int result;
 
 	HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG, "Disable RX PIPE");
@@ -2255,6 +2295,14 @@ static int hdd_ipa_wdi_disable_pipes(struct hdd_ipa_priv *hdd_ipa)
 	if (result) {
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
 			    "Disable TX PIPE fail, code %d", result);
+		return result;
+	}
+
+	/* Unmap IPA SMMU for all Rx hash table */
+	result = ol_txrx_rx_hash_smmu_map(pdev, false);
+	if (result) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+			    "IPA SMMU unmap failed");
 		return result;
 	}
 

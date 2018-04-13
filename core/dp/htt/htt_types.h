@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -368,6 +368,8 @@ struct htt_pdev_t {
 		qdf_spinlock_t rx_hash_lock;
 		struct htt_rx_hash_bucket **hash_table;
 		uint32_t listnode_offset;
+
+		bool smmu_map;
 	} rx_ring;
 #ifdef CONFIG_HL_SUPPORT
 	int rx_desc_size_hl;
