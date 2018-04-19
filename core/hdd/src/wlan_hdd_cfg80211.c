@@ -1765,6 +1765,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	}
 
 	if (!sap_config->acs_cfg.ch_list_count) {
+		qdf_atomic_set(&hdd_ctx->is_acs_allowed, 0);
+		hdd_err("acs config chan count 0");
 		ret = -EINVAL;
 		goto out;
 	}
@@ -16739,7 +16741,7 @@ static int wlan_hdd_cfg80211_connect_start(hdd_adapter_t *pAdapter,
 
 		qdf_runtime_pm_prevent_suspend(
 				&pHddCtx->runtime_context.connect);
-		hdd_prevent_suspend_timeout(HDD_WAKELOCK_TIMEOUT_CONNECT,
+		hdd_prevent_suspend_timeout(HDD_WAKELOCK_CONNECT_COMPLETE,
 					    WIFI_POWER_EVENT_WAKELOCK_CONNECT);
 
 		qdf_status = sme_roam_connect(WLAN_HDD_GET_HAL_CTX(pAdapter),
@@ -20879,6 +20881,12 @@ static int __wlan_hdd_cfg80211_update_connect_params(
 		fils_info->key_nai_length = req->fils_erp_username_len +
 					    sizeof(char) +
 					    req->fils_erp_realm_len;
+		if (fils_info->key_nai_length >
+		    FILS_MAX_KEYNAME_NAI_LENGTH) {
+			hdd_err("Key NAI Length %d",
+				fils_info->key_nai_length);
+			return -EINVAL;
+		}
 		if (req->fils_erp_username_len && req->fils_erp_username) {
 			buf = fils_info->keyname_nai;
 			qdf_mem_copy(buf, req->fils_erp_username,

@@ -5156,9 +5156,6 @@ static int drv_cmd_get_ibss_peer_info_all(hdd_adapter_t *adapter,
 			}
 			hdd_debug("%s", &extra[numOfBytestoPrint]);
 		}
-
-		/* Free temporary buffer */
-		qdf_mem_free(extra);
 	} else {
 		/* Command failed, log error */
 		hdd_err("GETIBSSPEERINFOALL command failed with status code %d",
@@ -6966,8 +6963,8 @@ static const struct hdd_drv_cmd hdd_drv_cmds[] = {
 	{"CHANNEL_SWITCH",            drv_cmd_set_channel_switch, true},
 	{"SETANTENNAMODE",            drv_cmd_set_antenna_mode, true},
 	{"GETANTENNAMODE",            drv_cmd_get_antenna_mode, false},
+	/* Deprecated commands */
 	{"STOP",                      drv_cmd_dummy, false},
-        /* Adding some deprecated commands */
         {"RXFILTER-START",            drv_cmd_dummy, false},
         {"RXFILTER-STOP",             drv_cmd_dummy, false},
         {"BTCOEXSCAN-START",          drv_cmd_dummy, false},

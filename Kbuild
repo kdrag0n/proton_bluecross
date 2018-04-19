@@ -1135,6 +1135,7 @@ PLD_OBJS +=	$(PLD_SRC_DIR)/pld_usb.o
 endif
 
 TARGET_INC := -I$(WLAN_ROOT)/../fw-api/fw
+TARGET_IF_INC := -I$(WLAN_COMMON_INC)/target_if/core/inc
 
 LINUX_INC :=	-Iinclude
 
@@ -1165,7 +1166,8 @@ INCS +=		$(WMA_INC) \
 INCS +=		$(HIF_INC) \
 		$(BMI_INC)
 
-INCS +=		$(TARGET_INC)
+INCS +=		$(TARGET_INC) \
+		$(TARGET_IF_INC)
 
 INCS +=		$(NLINK_INC) \
 		$(PTT_INC) \

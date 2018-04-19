@@ -309,7 +309,8 @@ typedef struct _cds_context_type {
 	qdf_mutex_t qdf_conc_list_lock;
 	qdf_mc_timer_t dbs_opportunistic_timer;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
-	void (*sap_restart_chan_switch_cb)(struct hdd_adapter_s *, uint32_t, uint32_t);
+	void (*sap_restart_chan_switch_cb)(struct hdd_adapter_s *,
+					   uint32_t, uint32_t);
 #endif
 	QDF_STATUS (*sme_get_valid_channels)(void*, uint16_t cfg_id,
 		uint8_t *, uint32_t *);
