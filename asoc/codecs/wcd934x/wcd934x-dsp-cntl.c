@@ -1266,6 +1266,8 @@ static int wcd_ctrl_component_bind(struct device *dev,
 		dev_err(dev, "%s: Failed to register entry %s, err = %d\n",
 			__func__, proc_name, ret);
 		snd_info_free_entry(entry);
+		cntl->ssr_entry.entry = NULL;
+		cntl->ssr_entry.offline = 0;
 		/* Let bind still happen even if creating the entry failed */
 		ret = 0;
 	}
@@ -1293,6 +1295,13 @@ static void wcd_ctrl_component_unbind(struct device *dev,
 		dev_err(dev, "%s: Failed to get cntl reference\n",
 			__func__);
 		return;
+	}
+
+	/* Remove SSR proc entry */
+	if (cntl->ssr_entry.entry) {
+		snd_info_free_entry(cntl->ssr_entry.entry);
+		cntl->ssr_entry.entry = NULL;
+		cntl->ssr_entry.offline = 0;
 	}
 
 	cntl->m_dev = NULL;
