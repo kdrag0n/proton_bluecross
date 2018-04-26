@@ -52,6 +52,8 @@ static int cirrus_ff_port = AFE_PORT_ID_QUATERNARY_TDM_RX;
 static int crus_sp_usecase_dt_count;
 static const char *crus_sp_usecase_dt_text[MAX_TUNING_CONFIGS];
 
+static bool swap_calibration;
+
 static void *crus_gen_afe_get_header(int length, int port, int module,
 				     int param)
 {
@@ -942,6 +944,20 @@ static long crus_sp_shared_ioctl(struct file *f, unsigned int cmd,
 			goto exit_io;
 		}
 		memcpy(&crus_sp_cal_rslt, io_data, bufsize);
+		if (swap_calibration) {
+			int32_t temp = 0;
+			temp = crus_sp_cal_rslt.status_l;
+			crus_sp_cal_rslt.status_l = crus_sp_cal_rslt.status_r;
+			crus_sp_cal_rslt.status_r = temp;
+
+			temp = crus_sp_cal_rslt.checksum_l;
+			crus_sp_cal_rslt.checksum_l = crus_sp_cal_rslt.checksum_r;
+			crus_sp_cal_rslt.checksum_r = temp;
+
+			temp = crus_sp_cal_rslt.z_l;
+			crus_sp_cal_rslt.z_l = crus_sp_cal_rslt.z_r;
+			crus_sp_cal_rslt.z_r = temp;
+		}
 		break;
 	default:
 		pr_err("%s: Invalid IOCTL, command = %d!\n", __func__, cmd);
@@ -1153,6 +1169,8 @@ static int msm_cirrus_playback_probe(struct platform_device *pdev)
 	int i;
 
 	pr_info("CRUS_SP: initializing platform device\n");
+
+	swap_calibration = of_property_read_bool(pdev->dev.of_node, "cirrus,swap_calibration");
 
 	crus_sp_usecase_dt_count = of_property_count_strings(pdev->dev.of_node,
 							     "usecase-names");
