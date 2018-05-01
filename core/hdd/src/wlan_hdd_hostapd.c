@@ -589,6 +589,9 @@ static int __hdd_hostapd_set_mac_address(struct net_device *dev, void *addr)
 		return -EINVAL;
 	}
 
+	hdd_info("Changing MAC to " MAC_ADDRESS_STR " of interface %s ",
+		 MAC_ADDR_ARRAY(mac_addr.bytes),
+		 dev->name);
 	memcpy(dev->dev_addr, psta_mac_addr->sa_data, ETH_ALEN);
 	EXIT();
 	return 0;
@@ -1735,16 +1738,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 					pHddApCtx->uBCStaId,
 					HDD_IPA_AP_CONNECT,
 					pHostapdAdapter->dev->dev_addr);
-			if (status) {
+			if (status)
 				hdd_err("WLAN_AP_CONNECT event failed");
-				/*
-				 * Make sure to set the event before proceeding
-				 * for error handling otherwise caller thread
-				 * will wait till 10 secs and no other
-				 * connection will go through before that.
-				 */
-				qdf_event_set(&pHostapdState->qdf_event);
-			}
 		}
 
 		if (0 !=

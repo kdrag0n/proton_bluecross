@@ -1266,6 +1266,7 @@ static void hdd_update_tgt_vht_cap(hdd_context_t *hdd_ctx,
 	uint32_t temp = 0;
 	uint32_t ch_width = eHT_CHANNEL_WIDTH_80MHZ;
 	uint32_t hw_rx_ldpc_enabled;
+	struct wma_caps_per_phy caps_per_phy;
 
 	if (!band_5g) {
 		hdd_debug("5GHz band disabled, skipping capability population");
@@ -1569,8 +1570,22 @@ static void hdd_update_tgt_vht_cap(hdd_context_t *hdd_ctx,
 	if (cfg->vht_short_gi_160 & WMI_VHT_CAP_SGI_160MHZ)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_SHORT_GI_160;
 
-	if (cfg->vht_rx_ldpc & WMI_VHT_CAP_RX_LDPC)
+	if (cfg->vht_rx_ldpc & WMI_VHT_CAP_RX_LDPC) {
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_RXLDPC;
+		hdd_debug("VHT RxLDPC capability is set");
+	} else {
+		/*
+		 * Get the RX LDPC capability for the NON DBS
+		 * hardware mode for 5G band
+		 */
+		status = wma_get_caps_for_phyidx_hwmode(&caps_per_phy,
+					HW_MODE_DBS_NONE, CDS_BAND_5GHZ);
+		if ((QDF_IS_STATUS_SUCCESS(status)) &&
+			(caps_per_phy.vht_5g & WMI_VHT_CAP_RX_LDPC)) {
+			band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_RXLDPC;
+			hdd_debug("VHT RX LDPC capability is set");
+		}
+	}
 
 	if (cfg->vht_short_gi_80 & WMI_VHT_CAP_SGI_80MHZ)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_SHORT_GI_80;
@@ -2717,6 +2732,8 @@ static int __hdd_set_mac_address(struct net_device *dev, void *addr)
 		hdd_err("MAC is Multicast");
 		return -EINVAL;
 	}
+	hdd_info("Changing MAC to " MAC_ADDRESS_STR " of the interface %s ",
+		 MAC_ADDR_ARRAY(mac_addr.bytes), dev->name);
 
 	memcpy(&adapter->macAddressCurrent, psta_mac_addr->sa_data, ETH_ALEN);
 	memcpy(dev->dev_addr, psta_mac_addr->sa_data, ETH_ALEN);
@@ -3978,6 +3995,16 @@ int hdd_set_fw_params(hdd_adapter_t *adapter)
 		goto error;
 	}
 
+	ret = sme_cli_set_command(
+			adapter->sessionId,
+			WMI_PDEV_PARAM_SECONDARY_RETRY_ENABLE,
+			hdd_ctx->config->enable_secondary_rate,
+			PDEV_CMD);
+	if (ret) {
+		hdd_err("Failed to set WMI_PDEV_PARAM_SECONDARY_RETRY_ENABLE");
+		goto error;
+	}
+
 	if (adapter->device_mode == QDF_STA_MODE) {
 		sme_set_smps_cfg(adapter->sessionId,
 					HDD_STA_SMPS_PARAM_UPPER_BRSSI_THRESH,
@@ -4898,21 +4925,22 @@ QDF_STATUS hdd_reset_all_adapters(hdd_context_t *hdd_ctx)
 		adapter = adapterNode->pAdapter;
 
 		if ((adapter->device_mode == QDF_STA_MODE) ||
-		    (adapter->device_mode == QDF_P2P_CLIENT_MODE))
+		    (adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
 			/* Stop tdls timers */
 			hdd_tdls_timers_stop(adapter);
+			adapter->sessionCtx.station.hdd_ReassocScenario = false;
+		}
 
 		hdd_info("Disabling queues");
+		hdd_cleanup_actionframe(hdd_ctx, adapter);
 		if (hdd_ctx->config->sap_internal_restart &&
 		    adapter->device_mode == QDF_SAP_MODE) {
 			wlan_hdd_netif_queue_control(adapter,
 						     WLAN_STOP_ALL_NETIF_QUEUE,
 						     WLAN_CONTROL_PATH);
 			if (test_bit(SOFTAP_BSS_STARTED,
-				     &adapter->event_flags)) {
+				     &adapter->event_flags))
 				hdd_sap_indicate_disconnect_for_sta(adapter);
-				hdd_cleanup_actionframe(hdd_ctx, adapter);
-			}
 			if (test_bit(DEVICE_IFACE_OPENED,
 				     &adapter->event_flags))
 				hdd_sap_destroy_events(adapter);
@@ -4922,7 +4950,6 @@ QDF_STATUS hdd_reset_all_adapters(hdd_context_t *hdd_ctx)
 					   WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					   WLAN_CONTROL_PATH);
 		}
-		adapter->sessionCtx.station.hdd_ReassocScenario = false;
 
 		/* Cleanup pending roc request */
 		wlan_hdd_cleanup_remain_on_channel_ctx(adapter);

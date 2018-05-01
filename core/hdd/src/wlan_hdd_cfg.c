@@ -5545,6 +5545,14 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_ENABLE_RTT_MAC_RANDOMIZATION_DEFAULT,
 		     CFG_ENABLE_RTT_MAC_RANDOMIZATION_MIN,
 		     CFG_ENABLE_RTT_MAC_RANDOMIZATION_MAX),
+
+	REG_VARIABLE(CFG_ENABLE_SECONDARY_RATE_NAME,
+		     WLAN_PARAM_HexInteger,
+		     struct hdd_config, enable_secondary_rate,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_ENABLE_SECONDARY_RATE_DEFAULT,
+		     CFG_ENABLE_SECONDARY_RATE_MIN,
+		     CFG_ENABLE_SECONDARY_RATE_MAX),
 };
 
 /**
@@ -7420,6 +7428,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_debug("Name = [%s] value = [0x%x]",
 		  CFG_CHANNEL_SELECT_LOGIC_CONC_NAME,
 		  pHddCtx->config->channel_select_logic_conc);
+	hdd_debug("Name = [%s] value = [0x%x]",
+		  CFG_ENABLE_SECONDARY_RATE_NAME,
+		  pHddCtx->config->enable_secondary_rate);
 }
 
 /**
