@@ -99,6 +99,16 @@ struct crus_delta_config_t {
 	char data[APR_CHUNK_SIZE];
 };
 
+/* Parse the speaker parameters from device tree */
+struct crus_cal_t {
+	u32 top_spk_impedance;
+	u32 top_spk_tolerance;
+	u32 top_spk_mean;
+	u32 bottom_spk_impedance;
+	u32 bottom_spk_tolerance;
+	u32 bottom_spk_mean;
+};
+
 extern int afe_apr_send_pkt_crus(void *data, int index, int set);
 extern int crus_afe_callback(void *payload, int size);
 void msm_crus_pb_add_controls(struct snd_soc_platform *platform);

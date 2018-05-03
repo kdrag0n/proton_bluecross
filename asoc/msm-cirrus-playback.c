@@ -53,7 +53,7 @@ static int crus_sp_usecase_dt_count;
 static const char *crus_sp_usecase_dt_text[MAX_TUNING_CONFIGS];
 
 static bool swap_calibration;
-
+static struct crus_cal_t crus_cal;
 static void *crus_gen_afe_get_header(int length, int port, int module,
 				     int param)
 {
@@ -831,6 +831,60 @@ void msm_crus_pb_add_controls(struct snd_soc_platform *platform)
 				      ARRAY_SIZE(crus_mixer_controls));
 }
 
+static u32 get_bound_z(u32 z, u32 tolerance, char bound)
+{
+	if (bound == 'u')
+		return z + z * tolerance / 100;
+	else
+		return z - z * tolerance / 100;
+}
+
+static void msm_crus_check_calibration_value(void)
+{
+	int32_t swap = 0;
+	u32 left_lower_bound = 0, left_upper_bound = 0;
+	u32 right_lower_bound = 0, right_upper_bound = 0;
+
+	if (swap_calibration) {
+		pr_info("%s: swap calibration value", __func__);
+		swap = crus_sp_cal_rslt.status_l;
+		crus_sp_cal_rslt.status_l = crus_sp_cal_rslt.status_r;
+		crus_sp_cal_rslt.status_r = swap;
+
+		swap = crus_sp_cal_rslt.checksum_l;
+		crus_sp_cal_rslt.checksum_l = crus_sp_cal_rslt.checksum_r;
+		crus_sp_cal_rslt.checksum_r = swap;
+
+		swap = crus_sp_cal_rslt.z_l;
+		crus_sp_cal_rslt.z_l = crus_sp_cal_rslt.z_r;
+		crus_sp_cal_rslt.z_r = swap;
+	}
+
+	left_lower_bound = get_bound_z(crus_cal.top_spk_impedance,
+			crus_cal.top_spk_tolerance, 'l');
+	left_upper_bound = get_bound_z(crus_cal.top_spk_impedance,
+			crus_cal.top_spk_tolerance, 'u');
+
+	right_lower_bound = get_bound_z(crus_cal.bottom_spk_impedance,
+			crus_cal.bottom_spk_tolerance, 'l');
+	right_upper_bound = get_bound_z(crus_cal.bottom_spk_impedance,
+			crus_cal.bottom_spk_tolerance, 'u');
+
+	pr_debug("%s: left bound: Lower: %u Upper: %u , right bound Lower: %u Upper: %u", __func__,
+			left_lower_bound, left_upper_bound, right_lower_bound, right_upper_bound);
+
+	if (crus_sp_cal_rslt.z_l > left_upper_bound || crus_sp_cal_rslt.z_l < left_lower_bound) {
+		pr_err("%s: left calibartion %u over limit, set default value %u", __func__,
+				crus_sp_cal_rslt.z_l, crus_cal.top_spk_mean);
+		crus_sp_cal_rslt.z_l = crus_cal.top_spk_mean;
+	}
+
+	if (crus_sp_cal_rslt.z_r > right_upper_bound || crus_sp_cal_rslt.z_r < right_lower_bound) {
+		pr_err("%s: right calibartion %u over limit, set default value %u", __func__,
+				crus_sp_cal_rslt.z_r, crus_cal.bottom_spk_mean);
+		crus_sp_cal_rslt.z_r = crus_cal.bottom_spk_mean;
+	}
+}
 static long crus_sp_shared_ioctl(struct file *f, unsigned int cmd,
 				 void __user *arg)
 {
@@ -944,20 +998,9 @@ static long crus_sp_shared_ioctl(struct file *f, unsigned int cmd,
 			goto exit_io;
 		}
 		memcpy(&crus_sp_cal_rslt, io_data, bufsize);
-		if (swap_calibration) {
-			int32_t temp = 0;
-			temp = crus_sp_cal_rslt.status_l;
-			crus_sp_cal_rslt.status_l = crus_sp_cal_rslt.status_r;
-			crus_sp_cal_rslt.status_r = temp;
 
-			temp = crus_sp_cal_rslt.checksum_l;
-			crus_sp_cal_rslt.checksum_l = crus_sp_cal_rslt.checksum_r;
-			crus_sp_cal_rslt.checksum_r = temp;
+		msm_crus_check_calibration_value();
 
-			temp = crus_sp_cal_rslt.z_l;
-			crus_sp_cal_rslt.z_l = crus_sp_cal_rslt.z_r;
-			crus_sp_cal_rslt.z_r = temp;
-		}
 		break;
 	default:
 		pr_err("%s: Invalid IOCTL, command = %d!\n", __func__, cmd);
@@ -1053,7 +1096,7 @@ temperature_left_show(struct device *dev, struct device_attribute *a, char *buf)
 		return sprintf(buf, "Calibration is not done\n");
 
 	r = buffer[3];
-	t = (material * scale_factor * (r-z) / z) + (temp0 * scale_factor);
+	t = (material * scale_factor * (r - z) / z) + (temp0 * scale_factor);
 
 	return sprintf(buf, "%d.%05dc\n", t / scale_factor, t % scale_factor);
 }
@@ -1086,7 +1129,7 @@ temperature_right_show(struct device *dev, struct device_attribute *a,
 		return sprintf(buf, "Calibration is not done\n");
 
 	r = buffer[1];
-	t = (material * scale_factor * (r-z) / z) + (temp0 * scale_factor);
+	t = (material * scale_factor * (r - z) / z) + (temp0 * scale_factor);
 
 	return sprintf(buf, "%d.%05dc\n", t / scale_factor, t % scale_factor);
 }
@@ -1164,13 +1207,66 @@ static const struct attribute_group *crus_sp_groups[] = {
 	NULL,
 };
 
+static int msm_crus_parse_spk(struct platform_device *pdev)
+{
+	swap_calibration = of_property_read_bool(pdev->dev.of_node, "cirrus,swap_calibration");
+
+	if (of_property_read_u32(pdev->dev.of_node, "cirrus,top-speaker-impedance", &crus_cal.top_spk_impedance)) {
+		dev_err(&pdev->dev, "parse cirrus,top-speaker-impedance failed\n");
+		return -EINVAL;
+	}
+
+	dev_dbg(&pdev->dev, "top of speaker impedance: %u\n",
+			crus_cal.top_spk_impedance);
+
+	if (of_property_read_u32(pdev->dev.of_node, "cirrus,top-speaker-tolerance", &crus_cal.top_spk_tolerance)) {
+		dev_err(&pdev->dev, "parse cirrus,top-speaker-tolerance failed\n");
+		return -EINVAL;
+	}
+
+	dev_dbg(&pdev->dev, "top of speaker tolerance: %u\n",
+			crus_cal.top_spk_tolerance);
+
+	if (of_property_read_u32(pdev->dev.of_node, "cirrus,top-speaker-mean", &crus_cal.top_spk_mean)) {
+		dev_err(&pdev->dev, "parse cirrus,top-speaker-mean failed\n");
+		return -EINVAL;
+	}
+
+	dev_dbg(&pdev->dev, "top of speaker mean: %u\n",
+			crus_cal.top_spk_mean);
+
+
+	if (of_property_read_u32(pdev->dev.of_node, "cirrus,bottom-speaker-impedance", &crus_cal.bottom_spk_impedance)) {
+		dev_err(&pdev->dev, "parse cirrus,bottom-speaker-impedance failed\n");
+		return -EINVAL;
+	}
+
+	dev_dbg(&pdev->dev, "bottom of speaker impedance: %u\n",
+			crus_cal.bottom_spk_impedance);
+
+	if (of_property_read_u32(pdev->dev.of_node, "cirrus,bottom-speaker-tolerance", &crus_cal.bottom_spk_tolerance)) {
+		dev_err(&pdev->dev, "parse cirrus,top-speaker-tolerance failed\n");
+		return -EINVAL;
+	}
+
+	dev_dbg(&pdev->dev, "bottom of speaker tolerance: %u\n",
+			crus_cal.bottom_spk_tolerance);
+
+	if (of_property_read_u32(pdev->dev.of_node, "cirrus,bottom-speaker-mean", &crus_cal.bottom_spk_mean)) {
+		dev_err(&pdev->dev, "parse cirrus,bottom-speaker-mean failed\n");
+		return -EINVAL;
+	}
+
+	dev_dbg(&pdev->dev, "bottom of speaker mean: %u\n",
+			crus_cal.bottom_spk_mean);
+
+	return 0;
+}
 static int msm_cirrus_playback_probe(struct platform_device *pdev)
 {
 	int i;
 
 	pr_info("CRUS_SP: initializing platform device\n");
-
-	swap_calibration = of_property_read_bool(pdev->dev.of_node, "cirrus,swap_calibration");
 
 	crus_sp_usecase_dt_count = of_property_count_strings(pdev->dev.of_node,
 							     "usecase-names");
@@ -1195,6 +1291,10 @@ static int msm_cirrus_playback_probe(struct platform_device *pdev)
 	for (i = 0; i < crus_sp_usecase_dt_count; i++)
 		pr_info("CRUS_SP: usecase[%d] = %s\n", i,
 			 crus_sp_usecase_dt_text[i]);
+
+	if (msm_crus_parse_spk(pdev)) {
+		return -EINVAL;
+	}
 
 	return 0;
 }
