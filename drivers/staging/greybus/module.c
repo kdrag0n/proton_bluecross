@@ -95,8 +95,8 @@ struct gb_module *gb_module_create(struct gb_host_device *hd, u8 module_id,
 	struct gb_module *module;
 	int i;
 
-	module = kzalloc(sizeof(*module) + num_interfaces * sizeof(intf),
-				GFP_KERNEL);
+	module = kzalloc(CHECKME_struct_size(&*module, intf, num_interfaces),
+			 GFP_KERNEL);
 	if (!module)
 		return NULL;
 
