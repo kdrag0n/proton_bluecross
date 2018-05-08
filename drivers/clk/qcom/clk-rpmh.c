@@ -432,7 +432,7 @@ static int clk_rpmh_probe(struct platform_device *pdev)
 	hw_clks = desc->clks;
 	num_clks = desc->num_clks;
 
-	rcc = devm_kzalloc(&pdev->dev, sizeof(*rcc) + sizeof(*clks) * num_clks,
+	rcc = devm_kzalloc(&pdev->dev, struct_size(rcc, clks, num_clks),
 			   GFP_KERNEL);
 	if (!rcc) {
 		ret = -ENOMEM;

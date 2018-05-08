@@ -1868,8 +1868,8 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 	size_t i;
 	int ret;
 
-	cprman = devm_kzalloc(dev, sizeof(*cprman) +
-			      sizeof(*cprman->onecell.hws) * asize,
+	cprman = devm_kzalloc(dev,
+			      CHECKME_struct_size(&*cprman, *cprman->onecell.hws, asize),
 			      GFP_KERNEL);
 	if (!cprman)
 		return -ENOMEM;
