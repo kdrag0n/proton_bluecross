@@ -636,6 +636,7 @@ struct tavil_priv {
 	struct platform_device *pdev_child_devices
 		[WCD934X_CHILD_DEVICES_MAX];
 	int child_count;
+	int codec_state;
 };
 
 static const struct tavil_reg_mask_val tavil_spkr_default[] = {
@@ -657,6 +658,27 @@ static const struct tavil_reg_mask_val tavil_spkr_mode1[] = {
 };
 
 static int __tavil_enable_efuse_sensing(struct tavil_priv *tavil);
+
+enum {
+	CODEC_STATE_UNKNOWN = -99,
+	CODEC_STATE_OVERFLOW = -2,
+	CODEC_STATE_UNDERFLOW,
+	CODEC_STATE_ONLINE,
+};
+
+static ssize_t codec_state_show(struct device *dev, struct device_attribute *attr,
+			char *buf)
+{
+	struct tavil_priv *tavil = (struct tavil_priv *)dev_get_drvdata(dev);
+
+	if (tavil) {
+		int codec_state = tavil->codec_state;
+		tavil->codec_state = CODEC_STATE_ONLINE;
+		return sprintf(buf, "%d", codec_state);
+	} else
+		return sprintf(buf, "%d", CODEC_STATE_UNKNOWN);
+}
+static DEVICE_ATTR_RO(codec_state);
 
 /**
  * tavil_set_spkr_gain_offset - offset the speaker path
@@ -9624,12 +9646,16 @@ static irqreturn_t tavil_slimbus_irq(int irq, void *data)
 			if (!(int_val & (1 << (port_id % 8))))
 				continue;
 		}
-		if (val & WCD934X_SLIM_IRQ_OVERFLOW)
+		if (val & WCD934X_SLIM_IRQ_OVERFLOW) {
 			dev_err_ratelimited(tavil->dev, "%s: overflow error on %s port %d, value %x\n",
 			   __func__, (tx ? "TX" : "RX"), port_id, val);
-		if (val & WCD934X_SLIM_IRQ_UNDERFLOW)
+			tavil->codec_state = CODEC_STATE_OVERFLOW;
+		}
+		if (val & WCD934X_SLIM_IRQ_UNDERFLOW) {
 			dev_err_ratelimited(tavil->dev, "%s: underflow error on %s port %d, value %x\n",
 			   __func__, (tx ? "TX" : "RX"), port_id, val);
+			tavil->codec_state = CODEC_STATE_UNDERFLOW;
+		}
 		if ((val & WCD934X_SLIM_IRQ_OVERFLOW) ||
 			(val & WCD934X_SLIM_IRQ_UNDERFLOW)) {
 			if (!tx)
@@ -10260,7 +10286,6 @@ static int tavil_soc_codec_probe(struct snd_soc_codec *codec)
 	 * can be released allowing the codec to go to SVS2.
 	 */
 	tavil_vote_svs(tavil, false);
-
 	return ret;
 
 err_pdata:
@@ -11008,6 +11033,12 @@ static int tavil_probe(struct platform_device *pdev)
 		goto err_cdc_reg;
 	}
 	schedule_work(&tavil->tavil_add_child_devices_work);
+
+	tavil->codec_state = CODEC_STATE_ONLINE;
+	ret = device_create_file(&pdev->dev, &dev_attr_codec_state);
+	if (ret)
+		dev_err(&pdev->dev, "%s: create codec state node failed\n",
+		 __func__);
 
 	return ret;
 
