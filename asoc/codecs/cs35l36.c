@@ -40,6 +40,9 @@
 
 #include "cs35l36.h"
 
+#ifdef CONFIG_CIRRUS_SPKR_PROTECTION
+#include <asoc/msm-cirrus-playback.h>
+#endif
 /*
  * Some fields take zero as a valid value so use a high bit flag that won't
  * get written to the device to mark those.
@@ -630,11 +633,40 @@ static int cs35l36_pcm_startup(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int cs35l36_dai_mute_stream(struct snd_soc_dai *dai,
+		int mute, int stream)
+{
+#ifdef CONFIG_CIRRUS_SPKR_PROTECTION
+	int ret = 0;
+
+	if (mute) {
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			if (dai->codec->component.name_prefix &&
+				!strcmp(dai->codec->component.name_prefix,
+				"R")) {
+
+				ret = msm_crus_store_imped('r');
+				if (ret)
+					pr_err("%s: get right impedance failed",
+							__func__);
+
+			} else {
+				ret = msm_crus_store_imped('l');
+				if (ret)
+					pr_err("%s: get left impedance failed",
+							__func__);
+			}
+		}
+	}
+#endif
+	return 0;
+}
 static const struct snd_soc_dai_ops cs35l36_ops = {
 	.startup = cs35l36_pcm_startup,
 	.set_fmt = cs35l36_set_dai_fmt,
 	.hw_params = cs35l36_pcm_hw_params,
 	.set_sysclk = cs35l36_dai_set_sysclk,
+	.mute_stream = cs35l36_dai_mute_stream,
 };
 
 static struct snd_soc_dai_driver cs35l36_dai[] = {

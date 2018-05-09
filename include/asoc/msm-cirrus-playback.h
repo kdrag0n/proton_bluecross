@@ -71,6 +71,12 @@ struct cirrus_cal_result_t {
 	int32_t z_r;
 };
 
+struct cirrus_spk_component {
+	/* the unit of imp is exp(10, -8) */
+	uint32_t imp_l;
+	uint32_t imp_r;
+};
+
 #define APR_CHUNK_SIZE		256
 #define CONFIG_FILE_SIZE	128
 #define PAYLOAD_FOLLOWS_CONFIG	4
@@ -111,6 +117,6 @@ struct crus_cal_t {
 
 extern int afe_apr_send_pkt_crus(void *data, int index, int set);
 extern int crus_afe_callback(void *payload, int size);
+extern int msm_crus_store_imped(char channel);
 void msm_crus_pb_add_controls(struct snd_soc_platform *platform);
-
 #endif /* _MSM_CIRRUS_PLAYBACK_H */

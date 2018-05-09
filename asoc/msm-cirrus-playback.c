@@ -27,6 +27,9 @@
 #define CRUS_TX_CONFIG "crus_sp_config_%s_tx.bin"
 #define CRUS_RX_CONFIG "crus_sp_config_%s_rx.bin"
 
+#define CIRRUS_RX_TOPOLOGY 0x10000CCC
+#define CIRRUS_TX_TOPOLOGY 0x10001CCC
+
 static struct device *crus_sp_device;
 static atomic_t crus_sp_misc_usage_count;
 
@@ -54,6 +57,8 @@ static const char *crus_sp_usecase_dt_text[MAX_TUNING_CONFIGS];
 
 static bool swap_calibration;
 static struct crus_cal_t crus_cal;
+static struct cirrus_spk_component crus_spk;
+
 static void *crus_gen_afe_get_header(int length, int port, int module,
 				     int param)
 {
@@ -887,6 +892,77 @@ static void msm_crus_check_calibration_value(void)
 		crus_sp_cal_rslt.z_r = crus_cal.bottom_spk_mean;
 	}
 }
+
+static bool msm_crus_is_cirrus_afe_topology(void)
+{
+	if (afe_get_topology(cirrus_ff_port) == CIRRUS_RX_TOPOLOGY
+		&& afe_get_topology(cirrus_fb_port) == CIRRUS_TX_TOPOLOGY)
+		return true;
+	else
+		return false;
+}
+
+int msm_crus_store_imped(char channel)
+{
+	/* cs35l36 speaker amp constant value */
+	const int amp_factor = 71498;
+	int32_t buffer[96] = {0};
+	int out_cal0;
+	int out_cal1;
+
+	if (!msm_crus_is_cirrus_afe_topology())
+		return -EINVAL;
+
+	if (crus_afe_get_param(cirrus_ff_port,
+		CIRRUS_SP, CRUS_PARAM_RX_GET_TEMP, sizeof(buffer), buffer))
+		return -EINVAL;
+
+	if (channel == 'l') {
+		out_cal0 = buffer[12];
+		out_cal1 = buffer[13];
+
+		if ((out_cal0 != 2) || (out_cal1 != 2))
+			return -EINVAL;
+
+		crus_spk.imp_l =  buffer[3] * amp_factor;
+
+		pr_debug("%s: left impedance %d", __func__,
+				crus_spk.imp_l);
+
+	} else if (channel == 'r') {
+		out_cal0 = buffer[14];
+		out_cal1 = buffer[15];
+
+		if ((out_cal0 != 2) || (out_cal1 != 2))
+			return -EINVAL;
+
+		crus_spk.imp_r = buffer[1] * amp_factor;
+
+		pr_debug("%s: right impedance %d", __func__,
+				crus_spk.imp_r);
+
+	} else
+		pr_err("%s: unknown channel", __func__);
+
+	return 0;
+}
+EXPORT_SYMBOL(msm_crus_store_imped);
+
+static ssize_t
+resistance_left_right_show(struct device *dev,
+		struct device_attribute *a, char *buf)
+{
+	const int scale_factor = 100000000;
+
+	return snprintf(buf, PAGE_SIZE, "%d.%d,%d.%d",
+			crus_spk.imp_l / scale_factor,
+			crus_spk.imp_l % scale_factor,
+			crus_spk.imp_r / scale_factor,
+			crus_spk.imp_r % scale_factor);
+}
+
+static DEVICE_ATTR_RO(resistance_left_right);
+
 static long crus_sp_shared_ioctl(struct file *f, unsigned int cmd,
 				 void __user *arg)
 {
@@ -1197,6 +1273,7 @@ static struct attribute *crus_sp_attrs[] = {
 	&dev_attr_temperature_right.attr,
 	&dev_attr_resistance_left.attr,
 	&dev_attr_resistance_right.attr,
+	&dev_attr_resistance_left_right.attr,
 	NULL,
 };
 
