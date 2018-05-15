@@ -188,7 +188,9 @@ static int msm_isp_prepare_v4l2_buf(struct msm_isp_buf_mgr *buf_mgr,
 	int i, rc = -1;
 	int ret;
 	struct msm_isp_buffer_mapped_info *mapped_info;
+#ifndef CONFIG_MSM_ISP_V1
 	uint32_t accu_length = 0;
+#endif
 	struct msm_isp_bufq *bufq = NULL;
 
 	bufq = msm_isp_get_bufq(buf_mgr, buf_info->bufq_handle);
@@ -227,8 +229,12 @@ static int msm_isp_prepare_v4l2_buf(struct msm_isp_buf_mgr *buf_mgr,
 			goto get_phy_err;
 		}
 
+#ifdef CONFIG_MSM_ISP_V1
+		mapped_info->paddr += qbuf_buf->planes[i].offset;
+#else
 		mapped_info->paddr += accu_length;
 		accu_length += qbuf_buf->planes[i].length;
+#endif
 
 		CDBG("%s: plane: %d addr:%pK\n",
 			__func__, i, (void *)mapped_info->paddr);
@@ -731,10 +737,17 @@ static int msm_isp_buf_divert(struct msm_isp_buf_mgr *buf_mgr,
 	spin_lock_irqsave(&bufq->bufq_lock, flags);
 
 	buf_info->frame_id = frame_id;
+#ifdef CONFIG_MSM_ISP_V1
+	if (buf_info->state == MSM_ISP_BUFFER_STATE_DEQUEUED) {
+		buf_info->state = MSM_ISP_BUFFER_STATE_DIVERTED;
+		buf_info->tv = tv;
+	}
+#else
 	if (BUF_SRC(bufq->stream_id) == MSM_ISP_BUFFER_SRC_NATIVE) {
 		buf_info->state = MSM_ISP_BUFFER_STATE_DIVERTED;
 		buf_info->tv = tv;
 	}
+#endif
 	spin_unlock_irqrestore(&bufq->bufq_lock, flags);
 	return 0;
 }
@@ -1076,7 +1089,6 @@ static void msm_isp_release_all_bufq(
 	}
 }
 
-
 /**
  * msm_isp_buf_put_scratch() - Release scratch buffers
  * @buf_mgr: The buffer structure for h/w
@@ -1218,7 +1230,6 @@ err1:
 	mutex_unlock(&buf_mgr->lock);
 	return rc;
 }
-
 
 static int msm_isp_init_isp_buf_mgr(struct msm_isp_buf_mgr *buf_mgr,
 	const char *ctx_name)
