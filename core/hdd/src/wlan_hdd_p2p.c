@@ -2802,6 +2802,7 @@ wlan_hdd_allow_sap_add(hdd_context_t *hdd_ctx,
 		adapter = adapter_node->pAdapter;
 		if (adapter && adapter->device_mode == QDF_SAP_MODE &&
 		    test_bit(NET_DEVICE_REGISTERED, &adapter->event_flags) &&
+		    adapter->dev &&
 		    !strncmp(adapter->dev->name, name, IFNAMSIZ)) {
 			beacon_data_t *beacon = adapter->sessionCtx.ap.beacon;
 
@@ -2810,7 +2811,7 @@ wlan_hdd_allow_sap_add(hdd_context_t *hdd_ctx,
 				adapter->sessionCtx.ap.beacon = NULL;
 				qdf_mem_free(beacon);
 			}
-			if (adapter->dev && adapter->dev->ieee80211_ptr) {
+			if (adapter->dev->ieee80211_ptr) {
 				*sap_dev = adapter->dev->ieee80211_ptr;
 				return false;
 			}

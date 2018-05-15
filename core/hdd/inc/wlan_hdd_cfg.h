@@ -10290,7 +10290,7 @@ enum restart_beaconing_on_ch_avoid_rule {
  * fw_timeout_crash - Enable/Disable BUG ON
  * @Min: 0
  * @Max: 1
- * @Default: 0
+ * @Default: 1
  *
  * This ini is used to Trigger host crash when firmware fails to send the
  * response to host
@@ -10308,7 +10308,7 @@ enum restart_beaconing_on_ch_avoid_rule {
 #define CFG_CRASH_FW_TIMEOUT_NAME       "fw_timeout_crash"
 #define CFG_CRASH_FW_TIMEOUT_DISABLE    (0)
 #define CFG_CRASH_FW_TIMEOUT_ENABLE     (1)
-#define CFG_CRASH_FW_TIMEOUT_DEFAULT    (0)
+#define CFG_CRASH_FW_TIMEOUT_DEFAULT    (1)
 
 /* Hold wakelock for unicast RX packets for the specified duration  */
 #define CFG_RX_WAKELOCK_TIMEOUT_NAME     "rx_wakelock_timeout"
@@ -12130,8 +12130,8 @@ enum hw_filter_mode {
  * <ini>
  * g_sap_chanswitch_beacon_cnt - channel switch beacon count
  * @Min: 1
- * @Max: 5
- * @Default: 5
+ * @Max: 10
+ * @Default: 10
  *
  * This ini is used to configure channel switch beacon count
  *
@@ -12144,7 +12144,7 @@ enum hw_filter_mode {
 #define CFG_SAP_CH_SWITCH_BEACON_CNT         "g_sap_chanswitch_beacon_cnt"
 #define CFG_SAP_CH_SWITCH_BEACON_CNT_MIN     (1)
 #define CFG_SAP_CH_SWITCH_BEACON_CNT_MAX     (10)
-#define CFG_SAP_CH_SWITCH_BEACON_CNT_DEFAULT (5)
+#define CFG_SAP_CH_SWITCH_BEACON_CNT_DEFAULT (10)
 
 /*
  * <ini>

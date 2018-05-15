@@ -433,6 +433,9 @@ QDF_STATUS wma_get_buf_start_scan_cmd(tp_wma_handle wma_handle,
 		case P2P_SCAN_TYPE_SEARCH:
 			WMA_LOGD("P2P_SCAN_TYPE_SEARCH");
 			cmd->scan_ctrl_flags |= WMI_SCAN_FILTER_PROBE_REQ;
+			if (!scan_req->numSsid)
+				cmd->scan_ctrl_flags |=
+					WMI_SCAN_ADD_BCAST_PROBE_REQ;
 			/* Default P2P burst duration of 120 ms will cover
 			 * 3 channels with default max dwell time 40 ms.
 			 * Cap limit will be set by
@@ -2902,6 +2905,14 @@ int wma_roam_synch_event_handler(void *handle, uint8_t *event,
 		return status;
 	}
 
+	/*
+	 * This flag is set during ROAM_START and once this event is being
+	 * executed which is a run to completion, no other event can interrupt
+	 * this in MC thread context. So, it is OK to reset the flag here as
+	 * soon as we receive this event.
+	 */
+	wma->interfaces[synch_event->vdev_id].roaming_in_progress = false;
+
 	if (synch_event->bcn_probe_rsp_len >
 	    param_buf->num_bcn_probe_rsp_frame ||
 	    synch_event->reassoc_req_len >
@@ -3844,7 +3855,7 @@ QDF_STATUS wma_pno_start(tp_wma_handle wma, tpSirPNOScanReq pno)
 			pno->aNetworks[i].ssId.length;
 		qdf_mem_copy(params->aNetworks[i].ssid.mac_ssid,
 			pno->aNetworks[i].ssId.ssId,
-				WMI_MAC_MAX_SSID_LENGTH);
+				pno->aNetworks[i].ssId.length);
 	}
 
 	params->enable_pno_scan_randomization =
@@ -6332,7 +6343,7 @@ QDF_STATUS wma_set_epno_network_list(tp_wma_handle wma,
 					req->networks[i].ssid.length;
 			qdf_mem_copy(params->networks[i].ssid.mac_ssid,
 					req->networks[i].ssid.ssId,
-					WMI_MAC_MAX_SSID_LENGTH);
+					req->networks[i].ssid.length);
 		}
 	}
 
@@ -6731,6 +6742,8 @@ int wma_roam_event_callback(WMA_HANDLE handle, uint8_t *event_buf,
 		WMA_LOGE("LFR3:Hand-Off Failed for vdevid %x",
 			 wmi_event->vdev_id);
 		wma_roam_ho_fail_handler(wma_handle, wmi_event->vdev_id);
+		wma_handle->interfaces[wmi_event->vdev_id].
+			roaming_in_progress = false;
 		break;
 #endif
 	case WMI_ROAM_REASON_INVALID:
@@ -6739,10 +6752,16 @@ int wma_roam_event_callback(WMA_HANDLE handle, uint8_t *event_buf,
 			WMA_LOGE("Memory unavailable for roam synch data");
 			return -ENOMEM;
 		}
-		if (wmi_event->notif == WMI_ROAM_NOTIF_ROAM_START)
+		if (wmi_event->notif == WMI_ROAM_NOTIF_ROAM_START) {
 			op_code = SIR_ROAMING_START;
-		if (wmi_event->notif == WMI_ROAM_NOTIF_ROAM_ABORT)
+			wma_handle->interfaces[wmi_event->vdev_id].
+				roaming_in_progress = true;
+		}
+		if (wmi_event->notif == WMI_ROAM_NOTIF_ROAM_ABORT) {
 			op_code = SIR_ROAMING_ABORT;
+			wma_handle->interfaces[wmi_event->vdev_id].
+				roaming_in_progress = false;
+		}
 		roam_synch_data->roamedVdevId = wmi_event->vdev_id;
 		wma_handle->pe_roam_synch_cb(
 				(tpAniSirGlobal)wma_handle->mac_context,

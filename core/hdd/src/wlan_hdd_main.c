@@ -1236,7 +1236,8 @@ static void hdd_update_tgt_ht_cap(hdd_context_t *hdd_ctx,
 	if (sme_cfg_get_str(hdd_ctx->hHal, WNI_CFG_SUPPORTED_MCS_SET, mcs_set,
 			    &value) == QDF_STATUS_SUCCESS) {
 		hdd_debug("Read MCS rate set");
-
+		if (cfg->num_rf_chains > SIZE_OF_SUPPORTED_MCS_SET)
+			cfg->num_rf_chains = SIZE_OF_SUPPORTED_MCS_SET;
 		if (pconfig->enable2x2) {
 			for (value = 0; value < cfg->num_rf_chains; value++)
 				mcs_set[value] =
@@ -2249,11 +2250,17 @@ int hdd_wlan_start_modules(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 			goto close;
 		}
 
+		ret = hdd_register_cb(hdd_ctx);
+		if (ret) {
+			hdd_err("Failed to register HDD callbacks!");
+			goto close;
+		}
+
 		status = cds_pre_enable(hdd_ctx->pcds_context);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("Failed to pre-enable CDS: %d", status);
 			ret = (status == QDF_STATUS_E_NOMEM) ? -ENOMEM : -EINVAL;
-			goto close;
+			goto deregister_cb;
 		}
 
 		hdd_sysfs_create_version_interface();
@@ -2316,6 +2323,9 @@ int hdd_wlan_start_modules(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 post_disable:
 	sme_destroy_config(hdd_ctx->hHal);
 	cds_post_disable();
+
+deregister_cb:
+	hdd_deregister_cb(hdd_ctx);
 
 close:
 	hdd_ctx->driver_status = DRIVER_MODULES_CLOSED;
@@ -4553,7 +4563,6 @@ static void hdd_wait_for_sme_close_sesion(hdd_context_t *hdd_ctx,
 				hdd_ndp_session_end_handler(adapter);
 			sme_print_commands(hdd_ctx->hHal);
 			clear_bit(SME_SESSION_OPENED, &adapter->event_flags);
-			return;
 		}
 		adapter->sessionId = HDD_SESSION_ID_INVALID;
 	}
@@ -7182,8 +7191,11 @@ static void hdd_bus_bw_work_handler(struct work_struct *work)
 		tx_packets += (uint64_t)ipa_tx_packets;
 		rx_packets += (uint64_t)ipa_rx_packets;
 
+		adapter->stats.tx_packets += ipa_tx_packets;
+		adapter->stats.rx_packets += ipa_rx_packets;
+
 		hdd_ipa_set_perf_level(hdd_ctx, tx_packets, rx_packets);
-		hdd_ipa_uc_stat_request(adapter, 2);
+		hdd_ipa_uc_stat_request(hdd_ctx, 2);
 	}
 
 	hdd_pld_request_bus_bandwidth(hdd_ctx, tx_packets, rx_packets);
@@ -10191,22 +10203,17 @@ static int hdd_features_init(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 	wlan_hdd_tsf_init(hdd_ctx);
 	hdd_encrypt_decrypt_init(hdd_ctx);
 
-	ret = hdd_register_cb(hdd_ctx);
-	if (ret) {
-		hdd_err("Failed to register HDD callbacks!");
-		goto deregister_frames;
-	}
 	status = wlan_hdd_update_dbs_scan_and_fw_mode_config(hdd_ctx);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("Failed to set dbs scan and fw mode cfg");
-		goto deregister_cb;
+		goto deregister_frames;
 	}
 	if (hdd_ctx->config->goptimize_chan_avoid_event) {
 		status = sme_enable_disable_chanavoidind_event(
 							hdd_ctx->hHal, 0);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("Failed to disable Chan Avoidance Indication");
-			goto deregister_cb;
+			goto deregister_frames;
 		}
 	}
 
@@ -10237,15 +10244,13 @@ static int hdd_features_init(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 	ret = hdd_set_auto_shutdown_cb(hdd_ctx);
 
 	if (ret)
-		goto deregister_cb;
+		goto deregister_frames;
 
 	wlan_hdd_init_chan_info(hdd_ctx);
 
 	EXIT();
 	return 0;
 
-deregister_cb:
-	hdd_deregister_cb(hdd_ctx);
 deregister_frames:
 	wlan_hdd_cfg80211_deregister_frames(adapter);
 out:
@@ -10419,8 +10424,6 @@ static int hdd_deconfigure_cds(hdd_context_t *hdd_ctx)
 	/* De-init features */
 	hdd_features_deinit(hdd_ctx);
 
-	/* De-register the SME callbacks */
-	hdd_deregister_cb(hdd_ctx);
 	hdd_encrypt_decrypt_deinit(hdd_ctx);
 
 	sme_destroy_config(hdd_ctx->hHal);
@@ -10569,6 +10572,9 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode)
 		ret = -EINVAL;
 		QDF_ASSERT(0);
 	}
+
+	/* De-register the SME callbacks */
+	hdd_deregister_cb(hdd_ctx);
 
 	hdd_runtime_suspend_context_deinit(hdd_ctx);
 
@@ -11048,6 +11054,11 @@ int hdd_register_cb(hdd_context_t *hdd_ctx)
 	QDF_STATUS status;
 	int ret = 0;
 
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err("in ftm mode, no need to register callbacks");
+		return ret;
+	}
+
 	ENTER();
 
 	sme_register11d_scan_done_callback(hdd_ctx->hHal, hdd_11d_scan_done);
@@ -11145,6 +11156,11 @@ void hdd_deregister_cb(hdd_context_t *hdd_ctx)
 {
 	QDF_STATUS status;
 	int ret;
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err("in ftm mode, no need to deregister callbacks");
+		return;
+	}
 
 	ENTER();
 

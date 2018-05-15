@@ -827,7 +827,12 @@ static inline bool hdd_is_tx_allowed(struct sk_buff *skb, uint8_t peer_id)
 	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	void *peer;
 
-	QDF_ASSERT(pdev);
+	if (qdf_unlikely(NULL == pdev)) {
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
+			  "%s: pdev is NULL", __func__);
+		QDF_ASSERT(pdev);
+		return false;
+	}
 	peer = ol_txrx_peer_find_by_local_id(pdev, peer_id);
 
 	if (peer == NULL) {
@@ -1094,9 +1099,15 @@ drop_pkt_and_release_skb:
 drop_pkt:
 
 	if (skb) {
+		/* track connectivity stats */
+		if (pAdapter->pkt_type_bitmap)
+			hdd_tx_rx_collect_connectivity_stats_info(skb, pAdapter,
+						PKT_TYPE_TX_DROPPED, &pkt_type);
+
 		qdf_dp_trace_data_pkt(skb, QDF_DP_TRACE_DROP_PACKET_RECORD, 0,
 				      QDF_TX);
 		kfree_skb(skb);
+		skb = NULL;
 	}
 
 drop_pkt_accounting:
@@ -1108,11 +1119,6 @@ drop_pkt_accounting:
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
 				  "%s : ARP packet dropped", __func__);
 	}
-
-	/* track connectivity stats */
-	if (pAdapter->pkt_type_bitmap)
-		hdd_tx_rx_collect_connectivity_stats_info(skb, pAdapter,
-						PKT_TYPE_TX_DROPPED, &pkt_type);
 
 	return NETDEV_TX_OK;
 }

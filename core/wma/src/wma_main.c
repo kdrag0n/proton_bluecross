@@ -1898,6 +1898,19 @@ static void wma_cleanup_hold_req(tp_wma_handle wma)
 	qdf_spin_unlock_bh(&wma->wma_hold_req_q_lock);
 }
 
+void wma_cleanup_vdev_resp_and_hold_req(void *priv)
+{
+	tp_wma_handle wma_handle = priv;
+
+	if (!wma_handle) {
+		WMA_LOGE(FL("wma_handle is invald!"));
+		return;
+	}
+
+	wma_cleanup_vdev_resp_queue(wma_handle);
+	wma_cleanup_hold_req(wma_handle);
+}
+
 /**
  * wma_shutdown_notifier_cb - Shutdown notifer call back
  * @priv : WMA handle
@@ -1913,10 +1926,16 @@ static void wma_cleanup_hold_req(tp_wma_handle wma)
 static void wma_shutdown_notifier_cb(void *priv)
 {
 	tp_wma_handle wma_handle = priv;
+	cds_msg_t msg = { 0 };
+	QDF_STATUS status;
 
 	qdf_event_set(&wma_handle->wma_resume_event);
-	wma_cleanup_vdev_resp_queue(wma_handle);
-	wma_cleanup_hold_req(wma_handle);
+
+	sys_build_message_header(SYS_MSG_ID_CLEAN_VDEV_RSP_QUEUE, &msg);
+	msg.bodyptr = priv;
+	status = cds_mq_post_message(QDF_MODULE_ID_SYS, &msg);
+	if (QDF_IS_STATUS_ERROR(status))
+		WMA_LOGE(FL("Failed to post SYS_MSG_ID_CLEAN_VDEV_RSP_QUEUE"));
 }
 
 struct wma_version_info g_wmi_version_info;
@@ -3221,7 +3240,13 @@ void wma_process_pdev_hw_mode_trans_ind(void *handle,
 {
 	uint32_t i;
 	tp_wma_handle wma = (tp_wma_handle) handle;
-
+	if (fixed_param->num_vdev_mac_entries > MAX_VDEV_SUPPORTED) {
+		WMA_LOGE("Number of Vdev mac entries %d exceeded"
+			 " max vdev supported %d",
+			 fixed_param->num_vdev_mac_entries,
+			 MAX_VDEV_SUPPORTED);
+		return;
+	}
 	hw_mode_trans_ind->old_hw_mode_index = fixed_param->old_hw_mode_index;
 	hw_mode_trans_ind->new_hw_mode_index = fixed_param->new_hw_mode_index;
 	hw_mode_trans_ind->num_vdev_mac_entries =

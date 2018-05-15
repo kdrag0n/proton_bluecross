@@ -3887,8 +3887,8 @@ QDF_STATUS csr_roam_call_callback(tpAniSirGlobal pMac, uint32_t sessionId,
 		 * failure, decrement bRefAssocStartCnt.
 		 */
 		pSession->bRefAssocStartCnt--;
-	} else if (u1 == eCSR_ROAM_SET_CHANNEL_RSP && u2 ==
-				eCSR_ROAM_RESULT_CHANNEL_CHANGE_SUCCESS)
+	} else if (pRoamInfo && (u1 == eCSR_ROAM_SET_CHANNEL_RSP)
+		   && (u2 == eCSR_ROAM_RESULT_CHANNEL_CHANGE_SUCCESS))
 		pSession->connectedProfile.operationChannel =
 			pRoamInfo->channelChangeRespEvent->newChannelNumber;
 
@@ -7565,6 +7565,8 @@ static void csr_roam_process_join_res(tpAniSirGlobal mac_ctx,
 			roam_info.chan_info.nss = join_rsp->nss;
 			roam_info.chan_info.rate_flags =
 				join_rsp->max_rate_flags;
+			roam_info.chan_info.ch_width =
+				join_rsp->vht_channel_width;
 #ifdef FEATURE_WLAN_TDLS
 			roam_info.tdls_prohibited = join_rsp->tdls_prohibited;
 			roam_info.tdls_chan_swit_prohibited =
@@ -21869,6 +21871,8 @@ static QDF_STATUS csr_process_roam_sync_callback(tpAniSirGlobal mac_ctx,
 	roam_info->chan_info.nss = roam_synch_data->join_rsp->nss;
 	roam_info->chan_info.rate_flags =
 		roam_synch_data->join_rsp->max_rate_flags;
+	roam_info->chan_info.ch_width =
+		roam_synch_data->join_rsp->vht_channel_width;
 	csr_roam_fill_tdls_info(mac_ctx, roam_info, roam_synch_data->join_rsp);
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	src_profile = &roam_synch_data->join_rsp->HTProfile;
