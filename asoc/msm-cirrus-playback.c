@@ -479,14 +479,16 @@ static int msm_routing_crus_sp_enable(struct snd_kcontrol *kcontrol,
 
 	mutex_lock(&crus_sp_lock);
 	crus_afe_set_param(cirrus_ff_port, CIRRUS_SP,
-			   CRUS_AFE_PARAM_ID_ENABLE, sizeof(struct crus_single_data_t),
-			   (void *)&crus_enable);
+				CIRRUS_SP_ENABLE,
+				sizeof(struct crus_single_data_t),
+				(void *)&crus_enable);
 	mutex_unlock(&crus_sp_lock);
 
 	mutex_lock(&crus_sp_lock);
 	crus_afe_set_param(cirrus_fb_port, CIRRUS_SP,
-			   CRUS_AFE_PARAM_ID_ENABLE, sizeof(struct crus_single_data_t),
-			   (void *)&crus_enable);
+				CIRRUS_SP_ENABLE,
+				sizeof(struct crus_single_data_t),
+				(void *)&crus_enable);
 	mutex_unlock(&crus_sp_lock);
 
 	return 0;
