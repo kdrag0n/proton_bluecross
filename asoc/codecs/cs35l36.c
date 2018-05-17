@@ -1238,9 +1238,6 @@ static int cs35l36_pac(struct cs35l36_private *cs35l36)
 
 		usleep_range(9500, 10500);
 
-		regmap_write(cs35l36->regmap, CS35L36_INT4_MASK,
-				CS35L36_MCU_CONFIG_UNMASK);
-
 		regmap_write(cs35l36->regmap, CS35L36_PAC_CTL1,
 				CS35L36_PAC_RESET);
 		regmap_write(cs35l36->regmap, CS35L36_PAC_CTL3,
@@ -1278,9 +1275,6 @@ static int cs35l36_pac(struct cs35l36_private *cs35l36)
 			if (count >= 100)
 				return -EINVAL;
 		}
-
-		regmap_write(cs35l36->regmap, CS35L36_INT4_MASK,
-				CS35L36_MCU_CONFIG_MASK);
 
 		regmap_write(cs35l36->regmap, CS35L36_INT4_STATUS,
 				CS35L36_MCU_CONFIG_CLR);
@@ -1506,9 +1500,6 @@ static int cs35l36_i2c_probe(struct i2c_client *i2c_client,
 	else
 		cs35l36->chip_version = CS35L36_10V_L36;
 
-	if (pdata->irq_config.is_present)
-		irq_pol = cs35l36_irq_gpio_config(cs35l36);
-
 	switch (cs35l36->rev_id) {
 	case CS35L36_REV_A0:
 		ret = regmap_register_patch(cs35l36->regmap,
@@ -1545,6 +1536,10 @@ static int cs35l36_i2c_probe(struct i2c_client *i2c_client,
 		}
 		break;
 	}
+
+	if (pdata->irq_config.is_present)
+		irq_pol = cs35l36_irq_gpio_config(cs35l36);
+
 	if (pdata->irq_config.is_shared) {
 		ret = devm_request_threaded_irq(dev, i2c_client->irq, NULL, cs35l36_irq,
 				IRQF_ONESHOT | IRQF_SHARED | irq_pol,
