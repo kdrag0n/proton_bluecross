@@ -91,7 +91,7 @@
 #include <asm/processor.h>
 #include "internal.h"
 
-static inline void task_name(struct seq_file *m, struct task_struct *p)
+void proc_task_name(struct seq_file *m, struct task_struct *p, bool escape)
 {
 	char *buf;
 	size_t size;
@@ -100,13 +100,17 @@ static inline void task_name(struct seq_file *m, struct task_struct *p)
 
 	get_task_comm(tcomm, p);
 
-	seq_puts(m, "Name:\t");
-
 	size = seq_get_buf(m, &buf);
-	ret = string_escape_str(tcomm, buf, size, ESCAPE_SPACE | ESCAPE_SPECIAL, "\n\\");
-	seq_commit(m, ret < size ? ret : -1);
+	if (escape) {
+		ret = string_escape_str(tcomm, buf, size,
+					ESCAPE_SPACE | ESCAPE_SPECIAL, "\n\\");
+		if (ret >= size)
+			ret = -1;
+	} else {
+		ret = strscpy(buf, tcomm, size);
+	}
 
-	seq_putc(m, '\n');
+	seq_commit(m, ret);
 }
 
 /*
@@ -384,7 +388,10 @@ int proc_pid_status(struct seq_file *m, struct pid_namespace *ns,
 {
 	struct mm_struct *mm = get_task_mm(task);
 
-	task_name(m, task);
+	seq_puts(m, "Name:\t");
+	proc_task_name(m, task, true);
+	seq_putc(m, '\n');
+
 	task_state(m, ns, pid, task);
 
 	if (mm) {
@@ -418,7 +425,6 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 	cputime_t cutime, cstime, utime, stime;
 	cputime_t cgtime, gtime;
 	unsigned long rsslim = 0;
-	char tcomm[sizeof(task->comm)];
 	unsigned long flags;
 
 	state = *get_task_state(task);
@@ -444,8 +450,6 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 			}
 		}
 	}
-
-	get_task_comm(tcomm, task);
 
 	sigemptyset(&sigign);
 	sigemptyset(&sigcatch);
@@ -513,7 +517,7 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 
 	seq_put_decimal_ull(m, "", pid_nr_ns(pid, ns));
 	seq_puts(m, " (");
-	seq_puts(m, tcomm);
+	proc_task_name(m, task, false);
 	seq_puts(m, ") ");
 	seq_putc(m, state);
 	seq_put_decimal_ll(m, " ", ppid);
