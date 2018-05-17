@@ -406,3 +406,22 @@ void __init cpuinfo_store_boot_cpu(void)
 }
 
 device_initcall(cpuinfo_regs_init);
+
+static bool is_blueline;
+
+static int __init get_hardware(char *cmdline)
+{
+	is_blueline = !strcmp(cmdline, "blueline");
+	return 0;
+}
+__setup("androidboot.hardware=", get_hardware);
+
+bool is_google_blueline(void)
+{
+	return is_blueline;
+}
+
+bool is_google_crosshatch(void)
+{
+	return !is_blueline;
+}
