@@ -219,9 +219,10 @@ static ssize_t proc_pid_cmdline_read(struct file *file, char __user *buf,
 	if (!tsk)
 		return -ESRCH;
 	mm = get_task_mm(tsk);
-	put_task_struct(tsk);
-	if (!mm)
-		return 0;
+	if (!mm) {
+		rv = 0;
+		goto out_put_task;
+	}
 	/* Check if process spawned far enough to have cmdline. */
 	if (!mm->env_end) {
 		rv = 0;
@@ -394,8 +395,23 @@ out_free_page:
 	free_page((unsigned long)page);
 out_mmput:
 	mmput(mm);
+out_put_task:
+	/*
+	 * Some userland tools use empty cmdline to distinguish kthreads.
+	 * Avoid empty cmdline for user tasks by returning tsk->comm with
+	 * \0 termination when empty.
+	 */
+	if (*pos == 0 && rv == 0 && !(tsk->flags & PF_KTHREAD)) {
+		char tcomm[TASK_COMM_LEN];
+
+		get_task_comm(tcomm, tsk);
+		rv = min(strlen(tcomm) + 1, count);
+		if (copy_to_user(buf, tsk->comm, rv))
+			rv = -EFAULT;
+	}
 	if (rv > 0)
 		*pos += rv;
+	put_task_struct(tsk);
 	return rv;
 }
 
