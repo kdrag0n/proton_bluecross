@@ -516,6 +516,8 @@ static int dsi_display_read_status(struct dsi_display_ctrl *ctrl,
 
 	for (i = 0; i < count; ++i) {
 		memset(config->status_buf, 0x0, SZ_4K);
+		if (config->status_cmd.state == DSI_CMD_SET_STATE_LP)
+			cmds[i].msg.flags |= MIPI_DSI_MSG_USE_LPM;
 		cmds[i].msg.rx_buf = config->status_buf;
 		cmds[i].msg.rx_len = config->status_cmds_rlen[i];
 		rc = dsi_ctrl_cmd_transfer(ctrl->ctrl, &cmds[i].msg, flags);
