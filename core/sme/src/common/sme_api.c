@@ -9295,6 +9295,17 @@ QDF_STATUS sme_stop_roaming(tHalHandle hal, uint8_t session_id, uint8_t reason)
 
 	session = CSR_GET_SESSION(mac_ctx, session_id);
 
+	/*
+	 * set the driver_disabled_roaming flag to true even if roaming
+	 * is not enabled on this session so that roam start requests for
+	 * this session can be blocked until driver enables roaming
+	 */
+	if (reason == eCsrDriverDisabled && session->pCurRoamProfile) {
+		session->pCurRoamProfile->driver_disabled_roaming = true;
+		sme_debug("driver_disabled_roaming set for session %d",
+			  session_id);
+	}
+
 	roam_info = &mac_ctx->roam.neighborRoamInfo[session_id];
 	if (!roam_info->b_roam_scan_offload_started) {
 		sme_debug("Roaming already disabled for session %d", session_id);
@@ -9307,10 +9318,12 @@ QDF_STATUS sme_stop_roaming(tHalHandle hal, uint8_t session_id, uint8_t reason)
 	}
 
 	req->Command = ROAM_SCAN_OFFLOAD_STOP;
-	if (reason == eCsrForcedDisassoc)
+
+	if ((reason == eCsrForcedDisassoc) || (reason == eCsrDriverDisabled))
 		req->reason = REASON_ROAM_STOP_ALL;
 	else
 		req->reason = REASON_SME_ISSUED;
+
 	req->sessionId = session_id;
 	if (csr_neighbor_middle_of_roaming(mac_ctx, session_id))
 		req->middle_of_roaming = 1;
@@ -15523,6 +15536,20 @@ bool sme_neighbor_middle_of_roaming(tHalHandle hHal, uint8_t sessionId)
 	return val;
 }
 
+bool sme_is_any_session_in_middle_of_roaming(tHalHandle hal)
+{
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+	uint8_t session_id;
+
+	for (session_id = 0; session_id < CSR_ROAM_SESSION_MAX; session_id++) {
+		if (CSR_IS_SESSION_VALID(mac_ctx, session_id) &&
+		    csr_neighbor_middle_of_roaming(mac_ctx, session_id))
+			return true;
+	}
+
+	return false;
+}
+
 /**
  * sme_send_flush_logs_cmd_to_fw() - Flush FW logs
  * @mac: MAC handle
@@ -19282,3 +19309,36 @@ bool sme_is_sta_key_exchange_in_progress(tHalHandle hal, uint8_t session_id)
 	return CSR_IS_WAIT_FOR_KEY(mac_ctx, session_id);
 }
 
+bool sme_validate_channel_list(tHalHandle hal,
+				      uint8_t *chan_list,
+				      uint8_t num_channels)
+{
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+	uint8_t i = 0;
+	uint8_t j;
+	bool found;
+	tCsrChannel *ch_lst_info = &mac_ctx->scan.base_channels;
+
+	if (!chan_list || !num_channels) {
+		sme_err("Chan list empty %pK or num_channels is 0", chan_list);
+		return false;
+	}
+
+	while (i < num_channels) {
+		found = false;
+		for (j = 0; j < ch_lst_info->numChannels; j++) {
+			if (ch_lst_info->channelList[j] == chan_list[i]) {
+				found = true;
+				break;
+			}
+		}
+
+		if (!found) {
+			sme_debug("Invalid channel %d", chan_list[i]);
+			return false;
+		}
+
+		i++;
+	}
+	return true;
+}

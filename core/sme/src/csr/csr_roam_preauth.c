@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -383,11 +383,11 @@ ABORT_PREAUTH:
 		if (csr_roam_is_roam_offload_scan_enabled(mac_ctx)) {
 			if (neighbor_roam_info->uOsRequestedHandoff) {
 				neighbor_roam_info->uOsRequestedHandoff = 0;
-				csr_roam_offload_scan(mac_ctx, 0,
+				csr_roam_offload_scan(mac_ctx, session_id,
 					ROAM_SCAN_OFFLOAD_START,
 					REASON_PREAUTH_FAILED_FOR_ALL);
 			} else {
-				csr_roam_offload_scan(mac_ctx, 0,
+				csr_roam_offload_scan(mac_ctx, session_id,
 					ROAM_SCAN_OFFLOAD_RESTART,
 					REASON_PREAUTH_FAILED_FOR_ALL);
 			}

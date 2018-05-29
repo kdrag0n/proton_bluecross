@@ -2867,7 +2867,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_channel,
 	status = wlansap_set_channel_change_with_csa(
 		WLAN_HDD_GET_SAP_CTX_PTR(pHostapdAdapter),
 		(uint32_t)target_channel,
-		target_bw, true);
+		target_bw, !(pHddCtx->config->sta_sap_scc_on_lte_coex_chan));
 
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("SAP set channel failed for channel: %d, bw: %d",
@@ -7942,11 +7942,28 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 		wlan_hdd_disconnect(sta_adapter, eCSR_DISCONNECT_REASON_DEAUTH);
 	}
 
+	/*
+	 * Reject start bss if reassoc in progress on any adapter.
+	 * sme_is_any_session_in_middle_of_roaming is for LFR2 and
+	 * hdd_is_roaming_in_progress is for LFR3
+	 */
+	if (sme_is_any_session_in_middle_of_roaming(hHal) ||
+	    hdd_is_roaming_in_progress(pHddCtx)) {
+		hdd_info("Reassociation in progress");
+		ret = -EINVAL;
+		goto ret_status;
+	}
+
+	/*
+	 * Disable Roaming on all adapters before starting bss
+	 */
+	wlan_hdd_disable_roaming(pHostapdAdapter);
+
 	sme_config = qdf_mem_malloc(sizeof(tSmeConfigParams));
 	if (!sme_config) {
 		hdd_err("failed to allocate memory");
 		ret = -EINVAL;
-		goto ret_status;
+		goto enable_roaming;
 	}
 
 	iniConfig = pHddCtx->config;
@@ -8573,6 +8590,10 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	pHostapdState->bCommit = true;
 	if (sme_config)
 		qdf_mem_free(sme_config);
+
+	/* Enable Roaming after start bss */
+	wlan_hdd_enable_roaming(pHostapdAdapter);
+
 	EXIT();
 
 	return 0;
@@ -8588,9 +8609,14 @@ error:
 	clear_bit(SOFTAP_INIT_DONE, &pHostapdAdapter->event_flags);
 	wlan_hdd_undo_acs(pHostapdAdapter);
 
+enable_roaming:
+	/* Enable Roaming after start bss in case of failure */
+	wlan_hdd_enable_roaming(pHostapdAdapter);
+
 ret_status:
 	if (disable_fw_tdls_state)
 		wlan_hdd_check_conc_and_update_tdls_state(pHddCtx, false);
+
 	return ret;
 }
 

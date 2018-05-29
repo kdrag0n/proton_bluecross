@@ -2952,7 +2952,7 @@ bool cds_is_connection_in_progress(uint8_t *session_id,
 				sme_neighbor_middle_of_roaming(
 					WLAN_HDD_GET_HAL_CTX(adapter),
 					adapter->sessionId)) ||
-				hdd_is_roaming_in_progress(adapter)) {
+				hdd_is_roaming_in_progress(hdd_ctx)) {
 			cds_debug("%pK(%d) Reassociation in progress",
 				WLAN_HDD_GET_STATION_CTX_PTR(adapter),
 				adapter->sessionId);
@@ -5719,6 +5719,10 @@ QDF_STATUS cds_get_pcl(enum cds_con_mode mode,
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx) {
 		cds_err("HDD context is NULL");
+		return status;
+	}
+	if ((mode < 0) || (mode >= CDS_MAX_NUM_OF_MODE)) {
+		cds_err("Incorrect concurrency mode:%d recieved", mode);
 		return status;
 	}
 
@@ -10157,7 +10161,13 @@ QDF_STATUS cds_valid_sap_conc_channel_check(uint8_t *con_ch, uint8_t sap_ch)
 	uint8_t channel = *con_ch;
 	uint8_t temp_channel = 0;
 	bool sta_sap_scc_on_dfs_chan;
+	hdd_context_t *hdd_ctx;
 
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		cds_err("HDD context is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
 	/*
 	 * if force SCC is set, Check if conc channel is DFS
 	 * or passive or part of LTE avoided channel list.
@@ -10183,7 +10193,8 @@ QDF_STATUS cds_valid_sap_conc_channel_check(uint8_t *con_ch, uint8_t sap_ch)
 	if (cds_valid_sta_channel_check(channel)) {
 		if (CDS_IS_DFS_CH(channel) ||
 			CDS_IS_PASSIVE_OR_DISABLE_CH(channel) ||
-			!cds_is_safe_channel(channel)) {
+			!(hdd_ctx->config->sta_sap_scc_on_lte_coex_chan ||
+			  cds_is_safe_channel(channel))) {
 			if (wma_is_hw_dbs_capable()) {
 				temp_channel =
 					cds_get_alternate_channel_for_sap();
