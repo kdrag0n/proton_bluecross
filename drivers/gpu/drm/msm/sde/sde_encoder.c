@@ -3410,10 +3410,14 @@ static void _sde_encoder_kickoff_phys(struct sde_encoder_virt *sde_enc)
 
 	if (sde_enc->elevated_ahb_vote) {
 		priv = sde_enc->base.dev->dev_private;
-		sde_kms = to_sde_kms(priv->kms);
-		if (priv != NULL && sde_kms != NULL) {
-			sde_power_scale_reg_bus(&priv->phandle,
-				sde_kms->core_client, VOTE_INDEX_LOW, false);
+		if (priv != NULL) {
+			sde_kms = to_sde_kms(priv->kms);
+			if (sde_kms != NULL) {
+				sde_power_scale_reg_bus(&priv->phandle,
+						sde_kms->core_client,
+						VOTE_INDEX_LOW,
+						false);
+			}
 		}
 		sde_enc->elevated_ahb_vote = false;
 	}
