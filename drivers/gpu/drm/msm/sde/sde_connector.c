@@ -1724,6 +1724,14 @@ void sde_connector_report_panel_dead(struct drm_connector *connector)
 	if (!c_conn)
 		return;
 
+	/* Panel dead notification can come:
+	 * 1) ESD thread
+	 * 2) Commit thread (if TE stops coming)
+	 * So such case, avoid failure notification twice.
+	 */
+	if (c_conn->panel_dead)
+		return;
+
 	c_conn->panel_dead = true;
 	event.type = DRM_EVENT_PANEL_DEAD;
 	event.length = sizeof(bool);
