@@ -402,14 +402,6 @@ static int hdd_add_beacon_filter(hdd_adapter_t *adapter)
 	return 0;
 }
 
-/**
- * hdd_copy_vht_caps()- copy vht caps info from roam info to
- *  hdd station context.
- * @hdd_sta_ctx: pointer to hdd station context
- * @roam_info: pointer to roam info
- *
- * Return: None
- */
 void hdd_copy_ht_caps(struct ieee80211_ht_cap *hdd_ht_cap,
 		      tDot11fIEHTCaps *roam_ht_cap)
 {
@@ -595,7 +587,7 @@ void hdd_copy_ht_caps(struct ieee80211_ht_cap *hdd_ht_cap,
 #define VHT_CAP_VHT_LINK_ADAPTATION_VHT_MRQ_MFB_SHIFT 26
 
 /**
- * hdd_copy_ht_caps()- copy ht caps info from roam info to
+ * hdd_copy_vht_caps()- copy vht caps info from roam info to
  *  hdd station context.
  * @hdd_sta_ctx: pointer to hdd station context
  * @roam_info: pointer to roam info
@@ -3954,7 +3946,7 @@ hdd_roam_tdls_status_update_handler(hdd_adapter_t *pAdapter,
 			for (staIdx = 0;
 			     staIdx < pHddCtx->max_num_tdls_sta;
 			     staIdx++) {
-				if (0 ==
+				if (HDD_WLAN_INVALID_STA_ID ==
 				    pHddCtx->tdlsConnInfo[staIdx].
 				    staId) {
 					pHddCtx->tdlsConnInfo[staIdx].
@@ -4085,7 +4077,8 @@ hdd_roam_tdls_status_update_handler(hdd_adapter_t *pAdapter,
 							 peerMac.bytes);
 				mutex_unlock(&pHddCtx->tdls_lock);
 
-				pHddCtx->tdlsConnInfo[staIdx].staId = 0;
+				pHddCtx->tdlsConnInfo[staIdx].staId =
+						HDD_WLAN_INVALID_STA_ID;
 				pHddCtx->tdlsConnInfo[staIdx].
 				sessionId = 255;
 				qdf_mem_zero(&pHddCtx->

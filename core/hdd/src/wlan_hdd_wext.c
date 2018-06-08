@@ -99,6 +99,7 @@
 #define HDD_FINISH_ULA_TIME_OUT         800
 #define HDD_SET_MCBC_FILTERS_TO_FW      1
 #define HDD_DELETE_MCBC_FILTERS_FROM_FW 0
+#define HDD_UT_SUSPEND_RESUME_LOG_RL (1024)
 
 /* To Validate Channel against the Frequency and Vice-Versa */
 static const struct ccp_freq_chan_map freq_chan_map[] = {
@@ -3879,6 +3880,10 @@ int wlan_hdd_get_link_speed(hdd_adapter_t *sta_adapter, uint32_t *link_speed)
 	return 0;
 }
 
+struct peer_rssi_priv {
+	struct sir_peer_sta_info peer_sta_info;
+};
+
 /**
  * hdd_get_peer_rssi_cb() - get peer station's rssi callback
  * @sta_rssi: pointer of peer information
@@ -3891,72 +3896,41 @@ int wlan_hdd_get_link_speed(hdd_adapter_t *sta_adapter, uint32_t *link_speed)
 static void hdd_get_peer_rssi_cb(struct sir_peer_info_resp *sta_rssi,
 							void *context)
 {
-	struct statsContext *get_rssi_context;
+	struct hdd_request *request;
 	struct sir_peer_info *rssi_info;
-	uint8_t peer_num, i;
-	hdd_adapter_t *padapter;
-	hdd_station_info_t *stainfo;
+	struct peer_rssi_priv *priv;
+	uint8_t peer_num;
 
-	if ((sta_rssi == NULL) || (context == NULL)) {
-		hdd_err("Bad param, sta_rssi [%pK] context [%pK]",
-			sta_rssi, context);
+	if (sta_rssi == NULL) {
+		hdd_err("Bad param, sta_rssi [%pK]", sta_rssi);
 		return;
 	}
 
-	spin_lock(&hdd_context_lock);
-	/*
-	 * there is a race condition that exists between this callback
-	 * function and the caller since the caller could time out either
-	 * before or while this code is executing.  we use a spinlock to
-	 * serialize these actions
-	 */
-	get_rssi_context = (struct statsContext *)context;
-	padapter = get_rssi_context->pAdapter;
-	if (get_rssi_context->magic != PEER_INFO_CONTEXT_MAGIC ||
-	    !padapter) {
-		/*
-		 * the caller presumably timed out so there is nothing
-		 * we can do
-		 */
-		spin_unlock(&hdd_context_lock);
-		hdd_warn("Invalid context, magic [%08x], adapter [%pK]",
-			get_rssi_context->magic, padapter);
+	request = hdd_request_get(context);
+	if (!request) {
+		hdd_err("Obsolete request.");
 		return;
 	}
+
+	priv = hdd_request_priv(request);
 
 	peer_num = sta_rssi->count;
 	rssi_info = sta_rssi->info;
-	get_rssi_context->magic = 0;
 
 	hdd_debug("%d peers", peer_num);
 
 	if (peer_num > MAX_PEER_STA) {
-		hdd_warn("Exceed max peer sta to handle one time %d", peer_num);
+		hdd_warn("Exceed max peer sta to handle one time %d",
+			 peer_num);
 		peer_num = MAX_PEER_STA;
 	}
 
-	qdf_mem_copy(padapter->peer_sta_info.info, rssi_info,
-		peer_num * sizeof(*rssi_info));
-	padapter->peer_sta_info.sta_num = peer_num;
+	qdf_mem_copy(priv->peer_sta_info.info, rssi_info,
+		     peer_num * sizeof(*rssi_info));
+	priv->peer_sta_info.sta_num = peer_num;
 
-	for (i = 0; i < peer_num; i++) {
-		stainfo = hdd_get_stainfo(padapter->cache_sta_info,
-					  rssi_info[i].peer_macaddr);
-		if (stainfo) {
-			stainfo->rssi = rssi_info[i].rssi;
-			stainfo->tx_rate = rssi_info[i].tx_rate;
-			stainfo->rx_rate = rssi_info[i].rx_rate;
-			hdd_info("rssi:%d tx_rate:%u rx_rate:%u %pM",
-				 stainfo->rssi, stainfo->tx_rate,
-				 stainfo->rx_rate, stainfo->macAddrSTA.bytes);
-		}
-	}
-
-	/* notify the caller */
-	complete(&get_rssi_context->completion);
-
-	/* serialization is complete */
-	spin_unlock(&hdd_context_lock);
+	hdd_request_complete(request);
+	hdd_request_put(request);
 }
 
 int wlan_hdd_get_peer_rssi(hdd_adapter_t *adapter,
@@ -3964,62 +3938,55 @@ int wlan_hdd_get_peer_rssi(hdd_adapter_t *adapter,
 			   int request_source)
 {
 	QDF_STATUS status;
+	void *cookie;
 	int ret;
-	static struct statsContext context;
 	struct sir_peer_info_req rssi_req;
+	struct hdd_request *request;
+	struct peer_rssi_priv *priv;
+	static const struct hdd_request_params params = {
+		.priv_size = sizeof(*priv),
+		.timeout_ms = WLAN_WAIT_TIME_STATS,
+	};
 
 	if (!adapter || !macaddress) {
-		hdd_err("pAdapter [%pK], macaddress [%pK]", adapter, macaddress);
+		hdd_err("adapter [%pK], macaddress [%pK]",
+			adapter, macaddress);
 		return -EFAULT;
 	}
 
-	init_completion(&context.completion);
-	context.magic = PEER_INFO_CONTEXT_MAGIC;
-	context.pAdapter = adapter;
+	request = hdd_request_alloc(&params);
+	if (!request) {
+		hdd_err("Request allocation failure");
+		return -ENOMEM;
+	}
+
+	cookie = hdd_request_cookie(request);
 
 	qdf_mem_copy(&(rssi_req.peer_macaddr), macaddress,
-				QDF_MAC_ADDR_SIZE);
+		     QDF_MAC_ADDR_SIZE);
 	rssi_req.sessionid = adapter->sessionId;
 	status = sme_get_peer_info(WLAN_HDD_GET_HAL_CTX(adapter),
-				rssi_req,
-				&context,
-				hdd_get_peer_rssi_cb);
+				   rssi_req,
+				   cookie,
+				   hdd_get_peer_rssi_cb);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("Unable to retrieve statistics for rssi");
 		ret = -EFAULT;
-	}
-
-	else if (request_source != HDD_WLAN_GET_PEER_RSSI_SOURCE_DRIVER) {
-		if (!wait_for_completion_timeout(&context.completion,
-				msecs_to_jiffies(WLAN_WAIT_TIME_STATS))) {
+	} else if (request_source != HDD_WLAN_GET_PEER_RSSI_SOURCE_DRIVER) {
+		ret = hdd_request_wait_for_response(request);
+		if (ret) {
 			hdd_err("SME timed out while retrieving rssi");
 			ret = -EFAULT;
 		} else {
+			priv = hdd_request_priv(request);
+			adapter->peer_sta_info = priv->peer_sta_info;
 			ret = 0;
 		}
-		goto set_magic;
 	} else {
 		ret = 0;
-		return ret;
 	}
-set_magic:
-	/*
-	 * either we never sent a request, we sent a request and received a
-	 * response or we sent a request and timed out.  if we never sent a
-	 * request or if we sent a request and got a response, we want to
-	 * clear the magic out of paranoia.  if we timed out there is a
-	 * race condition such that the callback function could be
-	 * executing at the same time we are. of primary concern is if the
-	 * callback function had already verified the "magic" but had not
-	 * yet set the completion variable when a timeout occurred. we
-	 * serialize these activities by invalidating the magic while
-	 * holding a shared spinlock which will cause us to block if the
-	 * callback is currently executing
-	 */
 
-	spin_lock(&hdd_context_lock);
-	context.magic = 0;
-	spin_unlock(&hdd_context_lock);
+	hdd_request_put(request);
 
 	return ret;
 }
@@ -5882,9 +5849,8 @@ static void hdd_get_class_a_statistics_cb(void *stats, void *context)
 	tCsrGlobalClassAStatsInfo *returned_stats;
 
 	ENTER();
-	if ((NULL == stats) || (NULL == context)) {
-		hdd_err("Bad param, stats [%p] context [%p]",
-			stats, context);
+	if (NULL == stats) {
+		hdd_err("Bad param, stats");
 		return;
 	}
 
@@ -8672,7 +8638,8 @@ static int __iw_setint_getnone(struct net_device *dev,
 				(set_value > CFG_ENABLE_MODULATED_DTIM_MAX)) {
 			hdd_err("Invalid gEnableModuleDTIM value %d",
 				set_value);
-			return -EINVAL;
+			ret = -EINVAL;
+			goto free;
 		} else {
 			hdd_ctx->config->enableModulatedDTIM = set_value;
 		}
@@ -12526,9 +12493,19 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 		ret = wlan_hdd_set_mon_chan(pAdapter, value[1], value[2]);
 		break;
 	case WE_SET_WLAN_SUSPEND:
+		if (!hdd_ctx->config->is_unit_test_framework_enabled) {
+			hdd_warn_ratelimited(HDD_UT_SUSPEND_RESUME_LOG_RL,
+					     "UT suspend is disabled");
+			return 0;
+		}
 		ret = hdd_wlan_fake_apps_suspend(hdd_ctx->wiphy, dev);
 		break;
 	case WE_SET_WLAN_RESUME:
+		if (!hdd_ctx->config->is_unit_test_framework_enabled) {
+			hdd_warn_ratelimited(HDD_UT_SUSPEND_RESUME_LOG_RL,
+					     "UT resume is disabled");
+			return 0;
+		}
 		ret = hdd_wlan_fake_apps_resume(hdd_ctx->wiphy, dev);
 		break;
 	case WE_LOG_BUFFER: {

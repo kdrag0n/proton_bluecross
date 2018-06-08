@@ -544,4 +544,15 @@ void wma_wmi_stop(void);
  */
 void wma_cleanup_vdev_resp_and_hold_req(void *priv);
 
+/**
+ * wma_send_dhcp_ind() - Send DHCP Start/Stop Indication to FW.
+ * @type - WMA message type.
+ * @device_mode - mode(AP, SAP etc) of the device.
+ * @mac_addr - MAC address of the adapter.
+ * @sta_mac_addr - MAC address of the peer station.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS wma_send_dhcp_ind(uint16_t type, uint8_t device_mode,
+			     uint8_t *mac_addr, uint8_t *sta_mac_addr);
 #endif

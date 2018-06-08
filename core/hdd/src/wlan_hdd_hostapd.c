@@ -203,7 +203,6 @@ int hdd_sap_context_init(hdd_context_t *hdd_ctx)
 	qdf_spinlock_create(&hdd_ctx->sap_update_info_lock);
 
 	qdf_atomic_init(&hdd_ctx->dfs_radar_found);
-	qdf_atomic_init(&hdd_ctx->is_acs_allowed);
 
 	return 0;
 }
@@ -1486,6 +1485,10 @@ static void hdd_fill_station_info(hdd_adapter_t *pHostapdAdapter,
 		hdd_copy_ht_caps(&stainfo->ht_caps, &event->ht_caps);
 	}
 
+	/* Initialize DHCP info */
+	stainfo->dhcp_phase = DHCP_PHASE_ACK;
+	stainfo->dhcp_nego_status = DHCP_NEGO_STOP;
+
 	while (i < WLAN_MAX_STA_COUNT) {
 		if (!qdf_mem_cmp(pHostapdAdapter->
 				 cache_sta_info[i].macAddrSTA.bytes,
@@ -1608,7 +1611,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 	struct ch_params_s sap_ch_param = {0};
 	eCsrPhyMode phy_mode;
 	bool legacy_phymode;
-	tSap_StationDisassocCompleteEvent *disconnect_event;
+	tSap_StationDisassocCompleteEvent *disassoc_comp;
 	hdd_station_info_t *stainfo;
 	cds_context_type *cds_ctx;
 
@@ -2201,34 +2204,21 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 		hdd_green_ap_add_sta(pHddCtx);
 		break;
 
-	case eSAP_STA_LOSTLINK_DETECTED:
-		disconnect_event =
-			&pSapEvent->sapevt.sapStationDisassocCompleteEvent;
-
-		wlan_hdd_get_peer_rssi(pHostapdAdapter,
-				       &disconnect_event->staMac,
-				       HDD_WLAN_GET_PEER_RSSI_SOURCE_DRIVER);
-
-		/*
-		 * For user initiated disconnect, reason_code is updated while
-		 * issuing the disconnect from HDD.
-		 */
-		if (disconnect_event->reason != eSAP_USR_INITATED_DISASSOC) {
-			stainfo = hdd_get_stainfo(
-					pHostapdAdapter->cache_sta_info,
-					disconnect_event->staMac);
-			if (stainfo)
-				stainfo->reason_code =
-					disconnect_event->reason_code;
-		}
-		return QDF_STATUS_SUCCESS;
-
 	case eSAP_STA_DISASSOC_EVENT:
+		disassoc_comp =
+			&pSapEvent->sapevt.sapStationDisassocCompleteEvent;
 		memcpy(wrqu.addr.sa_data,
-		       &pSapEvent->sapevt.sapStationDisassocCompleteEvent.
-		       staMac, QDF_MAC_ADDR_SIZE);
+		       &disassoc_comp->staMac, QDF_MAC_ADDR_SIZE);
 		hdd_notice(" disassociated " MAC_ADDRESS_STR,
 		       MAC_ADDR_ARRAY(wrqu.addr.sa_data));
+		stainfo = hdd_get_stainfo(pHostapdAdapter->cache_sta_info,
+					  disassoc_comp->staMac);
+		if (stainfo) {
+			stainfo->rssi = disassoc_comp->rssi;
+			stainfo->tx_rate = disassoc_comp->tx_rate;
+			stainfo->rx_rate = disassoc_comp->rx_rate;
+			stainfo->reason_code = disassoc_comp->reason_code;
+		}
 
 		qdf_status = qdf_event_set(&pHostapdState->qdf_sta_disassoc_event);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
@@ -2253,6 +2243,14 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 		DPTRACE(qdf_dp_trace_mgmt_pkt(QDF_DP_TRACE_MGMT_PACKET_RECORD,
 			pHostapdAdapter->sessionId,
 			QDF_PROTO_TYPE_MGMT, QDF_PROTO_MGMT_DISASSOC));
+
+		/* Send DHCP STOP indication to FW */
+		stainfo->dhcp_phase = DHCP_PHASE_ACK;
+		if (stainfo->dhcp_nego_status ==
+					DHCP_NEGO_IN_PROGRESS)
+			hdd_post_dhcp_ind(pHostapdAdapter, staId,
+					WMA_DHCP_STOP_IND);
+		stainfo->dhcp_nego_status = DHCP_NEGO_STOP;
 
 		hdd_softap_deregister_sta(pHostapdAdapter, staId);
 
@@ -2572,7 +2570,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 		/* send vendor event to hostapd only for hostapd based acs*/
 		if (!pHddCtx->config->force_sap_acs)
 			wlan_hdd_cfg80211_acs_ch_select_evt(pHostapdAdapter);
-		qdf_atomic_set(&pHddCtx->is_acs_allowed, 0);
+		qdf_atomic_set(
+			&pHostapdAdapter->sessionCtx.ap.acs_in_progress, 0);
 		return QDF_STATUS_SUCCESS;
 	case eSAP_ECSA_CHANGE_CHAN_IND:
 		hdd_debug("Channel change indication from peer for channel %d",
@@ -2654,6 +2653,10 @@ stopbss:
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 			hdd_warn("hdd_softap_stop_bss failed %d",
 			       qdf_status);
+			if (hdd_ipa_is_enabled(pHddCtx)) {
+				hdd_ipa_uc_disconnect_ap(pHostapdAdapter);
+				hdd_ipa_clean_adapter_iface(pHostapdAdapter);
+			}
 		}
 
 		/* notify userspace that the BSS has stopped */
@@ -4514,7 +4517,6 @@ static __iw_softap_disassoc_sta(struct net_device *dev,
 	uint8_t *peerMacAddr;
 	int ret;
 	struct tagCsrDelStaParams del_sta_params;
-	hdd_station_info_t *stainfo;
 
 	ENTER_DEV(dev);
 
@@ -4540,11 +4542,6 @@ static __iw_softap_disassoc_sta(struct net_device *dev,
 			(SIR_MAC_MGMT_DISASSOC >> 4),
 			&del_sta_params);
 	hdd_softap_sta_disassoc(pHostapdAdapter, &del_sta_params);
-
-	stainfo = hdd_get_stainfo(pHostapdAdapter->cache_sta_info,
-				  del_sta_params.peerMacAddr);
-	if (stainfo)
-		stainfo->reason_code = del_sta_params.reason_code;
 
 	EXIT();
 	return 0;
@@ -6465,7 +6462,7 @@ QDF_STATUS hdd_init_ap_mode(hdd_adapter_t *pAdapter, bool reinit)
 	ENTER();
 
 	hdd_info("SSR in progress: %d", reinit);
-
+	qdf_atomic_init(&pAdapter->sessionCtx.ap.acs_in_progress);
 	if (reinit)
 		sapContext = pAdapter->sessionCtx.ap.sapContext;
 	else {
@@ -7296,6 +7293,10 @@ int wlan_hdd_cfg80211_update_apies(hdd_adapter_t *adapter)
 
 	pConfig = &adapter->sessionCtx.ap.sapConfig;
 	beacon = adapter->sessionCtx.ap.beacon;
+	if (!beacon) {
+		hdd_err("Beacon is NULL !");
+		return -EINVAL;
+	}
 
 	genie = qdf_mem_malloc(MAX_GENIE_LEN);
 
@@ -8607,6 +8608,8 @@ error:
 	if (sme_config)
 		qdf_mem_free(sme_config);
 	clear_bit(SOFTAP_INIT_DONE, &pHostapdAdapter->event_flags);
+	qdf_atomic_set(
+		&pHostapdAdapter->sessionCtx.ap.acs_in_progress, 0);
 	wlan_hdd_undo_acs(pHostapdAdapter);
 
 enable_roaming:
@@ -8748,6 +8751,8 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 
 	pConfig = &pAdapter->sessionCtx.ap.sapConfig;
 	pConfig->acs_cfg.acs_mode = false;
+	qdf_atomic_set(
+		&pAdapter->sessionCtx.ap.acs_in_progress, 0);
 	wlan_hdd_undo_acs(pAdapter);
 	qdf_mem_zero(&pConfig->acs_cfg, sizeof(struct sap_acs_cfg));
 

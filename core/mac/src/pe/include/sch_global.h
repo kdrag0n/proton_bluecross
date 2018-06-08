@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, 2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -103,6 +103,10 @@ struct schMisc {
 	uint8_t fBeaconChanged;
 
 	uint16_t p2pIeOffset;
+
+	/* CSA and ECSA Switch Count Offsets to be sent to FW */
+	uint32_t csa_count_offset;
+	uint32_t ecsa_count_offset;
 
 };
 

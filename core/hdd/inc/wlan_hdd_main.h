@@ -61,6 +61,7 @@
 #include <cdp_txrx_peer_ops.h>
 #include "wlan_hdd_nan_datapath.h"
 #include "target_if_def_config.h"
+#include <qdf_idr.h>
 
 /** Number of Tx Queues */
 #ifdef QCA_LL_TX_FLOW_CONTROL_V2
@@ -782,7 +783,7 @@ typedef struct hdd_remain_on_chan_ctx {
 	struct ieee80211_channel chan;
 	enum nl80211_channel_type chan_type;
 	unsigned int duration;
-	u64 cookie;
+	int32_t id;
 	enum rem_on_channel_request_type rem_on_chan_request;
 	qdf_mc_timer_t hdd_remain_on_chan_timer;
 	action_pkt_buffer_t action_pkt_buff;
@@ -841,7 +842,7 @@ enum action_frm_type {
 
 typedef struct hdd_cfg80211_state_s {
 	uint16_t current_freq;
-	u64 action_cookie;
+	int32_t action_id;
 	uint8_t *buf;
 	size_t len;
 	hdd_remain_on_chan_ctx_t *remain_on_chan_ctx;
@@ -965,6 +966,33 @@ enum bss_stop_reason {
 };
 
 /**
+ * struct dhcp_phase - Per Peer DHCP Phases
+ * @DHCP_PHASE_ACK: upon receiving DHCP_ACK/NAK message in REQUEST phase or
+ *         DHCP_DELINE message in OFFER phase
+ * @DHCP_PHASE_DISCOVER: upon receiving DHCP_DISCOVER message in ACK phase
+ * @DHCP_PHASE_OFFER: upon receiving DHCP_OFFER message in DISCOVER phase
+ * @DHCP_PHASE_REQUEST: upon receiving DHCP_REQUEST message in OFFER phase or
+ *         ACK phase (Renewal process)
+ */
+enum dhcp_phase {
+	DHCP_PHASE_ACK,
+	DHCP_PHASE_DISCOVER,
+	DHCP_PHASE_OFFER,
+	DHCP_PHASE_REQUEST
+};
+
+/**
+ * struct dhcp_nego_status - Per Peer DHCP Negotiation Status
+ * @DHCP_NEGO_STOP: when the peer is in ACK phase or client disassociated
+ * @DHCP_NEGO_IN_PROGRESS: when the peer is in DISCOVER or REQUEST
+ *         (Renewal process) phase
+ */
+enum dhcp_nego_status {
+	DHCP_NEGO_STOP,
+	DHCP_NEGO_IN_PROGRESS
+};
+
+/**
  * typedef struct hdd_station_info_t - Per station structure kept in HDD for
  *                                     multiple station support for SoftAP
  * @isUsed: The station entry is used or not
@@ -1045,6 +1073,8 @@ typedef struct {
 	struct ieee80211_vht_cap vht_caps;
 	uint32_t reason_code;
 	int8_t rssi;
+	enum dhcp_phase dhcp_phase;
+	enum dhcp_nego_status dhcp_nego_status;
 } hdd_station_info_t;
 
 /**
@@ -1147,6 +1177,7 @@ struct hdd_ap_ctx_s {
 
 	/* Fw txrx stats info */
 	struct hdd_fw_txrx_stats txrx_stats;
+	qdf_atomic_t acs_in_progress;
 };
 
 typedef struct hdd_scaninfo_s {
@@ -1779,14 +1810,6 @@ struct suspend_resume_stats {
 };
 
 /**
- * struct hdd_nud_stats_context - hdd NUD stats context
- * @response_event: NUD stats request wait event
- */
-struct hdd_nud_stats_context {
-	struct completion response_event;
-};
-
-/**
  * struct hdd_scan_chan_info - channel info
  * @freq: radio frequence
  * @cmd flag: cmd flag
@@ -2062,6 +2085,8 @@ struct hdd_context_s {
 	struct delayed_work roc_req_work;
 	qdf_spinlock_t hdd_roc_req_q_lock;
 	qdf_list_t hdd_roc_req_q;
+	/*QDF ID allocation */
+	qdf_idr p2p_idr;
 	qdf_spinlock_t hdd_scan_req_q_lock;
 	qdf_list_t hdd_scan_req_q;
 	uint8_t miracast_value;
@@ -2154,7 +2179,6 @@ struct hdd_context_s {
 	uint8_t curr_band;
 	uint32_t no_of_probe_req_ouis;
 	uint32_t *probe_req_voui;
-	struct hdd_nud_stats_context nud_stats_context;
 	uint8_t bt_a2dp_active:1;
 	uint8_t bt_vo_active:1;
 #ifdef FEATURE_SPECTRAL_SCAN
@@ -2185,7 +2209,6 @@ struct hdd_context_s {
 	/* mutex lock to block concurrent access */
 	struct mutex power_stats_lock;
 #endif
-	qdf_atomic_t is_acs_allowed;
 };
 
 int hdd_validate_channel_and_bandwidth(hdd_adapter_t *adapter,
@@ -2842,17 +2865,6 @@ void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter, bool reinit);
 void hdd_set_rx_mode_rps(hdd_context_t *hdd_ctx, void *padapter, bool enable);
 
 /**
- * hdd_init_nud_stats_ctx() - initialize NUD stats context
- * @hdd_ctx: Pointer to hdd context
- *
- * Return: none
- */
-static inline void hdd_init_nud_stats_ctx(hdd_context_t *hdd_ctx)
-{
-	init_completion(&hdd_ctx->nud_stats_context.response_event);
-}
-
-/**
  * hdd_dbs_scan_selection_init() - initialization for DBS scan selection config
  * @hdd_ctx: HDD context
  *
@@ -3069,5 +3081,18 @@ void hdd_driver_memdump_deinit(void);
  *         else return false
  */
 bool hdd_is_cli_iface_up(hdd_context_t *hdd_ctx);
+
+/**
+ * hdd_get_nud_stats_cb() - callback api to update the stats received from FW
+ * @data: pointer to hdd context.
+ * @rsp: pointer to data received from FW.
+ * @context: callback context
+ *
+ * This is called when wlan driver received response event for
+ * get arp stats to firmware.
+ *
+ * Return: None
+ */
+void hdd_get_nud_stats_cb(void *data, struct rsp_stats *rsp, void *context);
 
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

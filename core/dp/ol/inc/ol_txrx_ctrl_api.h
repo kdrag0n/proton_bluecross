@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -499,7 +499,6 @@ QDF_STATUS ol_txrx_get_vdevid(struct ol_txrx_peer_t *peer, uint8_t *vdev_id);
 void *ol_txrx_get_vdev_by_sta_id(uint8_t sta_id);
 
 #define OL_TXRX_INVALID_LOCAL_PEER_ID 0xffff
-#define OL_TXRX_INVALID_TDLS_PEER_ID 0xff
 
 #define OL_TXRX_RSSI_INVALID 0xffff
 /**

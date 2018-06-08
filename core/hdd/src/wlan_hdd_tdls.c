@@ -297,7 +297,8 @@ void wlan_hdd_tdls_disable_offchan_and_teardown_links(hdd_context_t *hddctx,
 
 	for (staidx = 0; staidx < hddctx->max_num_tdls_sta;
 							staidx++) {
-		if (!hddctx->tdlsConnInfo[staidx].staId)
+		if (hddctx->tdlsConnInfo[staidx].staId ==
+				HDD_WLAN_INVALID_STA_ID)
 			continue;
 
 		mutex_lock(&hddctx->tdls_lock);
@@ -329,7 +330,8 @@ void wlan_hdd_tdls_disable_offchan_and_teardown_links(hdd_context_t *hddctx,
 		hdd_roam_deregister_tdlssta(adapter,
 			hddctx->tdlsConnInfo[staidx].staId);
 		wlan_hdd_tdls_decrement_peer_count(adapter);
-		hddctx->tdlsConnInfo[staidx].staId = 0;
+		hddctx->tdlsConnInfo[staidx].staId =
+					HDD_WLAN_INVALID_STA_ID;
 
 		hddctx->tdlsConnInfo[staidx].sessionId = 255;
 
@@ -673,7 +675,7 @@ static void wlan_hdd_tdls_del_non_forced_peers(tdlsCtx_t *hdd_tdls_ctx)
 			} else {
 				peer->link_status = eTDLS_LINK_IDLE;
 				peer->reason = eTDLS_LINK_UNSPECIFIED;
-				peer->staId = OL_TXRX_INVALID_TDLS_PEER_ID;
+				peer->staId = HDD_WLAN_INVALID_STA_ID;
 				peer->discovery_attempt = 0;
 			}
 		}
@@ -728,7 +730,8 @@ void hdd_tdls_context_init(hdd_context_t *hdd_ctx, bool ssr)
 	hdd_debug("max_num_tdls_sta: %d", hdd_ctx->max_num_tdls_sta);
 
 	for (sta_idx = 0; sta_idx < hdd_ctx->max_num_tdls_sta; sta_idx++) {
-		hdd_ctx->tdlsConnInfo[sta_idx].staId = 0;
+		hdd_ctx->tdlsConnInfo[sta_idx].staId =
+					HDD_WLAN_INVALID_STA_ID;
 		hdd_ctx->tdlsConnInfo[sta_idx].sessionId = 255;
 		qdf_mem_zero(&hdd_ctx->tdlsConnInfo[sta_idx].peerMac,
 			     QDF_MAC_ADDR_SIZE);
@@ -1699,7 +1702,7 @@ static void wlan_hdd_tdls_set_mode(hdd_context_t *pHddCtx,
 
 	ENTER();
 
-	hdd_debug("mode %d", (int)tdls_mode);
+	hdd_debug("mode %d, source %d", (int)tdls_mode, source);
 
 	if (0 != (wlan_hdd_validate_context(pHddCtx)))
 		return;
@@ -1748,7 +1751,9 @@ static void wlan_hdd_tdls_set_mode(hdd_context_t *pHddCtx,
 			    peer_update_timer) == QDF_TIMER_STATE_STOPPED)) {
 				hdd_debug("Start timer again,source bitmap:%lu",
 						pHddCtx->tdls_source_bitmap);
+				mutex_lock(&pHddCtx->tdls_lock);
 				wlan_hdd_tdls_implicit_enable(pHddTdlsCtx);
+				mutex_unlock(&pHddCtx->tdls_lock);
 			}
 			status = hdd_get_next_adapter(pHddCtx,
 						      pAdapterNode, &pNext);
@@ -1999,12 +2004,18 @@ void wlan_hdd_update_tdls_info(hdd_adapter_t *adapter, bool tdls_prohibited,
 	if (tdls_prohibited) {
 		hdd_ctx->tdls_mode = eTDLS_SUPPORT_NOT_ENABLED;
 	} else {
-		if (false == hdd_ctx->config->fEnableTDLSImplicitTrigger)
+		if (false == hdd_ctx->config->fEnableTDLSImplicitTrigger) {
 			hdd_ctx->tdls_mode = eTDLS_SUPPORT_EXPLICIT_TRIGGER_ONLY;
-		else if (true == hdd_ctx->config->fTDLSExternalControl)
+		} else if (true == hdd_ctx->config->fTDLSExternalControl) {
 			hdd_ctx->tdls_mode = eTDLS_SUPPORT_EXTERNAL_CONTROL;
-		else
+			if (!hdd_ctx->tdls_source_bitmap &&
+				hdd_ctx->tdls_external_peer_count)
+				wlan_hdd_tdls_implicit_enable(hdd_tdls_ctx);
+		} else {
 			hdd_ctx->tdls_mode = eTDLS_SUPPORT_ENABLED;
+			if (!hdd_ctx->tdls_source_bitmap)
+				wlan_hdd_tdls_implicit_enable(hdd_tdls_ctx);
+		}
 	}
 	tdls_param = qdf_mem_malloc(sizeof(*tdls_param));
 	if (!tdls_param) {
@@ -2481,7 +2492,7 @@ int wlan_hdd_tdls_reset_peer(hdd_adapter_t *pAdapter, const uint8_t *mac)
 	wlan_hdd_tdls_set_peer_link_status(curr_peer,
 					   eTDLS_LINK_IDLE,
 					   eTDLS_LINK_UNSPECIFIED);
-	curr_peer->staId = OL_TXRX_INVALID_TDLS_PEER_ID;
+	curr_peer->staId = HDD_WLAN_INVALID_STA_ID;
 ret_status:
 	return status;
 }
@@ -2895,7 +2906,8 @@ bool wlan_hdd_tdls_check_peer_buf_capable(hdd_context_t *hdd_ctx,
 		return false;
 
 	for (staIdx = 0; staIdx < hdd_ctx->max_num_tdls_sta; staIdx++) {
-		if (hdd_ctx->tdlsConnInfo[staIdx].staId) {
+		if (hdd_ctx->tdlsConnInfo[staIdx].staId !=
+						HDD_WLAN_INVALID_STA_ID) {
 			curr_peer = wlan_hdd_tdls_find_all_peer(hdd_ctx,
 				hdd_ctx->tdlsConnInfo[staIdx].peerMac.bytes);
 			if (curr_peer) {
@@ -5870,7 +5882,7 @@ static void wlan_hdd_tdls_idle_handler(void *user_data)
 	v_CONTEXT_t cds_context;
 	hdd_adapter_t *adapter;
 
-	if (!tdls_info->staId) {
+	if (tdls_info->staId == HDD_WLAN_INVALID_STA_ID) {
 		hdd_err("peer (staidx %u) doesn't exists", tdls_info->staId);
 		return;
 	}
@@ -6279,7 +6291,8 @@ static int wlan_hdd_tdls_teardown_links(hdd_context_t *hddctx,
 
 	for (staidx = 0; staidx < hddctx->max_num_tdls_sta;
 							staidx++) {
-		if (!hddctx->tdlsConnInfo[staidx].staId)
+		if (hddctx->tdlsConnInfo[staidx].staId ==
+						HDD_WLAN_INVALID_STA_ID)
 			continue;
 
 		mutex_lock(&hddctx->tdls_lock);

@@ -73,7 +73,6 @@
 #include <linux/semaphore.h>
 #include <linux/ctype.h>
 #include <linux/compat.h>
-#include <linux/reboot.h>
 #ifdef MSM_PLATFORM
 #include <soc/qcom/subsystem_restart.h>
 #endif
@@ -147,7 +146,6 @@
 #define PANIC_ON_BUG_STR ""
 #endif
 
-bool g_is_system_reboot_triggered;
 int wlan_start_ret_val;
 static DECLARE_COMPLETION(wlan_start_comp);
 static unsigned int dev_num = 1;
@@ -236,8 +234,8 @@ int limit_off_chan_tbl[HDD_MAX_AC][HDD_MAX_OFF_CHAN_ENTRIES] = {
 	{ HDD_AC_VO_BIT, HDD_MAX_OFF_CHAN_TIME_FOR_VO },
 };
 
+/* internal function declaration */
 struct notifier_block hdd_netdev_notifier;
-struct notifier_block system_reboot_notifier;
 
 struct sock *cesium_nl_srv_sock;
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
@@ -420,12 +418,6 @@ static bool hdd_wait_for_recovery_completion(void)
 	while (cds_is_driver_recovering()) {
 		if (retry == HDD_MOD_EXIT_SSR_MAX_RETRIES/2)
 			hdd_err("Recovery in progress; wait here!!!");
-
-		if (g_is_system_reboot_triggered) {
-			hdd_info("System Reboot happening ignore unload!!");
-			return false;
-		}
-
 		msleep(1000);
 		if (retry++ == HDD_MOD_EXIT_SSR_MAX_RETRIES) {
 			hdd_err("SSR never completed, error");
@@ -443,7 +435,6 @@ static bool hdd_wait_for_recovery_completion(void)
 	hdd_info("Recovery completed successfully!");
 	return true;
 }
-
 
 static int __hdd_netdev_notifier_call(struct notifier_block *nb,
 				    unsigned long state, void *data)
@@ -570,27 +561,6 @@ static int hdd_netdev_notifier_call(struct notifier_block *nb,
 
 struct notifier_block hdd_netdev_notifier = {
 	.notifier_call = hdd_netdev_notifier_call,
-};
-
-static int system_reboot_notifier_call(struct notifier_block *nb,
-				       unsigned long msg_type, void *_unused)
-{
-	switch (msg_type) {
-	case SYS_DOWN:
-	case SYS_HALT:
-	case SYS_POWER_OFF:
-		g_is_system_reboot_triggered = true;
-		hdd_info("reboot, reason: %ld", msg_type);
-		break;
-	default:
-		break;
-	}
-
-	return NOTIFY_OK;
-}
-
-struct notifier_block system_reboot_notifier = {
-	.notifier_call = system_reboot_notifier_call,
 };
 
 /* variable to hold the insmod parameters */
@@ -3598,6 +3568,7 @@ static void hdd_ap_adapter_deinit(hdd_context_t *hdd_ctx,
 		hdd_wmm_adapter_close(adapter);
 		clear_bit(WMM_INIT_DONE, &adapter->event_flags);
 	}
+	qdf_atomic_set(&adapter->sessionCtx.ap.acs_in_progress, 0);
 	wlan_hdd_undo_acs(adapter);
 
 	hdd_cleanup_actionframe(hdd_ctx, adapter);
@@ -4754,6 +4725,7 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 		/* Any softap specific cleanup here... */
 		sap_config = &adapter->sessionCtx.ap.sapConfig;
 		wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
+		qdf_atomic_set(&adapter->sessionCtx.ap.acs_in_progress, 0);
 		wlan_hdd_undo_acs(adapter);
 		if (adapter->device_mode == QDF_P2P_GO_MODE)
 			wlan_hdd_cleanup_remain_on_channel_ctx(adapter);
@@ -4814,6 +4786,7 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 			/* Reset WNI_CFG_PROBE_RSP Flags */
 			wlan_hdd_reset_prob_rspies(adapter);
 		}
+		clear_bit(SOFTAP_INIT_DONE, &adapter->event_flags);
 		qdf_mem_free(adapter->sessionCtx.ap.beacon);
 		adapter->sessionCtx.ap.beacon = NULL;
 		if (true == bCloseSession)
@@ -6176,10 +6149,11 @@ void hdd_unregister_notifiers(hdd_context_t *hdd_ctx)
  */
 static void hdd_exit_netlink_services(hdd_context_t *hdd_ctx)
 {
+	spectral_scan_deactivate_service();
+	cnss_diag_deactivate_service();
 	hdd_close_cesium_nl_sock();
-
 	ptt_sock_deactivate_svc();
-
+	oem_deactivate_service();
 	nl_srv_exit();
 }
 
@@ -6209,15 +6183,13 @@ static int hdd_init_netlink_services(hdd_context_t *hdd_ctx)
 		goto err_nl_srv;
 	}
 
-	ret = ptt_sock_activate_svc();
-	if (ret) {
-		hdd_err("ptt_sock_activate_svc failed: %d", ret);
-		goto err_nl_srv;
-	}
+	ptt_sock_activate_svc();
 
 	ret = hdd_open_cesium_nl_sock();
-	if (ret)
+	if (ret) {
 		hdd_err("hdd_open_cesium_nl_sock failed ret: %d", ret);
+		goto err_ptt_sock;
+	}
 
 	ret = cnss_diag_activate_service();
 	if (ret) {
@@ -6228,14 +6200,18 @@ static int hdd_init_netlink_services(hdd_context_t *hdd_ctx)
 	ret = spectral_scan_activate_service();
 	if (ret) {
 		hdd_alert("spectral_scan_activate_service failed: %d", ret);
-		goto err_close_cesium;
+		goto err_cnss_diag;
 	}
 
 	return 0;
 
+err_cnss_diag:
+	cnss_diag_deactivate_service();
 err_close_cesium:
 	hdd_close_cesium_nl_sock();
+err_ptt_sock:
 	ptt_sock_deactivate_svc();
+	oem_deactivate_service();
 err_nl_srv:
 	nl_srv_exit();
 out:
@@ -6280,6 +6256,7 @@ static int hdd_roc_context_init(hdd_context_t *hdd_ctx)
 {
 	qdf_spinlock_create(&hdd_ctx->hdd_roc_req_q_lock);
 	qdf_list_create(&hdd_ctx->hdd_roc_req_q, MAX_ROC_REQ_QUEUE_ENTRY);
+	qdf_idr_create(&hdd_ctx->p2p_idr);
 
 	INIT_DELAYED_WORK(&hdd_ctx->roc_req_work, wlan_hdd_roc_request_dequeue);
 
@@ -6296,6 +6273,7 @@ static int hdd_roc_context_init(hdd_context_t *hdd_ctx)
  */
 static void hdd_roc_context_destroy(hdd_context_t *hdd_ctx)
 {
+	qdf_idr_destroy(&hdd_ctx->p2p_idr);
 	qdf_list_destroy(&hdd_ctx->hdd_roc_req_q);
 	qdf_spinlock_destroy(&hdd_ctx->hdd_roc_req_q_lock);
 }
@@ -6452,7 +6430,6 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 		hdd_deinit_all_adapters(hdd_ctx, false);
 	}
 
-	unregister_reboot_notifier(&system_reboot_notifier);
 	unregister_netdevice_notifier(&hdd_netdev_notifier);
 
 	/* Free up RoC request queue and flush workqueue */
@@ -8462,7 +8439,6 @@ static int hdd_context_init(hdd_context_t *hdd_ctx)
 	hdd_ctx->max_intf_count = CSR_ROAM_SESSION_MAX;
 
 	hdd_init_ll_stats_ctx();
-	hdd_init_nud_stats_ctx(hdd_ctx);
 
 	init_completion(&hdd_ctx->chain_rssi_context.response_event);
 	init_completion(&hdd_ctx->mc_sus_event_var);
@@ -10862,12 +10838,6 @@ int hdd_wlan_startup(struct device *dev)
 		goto err_ipa_cleanup;
 	}
 
-	ret = register_reboot_notifier(&system_reboot_notifier);
-	if (ret) {
-		hdd_err("Failed to register reboot notifier: %d", ret);
-		goto err_unregister_netdev;
-	}
-
 	rtnl_held = hdd_hold_rtnl_lock();
 
 	ret = hdd_open_interfaces(hdd_ctx, rtnl_held);
@@ -10913,11 +10883,9 @@ err_close_adapters:
 	hdd_close_all_adapters(hdd_ctx, rtnl_held);
 
 err_release_rtnl_lock:
-	unregister_reboot_notifier(&system_reboot_notifier);
 	if (rtnl_held)
 		hdd_release_rtnl_lock();
 
-err_unregister_netdev:
 	unregister_netdevice_notifier(&hdd_netdev_notifier);
 
 err_ipa_cleanup:
@@ -10974,23 +10942,12 @@ void hdd_wlan_update_target_info(hdd_context_t *hdd_ctx, void *context)
 	hdd_ctx->target_type = tgt_info->target_type;
 }
 
-/**
- * hdd_get_nud_stats_cb() - callback api to update the stats
- *	received from the firmware
- * @data: pointer to adapter.
- * @rsp: pointer to data received from FW.
- *
- * This is called when wlan driver received response event for
- *	get arp stats to firmware.
- *
- * Return: None
- */
-static void hdd_get_nud_stats_cb(void *data, struct rsp_stats *rsp)
+void hdd_get_nud_stats_cb(void *data, struct rsp_stats *rsp, void *context)
 {
 	hdd_context_t *hdd_ctx = (hdd_context_t *)data;
-	struct hdd_nud_stats_context *context;
 	int status;
 	hdd_adapter_t *adapter = NULL;
+	struct hdd_request *request = NULL;
 
 	ENTER();
 
@@ -11000,12 +10957,19 @@ static void hdd_get_nud_stats_cb(void *data, struct rsp_stats *rsp)
 	}
 
 	status = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != status)
+	if (status != 0)
 		return;
+
+	request = hdd_request_get(context);
+	if (!request) {
+		hdd_err("obselete request");
+		return;
+	}
 
 	adapter = hdd_get_adapter_by_vdev(hdd_ctx, rsp->vdev_id);
 	if ((NULL == adapter) || (WLAN_HDD_ADAPTER_MAGIC != adapter->magic)) {
 		hdd_err("Invalid adapter or adapter has invalid magic");
+		hdd_request_put(request);
 		return;
 	}
 
@@ -11033,10 +10997,8 @@ static void hdd_get_nud_stats_cb(void *data, struct rsp_stats *rsp)
 							rsp->icmpv4_rsp_recvd;
 	}
 
-	spin_lock(&hdd_context_lock);
-	context = &hdd_ctx->nud_stats_context;
-	complete(&context->response_event);
-	spin_unlock(&hdd_context_lock);
+	hdd_request_complete(request);
+	hdd_request_put(request);
 
 	EXIT();
 }
@@ -11089,9 +11051,6 @@ int hdd_register_cb(hdd_context_t *hdd_ctx)
 
 	sme_set_rssi_threshold_breached_cb(hdd_ctx->hHal,
 					   hdd_rssi_threshold_breached);
-
-	sme_set_nud_debug_stats_cb(hdd_ctx->hHal,
-				   hdd_get_nud_stats_cb);
 
 	status = sme_apf_offload_register_callback(hdd_ctx->hHal,
 						   hdd_get_apf_capabilities_cb);
@@ -11253,8 +11212,6 @@ void hdd_softap_sta_disassoc(hdd_adapter_t *adapter,
 	if (pDelStaParams->peerMacAddr.bytes[0] & 0x1)
 		return;
 
-	wlan_hdd_get_peer_rssi(adapter, &pDelStaParams->peerMacAddr,
-			       HDD_WLAN_GET_PEER_RSSI_SOURCE_DRIVER);
 	wlansap_disassoc_sta(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
 			     pDelStaParams);
 }
@@ -12235,8 +12192,7 @@ static void __hdd_module_exit(void)
 	pr_info("%s: Unloading driver v%s\n", WLAN_MODULE_NAME,
 		QWLAN_VERSIONSTR);
 
-	if (!hdd_wait_for_recovery_completion())
-		return;
+	hdd_wait_for_recovery_completion();
 
 	wlan_hdd_unregister_driver();
 
@@ -12710,6 +12666,11 @@ static int con_mode_handler(const char *kmessage, const struct kernel_param *kp)
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
 		return ret;
+
+	if (!cds_wait_for_external_threads_completion(__func__)) {
+		hdd_warn("External threads are still active, can not change mode");
+		return -EAGAIN;
+	}
 
 	cds_ssr_protect(__func__);
 	ret = __con_mode_handler(kmessage, kp, hdd_ctx);

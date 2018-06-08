@@ -1623,31 +1623,34 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
-		goto out;
+		return ret;
+
+	if (!((adapter->device_mode == QDF_SAP_MODE) ||
+	      (adapter->device_mode == QDF_P2P_GO_MODE))) {
+		hdd_err("Invalid device mode %d", adapter->device_mode);
+		return -EINVAL;
+	}
 
 	if (cds_is_sub_20_mhz_enabled()) {
 		hdd_err("ACS not supported in sub 20 MHz ch wd.");
-		ret = -EINVAL;
-		goto out;
+		return -EINVAL;
 	}
-
-	if (qdf_atomic_inc_return(&hdd_ctx->is_acs_allowed) > 1) {
+	if (qdf_atomic_read(&adapter->sessionCtx.ap.acs_in_progress) > 0) {
 		hdd_err("ACS rejected as previous req already in progress");
-		ret = -EINVAL;
-		goto out;
+		return -EINVAL;
+	} else {
+		qdf_atomic_set(&adapter->sessionCtx.ap.acs_in_progress, 1);
 	}
 
 	ret = hdd_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_ACS_MAX, data, data_len,
 			    wlan_hdd_cfg80211_do_acs_policy);
 	if (ret) {
 		hdd_err("Invalid ATTR");
-		qdf_atomic_set(&hdd_ctx->is_acs_allowed, 0);
 		goto out;
 	}
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_ACS_HW_MODE]) {
 		hdd_err("Attr hw_mode failed");
-		qdf_atomic_set(&hdd_ctx->is_acs_allowed, 0);
 		goto out;
 	}
 	hw_mode = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_ACS_HW_MODE]);
@@ -1733,7 +1736,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 					sizeof(uint8_t) *
 					sap_config->acs_cfg.ch_list_count);
 			if (sap_config->acs_cfg.ch_list == NULL) {
-				qdf_atomic_set(&hdd_ctx->is_acs_allowed, 0);
 				ret = -ENOMEM;
 				goto out;
 			}
@@ -1752,7 +1754,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 				sap_config->acs_cfg.ch_list_count);
 			if (sap_config->acs_cfg.ch_list == NULL) {
 				hdd_err("ACS config alloc fail");
-				qdf_atomic_set(&hdd_ctx->is_acs_allowed, 0);
 				ret = -ENOMEM;
 				goto out;
 			}
@@ -1765,7 +1766,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	}
 
 	if (!sap_config->acs_cfg.ch_list_count) {
-		qdf_atomic_set(&hdd_ctx->is_acs_allowed, 0);
+		qdf_atomic_set(&adapter->sessionCtx.ap.acs_in_progress, 0);
 		hdd_err("acs config chan count 0");
 		ret = -EINVAL;
 		goto out;
@@ -1846,6 +1847,8 @@ out:
 		if (temp_skbuff != NULL)
 			return cfg80211_vendor_cmd_reply(temp_skbuff);
 	}
+
+	qdf_atomic_set(&adapter->sessionCtx.ap.acs_in_progress, 0);
 	wlan_hdd_undo_acs(adapter);
 	clear_bit(ACS_IN_PROGRESS, &hdd_ctx->g_event_flags);
 
@@ -3739,7 +3742,7 @@ static int32_t hdd_add_tx_bitrate(struct sk_buff *skb,
 	bitrate_compat = bitrate < (1UL << 16) ? bitrate : 0;
 
 	if (bitrate > 0) {
-		if(nla_put_u32(skb, NL80211_RATE_INFO_BITRATE32, bitrate)) {
+		if (nla_put_u32(skb, NL80211_RATE_INFO_BITRATE32, bitrate)) {
 			hdd_err("put fail bitrate: %u", bitrate);
 			goto fail;
 		}
@@ -3748,7 +3751,8 @@ static int32_t hdd_add_tx_bitrate(struct sk_buff *skb,
 	}
 
 	if (bitrate_compat > 0) {
-		if (nla_put_u16(skb, NL80211_RATE_INFO_BITRATE, bitrate_compat)) {
+		if (nla_put_u16(skb, NL80211_RATE_INFO_BITRATE,
+				bitrate_compat)) {
 			hdd_err("put fail bitrate_compat: %u", bitrate_compat);
 			goto fail;
 		}
@@ -4980,6 +4984,12 @@ __wlan_hdd_cfg80211_get_wifi_info(struct wiphy *wiphy,
 			"FW:%d.%d.%d.%d.%d HW:%s", major_spid, minor_spid,
 			siid, crmid, sub_id, hw_version);
 		skb_len += strlen(firmware_version) + 1;
+		count++;
+	}
+
+	if (tb_vendor[QCA_WLAN_VENDOR_ATTR_WIFI_INFO_RADIO_INDEX]) {
+		hdd_debug("Rcvd req for Radio index");
+		skb_len += sizeof(uint32_t);
 		count++;
 	}
 
@@ -11058,6 +11068,12 @@ static int __wlan_hdd_cfg80211_set_nud_stats(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
+	if (adapter->device_mode != QDF_STA_MODE) {
+		QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
+			  "%s STATS supported in only STA mode !!", __func__);
+		return -EINVAL;
+	}
+
 	if (tb[STATS_SET_START]) {
 		/* tracking is enabled for stats other than arp. */
 		if (tb[STATS_SET_DATA_PKT_INFO]) {
@@ -11623,14 +11639,18 @@ static int __wlan_hdd_cfg80211_get_nud_stats(struct wiphy *wiphy,
 					     const void *data, int data_len)
 {
 	int err = 0;
-	unsigned long rc;
-	struct hdd_nud_stats_context *context;
 	struct net_device *dev = wdev->netdev;
 	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	hdd_context_t *hdd_ctx = wiphy_priv(wiphy);
 	struct get_arp_stats_params arp_stats_params;
 	uint32_t pkt_type_bitmap;
 	struct sk_buff *skb;
+	struct hdd_request *request = NULL;
+	static const struct hdd_request_params params = {
+		.priv_size = 0,
+		.timeout_ms = WLAN_WAIT_TIME_NUD_STATS,
+	};
+	void *cookie = NULL;
 
 	ENTER();
 
@@ -11647,13 +11667,23 @@ static int __wlan_hdd_cfg80211_get_nud_stats(struct wiphy *wiphy,
 	if (err)
 		return err;
 
+	if (adapter->device_mode != QDF_STA_MODE) {
+		QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
+			  "%s STATS supported in only STA mode !!", __func__);
+		return -EINVAL;
+	}
+
+	request = hdd_request_alloc(&params);
+	if (!request) {
+		hdd_err("Request allocation failure");
+		return -ENOMEM;
+	}
+
+	cookie = hdd_request_cookie(request);
+
 	arp_stats_params.pkt_type = WLAN_NUD_STATS_ARP_PKT_TYPE;
 	arp_stats_params.vdev_id = adapter->sessionId;
 
-	spin_lock(&hdd_context_lock);
-	context = &hdd_ctx->nud_stats_context;
-	INIT_COMPLETION(context->response_event);
-	spin_unlock(&hdd_context_lock);
 
 	pkt_type_bitmap = adapter->pkt_type_bitmap;
 
@@ -11666,19 +11696,26 @@ static int __wlan_hdd_cfg80211_get_nud_stats(struct wiphy *wiphy,
 					0xFF, 0XFF,
 					DATA_STALL_LOG_RECOVERY_TRIGGER_PDR);
 
+	if (sme_set_nud_debug_stats_cb(hdd_ctx->hHal, hdd_get_nud_stats_cb,
+				       cookie) != QDF_STATUS_SUCCESS) {
+		hdd_err("Setting NUD debug stats callback failure");
+		err = -EINVAL;
+		goto exit;
+	}
+
 	if (QDF_STATUS_SUCCESS !=
 	    sme_get_nud_debug_stats(hdd_ctx->hHal, &arp_stats_params)) {
 		QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
 			  "%s STATS_SET_START CMD Failed!!", __func__);
-		return -EINVAL;
+		err = -EINVAL;
+		goto exit;
 	}
 
-	rc = wait_for_completion_timeout(&context->response_event,
-					 msecs_to_jiffies(
-						WLAN_WAIT_TIME_NUD_STATS));
-	if (!rc) {
-		hdd_err("Target response timed out request ");
-		return -ETIMEDOUT;
+	err = hdd_request_wait_for_response(request);
+	if (err) {
+		hdd_err("SME timedout while retrieving NUD stats");
+		err = -ETIMEDOUT;
+		goto exit;
 	}
 
 	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
@@ -11686,7 +11723,8 @@ static int __wlan_hdd_cfg80211_get_nud_stats(struct wiphy *wiphy,
 	if (!skb) {
 		hdd_err("%s: cfg80211_vendor_cmd_alloc_reply_skb failed",
 			__func__);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto exit;
 	}
 
 	if (nla_put_u16(skb, COUNT_FROM_NETDEV,
@@ -11708,7 +11746,8 @@ static int __wlan_hdd_cfg80211_get_nud_stats(struct wiphy *wiphy,
 			rx_host_drop_reorder)) {
 		hdd_err("nla put fail");
 		kfree_skb(skb);
-		return -EINVAL;
+		err = -EINVAL;
+		goto exit;
 	}
 	if (adapter->con_status)
 		nla_put_flag(skb, AP_LINK_ACTIVE);
@@ -11719,11 +11758,15 @@ static int __wlan_hdd_cfg80211_get_nud_stats(struct wiphy *wiphy,
 	pkt_type_bitmap &= ~CONNECTIVITY_CHECK_SET_ARP;
 
 	if (pkt_type_bitmap) {
-		if (hdd_populate_connectivity_check_stats_info(adapter, skb))
-			return -EINVAL;
+		if (hdd_populate_connectivity_check_stats_info(adapter, skb)) {
+			err = -EINVAL;
+			goto exit;
+		}
 	}
 
 	cfg80211_vendor_cmd_reply(skb);
+exit:
+	hdd_request_put(request);
 	return err;
 }
 
@@ -16941,6 +16984,14 @@ static bool wlan_hdd_fils_data_in_limits(struct cfg80211_connect_params *req)
 		return false;
 	}
 
+	if (!req->fils_erp_rrk || !req->fils_erp_realm ||
+	    !req->fils_erp_username) {
+		hdd_err("buffer incorrect, user=%pK rrk=%pK realm=%pK",
+			req->fils_erp_username, req->fils_erp_rrk,
+			req->fils_erp_realm);
+		return false;
+	}
+
 	return true;
 }
 
@@ -19321,8 +19372,6 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 			}
 
 			pAdapter->aStaInfo[staId].isDeauthInProgress = true;
-			pAdapter->cache_sta_info[staId].reason_code =
-				pDelStaParams->reason_code;
 
 			hdd_debug("Delete STA with MAC::" MAC_ADDRESS_STR,
 			       MAC_ADDR_ARRAY(mac));
@@ -19567,8 +19616,7 @@ static void hdd_fill_pmksa_info(tPmkidCacheInfo *pmk_cache,
 		qdf_mem_copy(pmk_cache->BSSID.bytes,
 			     pmksa->bssid, QDF_MAC_ADDR_SIZE);
 	} else {
-		qdf_mem_copy(pmk_cache->ssid, pmksa->ssid,
-			     SIR_MAC_MAX_SSID_LENGTH);
+		qdf_mem_copy(pmk_cache->ssid, pmksa->ssid, pmksa->ssid_len);
 		qdf_mem_copy(pmk_cache->cache_id, pmksa->cache_id,
 			     CACHE_ID_LEN);
 		pmk_cache->ssid_len = pmksa->ssid_len;
