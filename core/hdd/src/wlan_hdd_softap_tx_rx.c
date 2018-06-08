@@ -616,13 +616,11 @@ drop_pkt:
 
 	qdf_dp_trace_data_pkt(skb, QDF_DP_TRACE_DROP_PACKET_RECORD, 0,
 			      QDF_TX);
-	kfree_skb(skb);
 
 drop_pkt_accounting:
-	++pAdapter->stats.tx_dropped;
-	++pAdapter->hdd_stats.hddTxRxStats.txXmitDropped;
+	++pAdapter->hdd_stats.hddTxRxStats.txXmitRejected;
 
-	return NETDEV_TX_OK;
+	return NETDEV_TX_BUSY;
 }
 
 /**
