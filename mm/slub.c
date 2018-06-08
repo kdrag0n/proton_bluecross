@@ -4151,12 +4151,6 @@ void __init kmem_cache_init(void)
 		       SLAB_HWCACHE_ALIGN);
 
 	kmem_cache = bootstrap(&boot_kmem_cache);
-
-	/*
-	 * Allocate kmem_cache_node properly from the kmem_cache slab.
-	 * kmem_cache_node is separately allocated so no need to
-	 * update any list pointers.
-	 */
 	kmem_cache_node = bootstrap(&boot_kmem_cache_node);
 
 	/* Now we can use the kmem_cache to allocate kmalloc slabs */
