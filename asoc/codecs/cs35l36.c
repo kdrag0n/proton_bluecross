@@ -1121,13 +1121,14 @@ static int cs35l36_handle_of_data(struct i2c_client *i2c_client,
 	struct device_node *np = i2c_client->dev.of_node;
 	struct irq_cfg *irq_gpio_config = &pdata->irq_config;
 	struct device_node *irq_gpio;
-	unsigned int val, ret;
+	int ret;
+	u32 val;
 
 	if (!np)
 		return 0;
 
 	ret = of_property_read_u32(np, "cirrus,boost-ctl-millivolt", &val);
-	if (ret >= 0) {
+	if (!ret) {
 		if (val < 2550 || val > 12000) {
 			dev_err(&i2c_client->dev,
 				"Invalid Boost Voltage %d mV\n", val);
@@ -1141,7 +1142,7 @@ static int cs35l36_handle_of_data(struct i2c_client *i2c_client,
 		pdata->bst_vctl_sel = val | CS35L36_VALID_PDATA;
 
 	ret = of_property_read_u32(np, "cirrus,boost-peak-milliamp", &val);
-	if (ret >= 0) {
+	if (!ret) {
 		if (val < 1600 || val > 4500) {
 			dev_err(&i2c_client->dev,
 				"Invalid Boost Peak Current %u mA\n", val);
