@@ -638,6 +638,7 @@ static int cs35l36_dai_mute_stream(struct snd_soc_dai *dai,
 {
 #ifdef CONFIG_CIRRUS_SPKR_PROTECTION
 	int ret = 0;
+	pr_debug("%s: mute: %d , stream: %d", __func__, mute, stream);
 
 	if (mute) {
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
@@ -657,10 +658,14 @@ static int cs35l36_dai_mute_stream(struct snd_soc_dai *dai,
 							__func__);
 			}
 		}
+	} else {
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+			msm_crus_check_set_setting(CS35L36_UNMUTE);
 	}
 #endif
 	return 0;
 }
+
 static const struct snd_soc_dai_ops cs35l36_ops = {
 	.startup = cs35l36_pcm_startup,
 	.set_fmt = cs35l36_set_dai_fmt,

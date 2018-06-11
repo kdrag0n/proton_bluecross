@@ -784,6 +784,15 @@ static int afe_apr_send_pkt(void *data, wait_queue_head_t *wait)
 #if defined(CONFIG_CIRRUS_SPKR_PROTECTION)
 extern int afe_apr_send_pkt_crus(void *data, int index, int set)
 {
+	int ret = 0;
+
+	ret = afe_q6_interface_prepare();
+	if (ret != 0) {
+		pr_err("%s: Q6 interface prepare failed ret: %d\n",
+				__func__, ret);
+		return -EINVAL;
+	}
+
 	if (set)
 		return afe_apr_send_pkt(data, &this_afe.wait[index]);
 	else /* get */
@@ -2237,6 +2246,10 @@ EXPORT_SYMBOL(afe_set_config);
 void afe_clear_config(enum afe_config_type config)
 {
 	clear_bit(config, &afe_configured_cmd);
+#if defined(CONFIG_CIRRUS_SPKR_PROTECTION)
+	if (config == AFE_CIRRUS_PORT_CONFIG)
+		msm_crus_check_set_setting(AFE_SSR);
+#endif
 }
 EXPORT_SYMBOL(afe_clear_config);
 

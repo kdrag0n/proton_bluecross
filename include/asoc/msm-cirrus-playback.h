@@ -12,6 +12,11 @@
 #ifndef MSM_CIRRUS_PLAYBACK_H
 #define MSM_CIRRUS_PLAYBACK_H
 
+#define CIRRUS_ENABLE           0x1
+#define CIRRUS_USECASE          0x2
+#define CIRRUS_BIN_FILE         0x4
+#define CIRRUS_ALL_SETTING      0x7
+
 #include <linux/slab.h>
 #include <sound/soc.h>
 #include <dsp/apr_audio-v2.h>
@@ -71,12 +76,6 @@ struct cirrus_cal_result_t {
 	int32_t z_r;
 };
 
-struct cirrus_spk_component {
-	/* the unit of imp is exp(10, -8) */
-	uint32_t imp_l;
-	uint32_t imp_r;
-};
-
 #define APR_CHUNK_SIZE		256
 #define CONFIG_FILE_SIZE	128
 #define PAYLOAD_FOLLOWS_CONFIG	4
@@ -115,8 +114,28 @@ struct crus_cal_t {
 	u32 bottom_spk_mean;
 };
 
+enum {
+	SPK_RX = 0,
+	SPK_TX = 1,
+	MAX_SPK_PORT = 2,
+};
+
+enum {
+	CS35L36_UNMUTE = 0,
+	AFE_SSR = 1,
+};
+
+struct cirrus_spk_component {
+	/* the unit of imp is exp(10, -8) */
+	uint32_t imp_l;
+	uint32_t imp_r;
+	unsigned char flag;
+	const struct firmware *bin_files[MAX_SPK_PORT][MAX_TUNING_CONFIGS];
+};
+
 extern int afe_apr_send_pkt_crus(void *data, int index, int set);
 extern int crus_afe_callback(void *payload, int size);
 extern int msm_crus_store_imped(char channel);
+extern void msm_crus_check_set_setting(unsigned char cmd);
 void msm_crus_pb_add_controls(struct snd_soc_platform *platform);
 #endif /* _MSM_CIRRUS_PLAYBACK_H */

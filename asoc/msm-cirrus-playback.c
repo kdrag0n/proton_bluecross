@@ -9,7 +9,6 @@
 * GNU General Public License for more details.
 */
 
-
 #include <linux/firmware.h>
 #include <linux/device.h>
 #include <linux/miscdevice.h>
@@ -26,6 +25,9 @@
 
 #define CRUS_TX_CONFIG "crus_sp_config_%s_tx.bin"
 #define CRUS_RX_CONFIG "crus_sp_config_%s_rx.bin"
+
+#define CRUS_TX_MULTI_CONFIG "crus_sp_config_%s_tx_%d.bin"
+#define CRUS_RX_MULTI_CONFIG "crus_sp_config_%s_rx_%d.bin"
 
 #define CIRRUS_RX_TOPOLOGY 0x10000CCC
 #define CIRRUS_TX_TOPOLOGY 0x10001CCC
@@ -58,6 +60,18 @@ static const char *crus_sp_usecase_dt_text[MAX_TUNING_CONFIGS];
 static bool swap_calibration;
 static struct crus_cal_t crus_cal;
 static struct cirrus_spk_component crus_spk;
+static unsigned char count_config;
+
+static bool msm_crus_is_cirrus_afe_topology(void)
+{
+	if (afe_get_topology(cirrus_ff_port)
+			== CIRRUS_RX_TOPOLOGY
+			&& afe_get_topology(cirrus_fb_port)
+				== CIRRUS_TX_TOPOLOGY)
+		return true;
+	else
+		return false;
+}
 
 static void *crus_gen_afe_get_header(int length, int port, int module,
 				     int param)
@@ -167,6 +181,11 @@ static int crus_afe_get_param(int port, int module, int param, int length,
 	pr_info("%s: port = %d module = %d param = 0x%x length = %d\n",
 		__func__, port, module, param, length);
 
+	if (!msm_crus_is_cirrus_afe_topology()) {
+		pr_warn("%s: afe port is not cirrus's topology", __func__);
+		return -EPERM;
+	}
+
 	config = (struct afe_custom_crus_get_config_t *)
 		 crus_gen_afe_get_header(length, port, module, param);
 	if (config == NULL) {
@@ -231,6 +250,11 @@ static int crus_afe_set_param(int port, int module, int param, int length,
 	pr_info("%s: port = %d module = %d param = 0x%x length = %d\n",
 		__func__, port, module, param, length);
 
+	if (!msm_crus_is_cirrus_afe_topology()) {
+		pr_warn("%s: afe port is not cirrus's topology", __func__);
+		return -EPERM;
+	}
+
 	config = crus_gen_afe_set_header(length, port, module, param);
 	if (config == NULL) {
 		pr_err("%s: Memory allocation failed!\n", __func__);
@@ -270,6 +294,11 @@ static int crus_afe_send_config(const char *data, int32_t length,
 
 	pr_info("%s: called with module_id = %x, string length = %d\n",
 						__func__, module, length);
+
+	if (!msm_crus_is_cirrus_afe_topology()) {
+		pr_warn("%s: afe port is not cirrus's topology", __func__);
+		return -EPERM;
+	}
 
 	/* Destination settings for message */
 	if (port == cirrus_ff_port)
@@ -351,6 +380,11 @@ static int crus_afe_send_delta(const char *data, uint32_t length)
 	pr_info("%s: called with module_id = %x, string length = %d\n",
 						__func__, module, length);
 
+	if (!msm_crus_is_cirrus_afe_topology()) {
+		pr_warn("%s: afe port is not cirrus's topology", __func__);
+		return -EPERM;
+	}
+
 	if (length > APR_CHUNK_SIZE)
 		mem_size = APR_CHUNK_SIZE;
 	else
@@ -422,6 +456,90 @@ extern int crus_afe_callback(void *payload, int size)
 	return 0;
 }
 
+static int msm_crus_send_usecase(int usecase)
+{
+	struct crus_rx_run_case_ctrl_t case_ctrl;
+
+	case_ctrl.status_l = 1;
+	case_ctrl.status_r = 1;
+	case_ctrl.z_l = crus_sp_cal_rslt.z_l;
+	case_ctrl.z_r = crus_sp_cal_rslt.z_r;
+	case_ctrl.checksum_l = crus_sp_cal_rslt.z_l + 1;
+	case_ctrl.checksum_r = crus_sp_cal_rslt.z_r + 1;
+
+	case_ctrl.atemp = 23;
+	case_ctrl.value = usecase;
+
+	if (crus_afe_set_param(cirrus_fb_port, CIRRUS_SP,
+			   CRUS_PARAM_TX_SET_USECASE, sizeof(usecase),
+			   (void *)&usecase))
+		return -EPERM;
+
+	if (crus_afe_set_param(cirrus_ff_port, CIRRUS_SP,
+			   CRUS_PARAM_RX_SET_USECASE, sizeof(case_ctrl),
+			   (void *)&case_ctrl))
+		return -EPERM;
+
+	return 0;
+}
+
+static int msm_crus_send_config(int usecase, int port,
+				const struct firmware *firmware)
+{
+	int ret = 0;
+
+	if (firmware == NULL)
+		return -EINVAL;
+
+	if (usecase >= crus_sp_usecase_dt_count)
+		return -EINVAL;
+
+	if (port == SPK_RX) {
+		if (count_config & (1 << (SPK_RX + usecase * 2)))
+			return 0;
+
+
+		if (msm_crus_send_usecase(usecase)) {
+			ret = -EPERM;
+			goto exit;
+		}
+
+		if (crus_afe_send_config(
+				firmware->data,
+				firmware->size,
+				cirrus_ff_port, CIRRUS_SP)) {
+			ret = -EPERM;
+			goto exit;
+		}
+
+		count_config |= (1 << (SPK_RX + usecase * 2));
+	} else if (port == SPK_TX) {
+		if (count_config & (1 << (SPK_TX + usecase * 2)))
+			return 0;
+
+		if (msm_crus_send_usecase(usecase)) {
+			ret = -EPERM;
+			goto exit;
+		}
+
+		if (crus_afe_send_config(
+				firmware->data,
+				firmware->size,
+				cirrus_fb_port, CIRRUS_SP)) {
+			ret = -EPERM;
+			goto exit;
+		}
+
+		count_config |= (1 << (SPK_TX + usecase * 2));
+	} else {
+		pr_err("%s: unknown port %d", __func__, port);
+		ret = -EINVAL;
+	}
+
+exit:
+	msm_crus_send_usecase(cirrus_sp_usecase);
+	return ret;
+}
 int msm_routing_cirrus_fbport_get(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
@@ -470,12 +588,15 @@ static int msm_routing_crus_sp_enable(struct snd_kcontrol *kcontrol,
 				      struct snd_ctl_elem_value *ucontrol)
 {
 	const int crus_set = ucontrol->value.integer.value[0];
+	int ret = 0;
 
 	if (crus_set > 255) {
 		pr_err("Cirrus SP Enable: Invalid entry; Enter 0 to DISABLE,"
 		       " 1 to ENABLE; 2-255 are reserved for debug\n");
 		return -EINVAL;
 	}
+
+	mutex_lock(&crus_sp_lock);
 
 	switch (crus_set) {
 	case 0: /* "Config SP Disable" */
@@ -489,24 +610,36 @@ static int msm_routing_crus_sp_enable(struct snd_kcontrol *kcontrol,
 		cirrus_sp_en = 1;
 		break;
 	default:
-		return -EINVAL;
+		ret = -EINVAL;
+		goto exit;
 	}
 
-	mutex_lock(&crus_sp_lock);
-	crus_afe_set_param(cirrus_ff_port, CIRRUS_SP,
+	crus_spk.flag = crus_spk.flag & ~CIRRUS_ENABLE;
+
+	if (crus_afe_set_param(cirrus_ff_port, CIRRUS_SP,
 				CIRRUS_SP_ENABLE,
 				sizeof(struct crus_single_data_t),
-				(void *)&crus_enable);
-	mutex_unlock(&crus_sp_lock);
+				(void *)&crus_enable)) {
+		ret = -EPERM;
+		goto exit;
+	}
 
-	mutex_lock(&crus_sp_lock);
-	crus_afe_set_param(cirrus_fb_port, CIRRUS_SP,
+	if (crus_afe_set_param(cirrus_fb_port, CIRRUS_SP,
 				CIRRUS_SP_ENABLE,
 				sizeof(struct crus_single_data_t),
-				(void *)&crus_enable);
-	mutex_unlock(&crus_sp_lock);
+				(void *)&crus_enable)) {
+		ret = -EPERM;
+		goto exit;
+	}
 
-	return 0;
+	crus_spk.flag = crus_spk.flag | CIRRUS_ENABLE;
+
+exit:
+	mutex_unlock(&crus_sp_lock);
+	pr_debug("%s: flag: %x ret: %d", __func__,
+			crus_spk.flag, ret);
+
+	return ret;
 }
 
 static int msm_routing_crus_sp_enable_get(struct snd_kcontrol *kcontrol,
@@ -518,13 +651,27 @@ static int msm_routing_crus_sp_enable_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static bool msm_crus_check_count(unsigned char number, int total_count)
+{
+	int i = 0;
+
+	pr_debug("%s: number: %x, total_count: %d", __func__,
+			number, total_count);
+
+	for (i = 0; i < total_count; i++) {
+		if (!(number & (1 << i)))
+			return false;
+	}
+	return true;
+}
+
 static int msm_routing_crus_sp_usecase(struct snd_kcontrol *kcontrol,
 				       struct snd_ctl_elem_value *ucontrol)
 {
-	struct crus_rx_run_case_ctrl_t case_ctrl;
 	const int crus_set = ucontrol->value.integer.value[0];
 	struct soc_enum *e = (struct soc_enum *)kcontrol->private_value;
 	uint32_t max_index = e->items;
+	int ret = 0;
 
 	pr_debug("Starting Cirrus SP Config function call %d\n", crus_set);
 
@@ -533,26 +680,24 @@ static int msm_routing_crus_sp_usecase(struct snd_kcontrol *kcontrol,
 		return -EINVAL;
 	}
 
+	mutex_lock(&crus_sp_lock);
+
 	cirrus_sp_usecase = crus_set;
+	crus_spk.flag = crus_spk.flag & ~CIRRUS_USECASE;
 
-	case_ctrl.status_l = 1;
-	case_ctrl.status_r = 1;
-	case_ctrl.z_l = crus_sp_cal_rslt.z_l;
-	case_ctrl.z_r = crus_sp_cal_rslt.z_r;
-	case_ctrl.checksum_l = crus_sp_cal_rslt.z_l + 1;
-	case_ctrl.checksum_r = crus_sp_cal_rslt.z_r + 1;
+	if (msm_crus_send_usecase(cirrus_sp_usecase)) {
+		ret = -EPERM;
+		goto exit;
+	}
 
-	case_ctrl.atemp = 23;
-	case_ctrl.value = cirrus_sp_usecase;
+	crus_spk.flag = crus_spk.flag | CIRRUS_USECASE;
 
-	crus_afe_set_param(cirrus_fb_port, CIRRUS_SP,
-			   CRUS_PARAM_TX_SET_USECASE, sizeof(cirrus_sp_usecase),
-			   (void *)&cirrus_sp_usecase);
-	crus_afe_set_param(cirrus_ff_port, CIRRUS_SP,
-			   CRUS_PARAM_RX_SET_USECASE, sizeof(case_ctrl),
-			   (void *)&case_ctrl);
+exit:
+	mutex_unlock(&crus_sp_lock);
+	pr_debug("%s: flag: %x ret: %d", __func__,
+			crus_spk.flag, ret);
 
-	return 0;
+	return ret;
 }
 
 static int msm_routing_crus_sp_usecase_get(struct snd_kcontrol *kcontrol,
@@ -573,6 +718,9 @@ static int msm_routing_crus_load_config(struct snd_kcontrol *kcontrol,
 	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
 	struct msm_pcm_drv_data *pdata = snd_soc_platform_get_drvdata(platform);
 	int rc = 0;
+	int i = 0;
+
+	mutex_lock(&crus_sp_lock);
 
 	config = kzalloc(CONFIG_FILE_SIZE, GFP_KERNEL);
 	if (!config) {
@@ -587,32 +735,70 @@ static int msm_routing_crus_load_config(struct snd_kcontrol *kcontrol,
 		break;
 	case 1: /* Load RX Config */
 		cirrus_fb_load_conf_sel = crus_set;
-		snprintf(config, CONFIG_FILE_SIZE, CRUS_RX_CONFIG,
-				pdata->config_name);
-		if (request_firmware(&firmware, config, crus_sp_device) != 0) {
-			pr_err("%s: Request firmware failed\n", __func__);
-			rc = -EINVAL;
-			goto exit;
-		} else {
-			pr_info("%s: Sending RX config\n", __func__);
-			crus_afe_send_config(firmware->data, firmware->size,
-					     cirrus_ff_port, CIRRUS_SP);
-			release_firmware(firmware);
+
+		for (i = 0; i < crus_sp_usecase_dt_count; i++) {
+			if (crus_spk.bin_files[SPK_RX][i]) {
+				pr_debug("%s: stored RX firmware usecase: %d already",
+						__func__, i);
+				continue;
+			}
+
+			if (i == 0)
+				snprintf(config, CONFIG_FILE_SIZE,
+						CRUS_RX_CONFIG,
+						pdata->config_name);
+			else
+				snprintf(config, CONFIG_FILE_SIZE,
+						CRUS_RX_MULTI_CONFIG,
+						pdata->config_name, i);
+
+			if (request_firmware(&firmware, config,
+					crus_sp_device) != 0) {
+				pr_err("%s: Request firmware %s failed\n",
+						__func__, config);
+				continue;
+			} else {
+				pr_info("%s: Sending RX config\n", __func__);
+				crus_spk.bin_files[SPK_RX][i] = firmware;
+
+				if (msm_crus_send_config(i, SPK_RX,
+						crus_spk.bin_files[SPK_RX][i]))
+					continue;
+			}
 		}
 		break;
 	case 2: /* Load TX Config */
 		cirrus_fb_load_conf_sel = crus_set;
-		snprintf(config, CONFIG_FILE_SIZE, CRUS_TX_CONFIG,
-				pdata->config_name);
-		if (request_firmware(&firmware, config, crus_sp_device) != 0) {
-			pr_err("%s: Request firmware failed\n", __func__);
-			rc = -EINVAL;
-			goto exit;
-		} else {
-			pr_info("%s: Sending TX config\n", __func__);
-			crus_afe_send_config(firmware->data, firmware->size,
-					     cirrus_fb_port, CIRRUS_SP);
-			release_firmware(firmware);
+
+		for (i = 0; i < crus_sp_usecase_dt_count; i++) {
+			if (crus_spk.bin_files[SPK_TX][i]) {
+				pr_debug("%s: stored TX firmware usecase: %d already",
+						__func__, i);
+				continue;
+			}
+
+			if (i == 0)
+				snprintf(config, CONFIG_FILE_SIZE,
+						CRUS_TX_CONFIG,
+						pdata->config_name);
+			else
+				snprintf(config, CONFIG_FILE_SIZE,
+						CRUS_TX_MULTI_CONFIG,
+						pdata->config_name, i);
+
+			if (request_firmware(&firmware, config,
+					crus_sp_device) != 0) {
+				pr_err("%s: Request firmware %s failed\n",
+						__func__, config);
+				continue;
+			} else {
+				pr_info("%s: Sending TX config\n", __func__);
+				crus_spk.bin_files[SPK_TX][i] = firmware;
+
+				if (msm_crus_send_config(i, SPK_TX,
+						crus_spk.bin_files[SPK_TX][i]))
+					continue;
+			}
 		}
 		break;
 	default:
@@ -620,9 +806,17 @@ static int msm_routing_crus_load_config(struct snd_kcontrol *kcontrol,
 		goto exit;
 	}
 
+	if (msm_crus_check_count(count_config,
+			MAX_SPK_PORT * crus_sp_usecase_dt_count)) {
+		count_config = 0;
+		crus_spk.flag = crus_spk.flag | CIRRUS_BIN_FILE;
+	}
 exit:
 	cirrus_fb_load_conf_sel = 0;
 	kfree(config);
+	mutex_unlock(&crus_sp_lock);
+	pr_debug("%s: flag: %x rc: %d", __func__,
+			crus_spk.flag, rc);
 	return rc;
 }
 
@@ -903,15 +1097,6 @@ static void msm_crus_check_calibration_value(void)
 	}
 }
 
-static bool msm_crus_is_cirrus_afe_topology(void)
-{
-	if (afe_get_topology(cirrus_ff_port) == CIRRUS_RX_TOPOLOGY
-		&& afe_get_topology(cirrus_fb_port) == CIRRUS_TX_TOPOLOGY)
-		return true;
-	else
-		return false;
-}
-
 int msm_crus_store_imped(char channel)
 {
 	/* cs35l36 speaker amp constant value */
@@ -972,6 +1157,104 @@ resistance_left_right_show(struct device *dev,
 }
 
 static DEVICE_ATTR_RO(resistance_left_right);
+
+void msm_crus_check_set_setting(unsigned char cmd)
+{
+	int i = 0, retries = 10;
+
+	pr_debug("%s: cmd: %d", __func__, cmd);
+	mutex_lock(&crus_sp_lock);
+
+	if (cmd == CS35L36_UNMUTE) {
+		if (crus_spk.flag == CIRRUS_ALL_SETTING) {
+			pr_debug("%s: setting is ready", __func__);
+			goto exit;
+		}
+
+		do {
+			if (!(crus_spk.flag & CIRRUS_ENABLE)) {
+				if (crus_afe_set_param(cirrus_ff_port,
+					CIRRUS_SP,
+					CIRRUS_SP_ENABLE,
+					sizeof(struct crus_single_data_t),
+					(void *)&crus_enable))
+					continue;
+
+				if (crus_afe_set_param(cirrus_fb_port,
+					CIRRUS_SP,
+					CIRRUS_SP_ENABLE,
+					sizeof(struct crus_single_data_t),
+					(void *)&crus_enable))
+					continue;
+
+				crus_spk.flag = crus_spk.flag |
+						CIRRUS_ENABLE;
+
+				pr_debug("%s: send enable: %d successfully",
+						__func__, crus_enable.value);
+			}
+
+			if (!(crus_spk.flag & CIRRUS_USECASE)) {
+				if (msm_crus_send_usecase(cirrus_sp_usecase))
+					continue;
+
+				crus_spk.flag = crus_spk.flag |
+						CIRRUS_USECASE;
+
+				pr_debug("%s: send USECASE: %d successfully",
+						__func__, cirrus_sp_usecase);
+			}
+
+			if (!(crus_spk.flag & CIRRUS_BIN_FILE)) {
+				for (i = 0; i < crus_sp_usecase_dt_count; i++) {
+					if (!crus_spk.bin_files
+						[SPK_RX][i] ||
+						!crus_spk.bin_files
+						[SPK_TX][i]) {
+						pr_info("%s: profile: %d is not ready",
+								__func__, i);
+						continue;
+					}
+
+					if (msm_crus_send_config(i, SPK_TX,
+						crus_spk.bin_files[SPK_TX][i]))
+						continue;
+
+					if (msm_crus_send_config(i, SPK_RX,
+						crus_spk.bin_files[SPK_RX][i]))
+						continue;
+				}
+
+				if (msm_crus_check_count(count_config,
+						MAX_SPK_PORT *
+						crus_sp_usecase_dt_count)) {
+					count_config = 0;
+					crus_spk.flag = crus_spk.flag |
+							CIRRUS_BIN_FILE;
+
+					pr_debug("%s: send bin files successfully",
+							__func__);
+				}
+			}
+		} while (crus_spk.flag != CIRRUS_ALL_SETTING && retries-- > 0);
+	} else if (cmd == AFE_SSR) {
+		pr_debug("%s: clear flag", __func__);
+		crus_spk.flag = 0;
+	} else {
+		pr_err("%s: unknown command: %d", __func__, cmd);
+	}
+
+	if (retries <= 0 && crus_spk.flag != 0 && count_config != 0) {
+		pr_err("%s: stop to retry", __func__);
+		count_config = 0;
+		crus_spk.flag = CIRRUS_ALL_SETTING;
+	}
+exit:
+	mutex_unlock(&crus_sp_lock);
+	pr_debug("%s: crus_spk.flag: %x", __func__,
+			crus_spk.flag);
+}
+EXPORT_SYMBOL(msm_crus_check_set_setting);
 
 static long crus_sp_shared_ioctl(struct file *f, unsigned int cmd,
 				 void __user *arg)
@@ -1296,6 +1579,20 @@ static const struct attribute_group *crus_sp_groups[] = {
 	NULL,
 };
 
+static void msm_crus_init_spk(void)
+{
+	int i = 0, j = 0;
+
+	pr_debug("%s: init ssr parameters", __func__);
+
+	mutex_lock(&crus_sp_lock);
+	crus_spk.flag = 0;
+	for (i = 0; i < MAX_SPK_PORT; i++)
+		for (j = 0; j < MAX_TUNING_CONFIGS; j++)
+		crus_spk.bin_files[i][j] = NULL;
+	mutex_unlock(&crus_sp_lock);
+}
+
 static int msm_crus_parse_spk(struct platform_device *pdev)
 {
 	swap_calibration = of_property_read_bool(pdev->dev.of_node, "cirrus,swap_calibration");
@@ -1385,6 +1682,7 @@ static int msm_cirrus_playback_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	msm_crus_init_spk();
 	return 0;
 }
 
@@ -1437,9 +1735,14 @@ module_init(crus_sp_init);
 
 static void __exit crus_sp_exit(void)
 {
+	int i = 0, j = 0;
 	mutex_destroy(&crus_sp_get_param_lock);
 	mutex_destroy(&crus_sp_lock);
-
+	for (i = 0; i < MAX_SPK_PORT; i++)
+		for (j = 0; j < MAX_TUNING_CONFIGS; j++) {
+			release_firmware(crus_spk.bin_files[i][j]);
+			crus_spk.bin_files[i][j] = NULL;
+		}
 	platform_driver_unregister(&msm_cirrus_playback_driver);
 }
 module_exit(crus_sp_exit);

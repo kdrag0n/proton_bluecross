@@ -3788,6 +3788,9 @@ static void msm_afe_clear_config(void)
 {
 	afe_clear_config(AFE_CDC_REGISTERS_CONFIG);
 	afe_clear_config(AFE_SLIMBUS_SLAVE_CONFIG);
+#if defined(CONFIG_CIRRUS_SPKR_PROTECTION)
+	afe_clear_config(AFE_CIRRUS_PORT_CONFIG);
+#endif
 }
 
 static int msm_adsp_power_up_config(struct snd_soc_codec *codec,
