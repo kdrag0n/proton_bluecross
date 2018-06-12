@@ -6423,7 +6423,7 @@ wait:
 
 	if (!chip->batt_profile)
 		chip->batt_profile = devm_kzalloc(chip->dev,
-				sizeof(char) * len, GFP_KERNEL);
+				len, GFP_KERNEL);
 
 	if (!chip->batt_profile) {
 		pr_err("out of memory\n");

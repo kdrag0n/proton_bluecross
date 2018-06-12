@@ -7368,8 +7368,8 @@ static int smb_parse_wipower_map_dt(struct smbchg_chip *chip,
 
 	data = prop->value;
 	num = total_elements / RANGE_ENTRY;
-	map->entries = devm_kzalloc(chip->dev,
-			num * sizeof(struct ilim_entry), GFP_KERNEL);
+	map->entries = devm_kcalloc(chip->dev,
+			num, sizeof(struct ilim_entry), GFP_KERNEL);
 	if (!map->entries)
 		return -ENOMEM;
 

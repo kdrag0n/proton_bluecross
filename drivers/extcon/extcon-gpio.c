@@ -198,8 +198,9 @@ static int gpio_extcon_probe(struct platform_device *pdev)
 	if (ret < 0)
 		return ret;
 
-	data->supported_cable = devm_kzalloc(&pdev->dev,
-					     sizeof(*data->supported_cable) * 2,
+	data->supported_cable = devm_kcalloc(&pdev->dev,
+					     2,
+					     sizeof(*data->supported_cable),
 					     GFP_KERNEL);
 	if (!data->supported_cable)
 		return -ENOMEM;

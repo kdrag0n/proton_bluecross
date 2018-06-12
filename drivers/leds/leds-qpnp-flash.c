@@ -1092,10 +1092,10 @@ static int flash_regulator_parse_dt(struct qpnp_flash_led *led,
 	const char *temp_string;
 	u32 val;
 
-	flash_node->reg_data = devm_kzalloc(&led->pdev->dev,
-					sizeof(struct flash_regulator_data *) *
-						flash_node->num_regulators,
-						GFP_KERNEL);
+	flash_node->reg_data = devm_kcalloc(&led->pdev->dev,
+					flash_node->num_regulators,
+					sizeof(struct flash_regulator_data *),
+					GFP_KERNEL);
 	if (!flash_node->reg_data) {
 		dev_err(&led->pdev->dev,
 				"Unable to allocate memory\n");
