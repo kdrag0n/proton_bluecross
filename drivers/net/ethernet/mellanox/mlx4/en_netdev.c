@@ -2100,12 +2100,12 @@ static int mlx4_en_copy_priv(struct mlx4_en_priv *dst,
 	dst->stride = roundup_pow_of_two(sizeof(struct mlx4_en_rx_desc) +
 					 DS_SIZE * MLX4_EN_MAX_RX_FRAGS);
 
-	dst->tx_ring = kzalloc(sizeof(struct mlx4_en_tx_ring *) * MAX_TX_RINGS,
+	dst->tx_ring = kcalloc(MAX_TX_RINGS, sizeof(struct mlx4_en_tx_ring *),
 				GFP_KERNEL);
 	if (!dst->tx_ring)
 		return -ENOMEM;
 
-	dst->tx_cq = kzalloc(sizeof(struct mlx4_en_cq *) * MAX_TX_RINGS,
+	dst->tx_cq = kcalloc(MAX_TX_RINGS, sizeof(struct mlx4_en_cq *),
 			      GFP_KERNEL);
 	if (!dst->tx_cq) {
 		kfree(dst->tx_ring);
@@ -3106,13 +3106,14 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 	priv->tx_work_limit = MLX4_EN_DEFAULT_TX_WORK;
 	netdev_rss_key_fill(priv->rss_key, sizeof(priv->rss_key));
 
-	priv->tx_ring = kzalloc(sizeof(struct mlx4_en_tx_ring *) * MAX_TX_RINGS,
+	priv->tx_ring = kcalloc(MAX_TX_RINGS,
+				sizeof(struct mlx4_en_tx_ring *),
 				GFP_KERNEL);
 	if (!priv->tx_ring) {
 		err = -ENOMEM;
 		goto out;
 	}
-	priv->tx_cq = kzalloc(sizeof(struct mlx4_en_cq *) * MAX_TX_RINGS,
+	priv->tx_cq = kcalloc(MAX_TX_RINGS, sizeof(struct mlx4_en_cq *),
 			      GFP_KERNEL);
 	if (!priv->tx_cq) {
 		err = -ENOMEM;

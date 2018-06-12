@@ -708,7 +708,7 @@ int nvm_dev_factory(struct nvm_dev *dev, int flags)
 	struct sysblk_scan s;
 	unsigned long *blk_bitmap;
 
-	blk_bitmap = kzalloc(factory_nblks(dev->blks_per_lun) * dev->nr_luns,
+	blk_bitmap = kcalloc(factory_nblks(dev->blks_per_lun), dev->nr_luns,
 								GFP_KERNEL);
 	if (!blk_bitmap)
 		return ret;

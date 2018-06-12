@@ -505,8 +505,8 @@ static void sde_mdp_parse_vbif_memtype(struct platform_device *pdev,
 
 	mdata->vbif_memtype_count = sde_mdp_parse_dt_prop_len(pdev,
 			"qcom,mdss-rot-vbif-memtype");
-	mdata->vbif_memtype = kzalloc(sizeof(u32) *
-			mdata->vbif_memtype_count, GFP_KERNEL);
+	mdata->vbif_memtype = kcalloc(mdata->vbif_memtype_count, sizeof(u32),
+				      GFP_KERNEL);
 	if (!mdata->vbif_memtype) {
 		mdata->vbif_memtype_count = 0;
 		return;
@@ -533,8 +533,8 @@ static void sde_mdp_parse_vbif_qos(struct platform_device *pdev,
 
 	mdata->npriority_lvl = sde_mdp_parse_dt_prop_len(pdev,
 			"qcom,mdss-rot-vbif-qos-setting");
-	mdata->vbif_nrt_qos = kzalloc(sizeof(u32) *
-			mdata->npriority_lvl, GFP_KERNEL);
+	mdata->vbif_nrt_qos = kcalloc(mdata->npriority_lvl, sizeof(u32),
+				      GFP_KERNEL);
 	if (!mdata->vbif_nrt_qos) {
 		mdata->npriority_lvl = 0;
 		return;

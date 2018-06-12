@@ -2994,8 +2994,9 @@ static int msm_comm_init_core(struct msm_vidc_inst *inst)
 		goto core_already_inited;
 	}
 	if (!core->capabilities) {
-		core->capabilities = kzalloc(VIDC_MAX_SESSIONS *
-				sizeof(struct msm_vidc_capability), GFP_KERNEL);
+		core->capabilities = kcalloc(VIDC_MAX_SESSIONS,
+					     sizeof(struct msm_vidc_capability),
+					     GFP_KERNEL);
 		if (!core->capabilities) {
 			dprintk(VIDC_ERR,
 				"%s: failed to allocate capabilities\n",

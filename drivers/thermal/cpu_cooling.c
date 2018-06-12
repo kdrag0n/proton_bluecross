@@ -1097,8 +1097,9 @@ __cpufreq_cooling_register(struct device_node *np,
 
 	/* Last level will indicate the core will be isolated. */
 	cpufreq_dev->max_level++;
-	cpufreq_dev->freq_table = kzalloc(sizeof(*cpufreq_dev->freq_table) *
-					  cpufreq_dev->max_level, GFP_KERNEL);
+	cpufreq_dev->freq_table = kcalloc(cpufreq_dev->max_level,
+					  sizeof(*cpufreq_dev->freq_table),
+					  GFP_KERNEL);
 	if (!cpufreq_dev->freq_table) {
 		cool_dev = ERR_PTR(-ENOMEM);
 		goto free_time_in_idle_timestamp;

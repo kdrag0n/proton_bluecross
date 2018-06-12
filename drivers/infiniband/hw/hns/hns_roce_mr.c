@@ -128,9 +128,9 @@ static int hns_roce_buddy_init(struct hns_roce_buddy *buddy, int max_order)
 	buddy->max_order = max_order;
 	spin_lock_init(&buddy->lock);
 
-	buddy->bits = kzalloc((buddy->max_order + 1) * sizeof(long *),
+	buddy->bits = kcalloc(buddy->max_order + 1, sizeof(long *),
 			       GFP_KERNEL);
-	buddy->num_free = kzalloc((buddy->max_order + 1) * sizeof(int *),
+	buddy->num_free = kcalloc(buddy->max_order + 1, sizeof(int *),
 				   GFP_KERNEL);
 	if (!buddy->bits || !buddy->num_free)
 		goto err_out;

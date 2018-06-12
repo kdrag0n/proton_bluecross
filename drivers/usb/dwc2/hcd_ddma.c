@@ -106,7 +106,7 @@ static int dwc2_desc_list_alloc(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh,
 					   qh->desc_list_sz,
 					   DMA_TO_DEVICE);
 
-	qh->n_bytes = kzalloc(sizeof(u32) * dwc2_max_desc_num(qh), flags);
+	qh->n_bytes = kcalloc(dwc2_max_desc_num(qh), sizeof(u32), flags);
 	if (!qh->n_bytes) {
 		dma_unmap_single(hsotg->dev, qh->desc_list_dma,
 				 qh->desc_list_sz,

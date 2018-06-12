@@ -237,8 +237,8 @@ int cam_req_mgr_workq_create(char *name, int32_t num_tasks,
 		crm_workq->in_irq = in_irq;
 		crm_workq->task.num_task = num_tasks;
 		crm_workq->task.pool = (struct crm_workq_task *)
-			kzalloc(sizeof(struct crm_workq_task) *
-				crm_workq->task.num_task,
+			kcalloc(crm_workq->task.num_task,
+				sizeof(struct crm_workq_task),
 				GFP_KERNEL);
 		if (!crm_workq->task.pool) {
 			CAM_WARN(CAM_CRM, "Insufficient memory %lu",

@@ -68,7 +68,7 @@ struct cpumask *irq_create_affinity_masks(const struct cpumask *affinity,
 	if (!zalloc_cpumask_var(&nmsk, GFP_KERNEL))
 		return NULL;
 
-	masks = kzalloc(nvec * sizeof(*masks), GFP_KERNEL);
+	masks = kcalloc(nvec, sizeof(*masks), GFP_KERNEL);
 	if (!masks)
 		goto out;
 

@@ -4506,11 +4506,12 @@ static int sde_crtc_atomic_check(struct drm_crtc *crtc,
 		goto end;
 	}
 
-	pstates = kzalloc(SDE_PSTATES_MAX *
-			sizeof(struct plane_state), GFP_KERNEL);
+	pstates = kcalloc(SDE_PSTATES_MAX, sizeof(struct plane_state),
+			  GFP_KERNEL);
 
-	multirect_plane = kzalloc(SDE_MULTIRECT_PLANE_MAX *
-		sizeof(struct sde_multirect_plane_states), GFP_KERNEL);
+	multirect_plane = kcalloc(SDE_MULTIRECT_PLANE_MAX,
+				  sizeof(struct sde_multirect_plane_states),
+				  GFP_KERNEL);
 
 	if (!pstates || !multirect_plane) {
 		rc = -ENOMEM;
