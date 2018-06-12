@@ -681,9 +681,8 @@ struct ib_qp *rvt_create_qp(struct ib_pd *ibpd,
 				sqsize * sz,
 				gfp | __GFP_ZERO, PAGE_KERNEL);
 		else
-			swq = vzalloc_node(
-				sqsize * sz,
-				rdi->dparms.node);
+			swq = vzalloc_node(array_size(sz, sqsize),
+					   rdi->dparms.node);
 		if (!swq)
 			return ERR_PTR(-ENOMEM);
 
