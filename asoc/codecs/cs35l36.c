@@ -184,17 +184,11 @@ static int cs35l36_main_amp_event(struct snd_soc_dapm_widget *w,
 		regmap_update_bits(cs35l36->regmap, CS35L36_ASP_RX1_SEL,
 					CS35L36_PCM_RX_SEL_MASK,
 					CS35L36_PCM_RX_SEL_PCM);
-		regmap_update_bits(cs35l36->regmap, CS35L36_AMP_OUT_MUTE,
-					CS35L36_AMP_MUTE_MASK,
-					0 << CS35L36_AMP_MUTE_SHIFT);
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		regmap_update_bits(cs35l36->regmap, CS35L36_ASP_RX1_SEL,
 					CS35L36_PCM_RX_SEL_MASK,
 					CS35L36_PCM_RX_SEL_ZERO);
-		regmap_update_bits(cs35l36->regmap, CS35L36_AMP_OUT_MUTE,
-					CS35L36_AMP_MUTE_MASK,
-					1 << CS35L36_AMP_MUTE_SHIFT);
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		regmap_update_bits(cs35l36->regmap, CS35L36_PWR_CTRL1,
@@ -260,7 +254,8 @@ static const struct snd_kcontrol_new cs35l36_boost_mux[] = {
 };
 
 static const struct snd_kcontrol_new amp_enable_ctrl =
-		SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0);
+	SOC_DAPM_SINGLE_AUTODISABLE("Switch", CS35L36_AMP_OUT_MUTE,
+					CS35L36_AMP_MUTE_SHIFT, 1, 1);
 
 static const char * const asp_tx_src_text[] = {
 	"Zero Fill", "ASPRX1", "VMON", "IMON",
