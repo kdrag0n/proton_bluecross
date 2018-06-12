@@ -951,8 +951,7 @@ static void netvsc_sc_open(struct vmbus_channel *new_sc)
 	set_per_channel_state(new_sc, nvscdev->sub_cb_buf + (chn_index - 1) *
 			      NETVSC_PACKET_SIZE);
 
-	nvscdev->mrc[chn_index].buf = vzalloc(NETVSC_RECVSLOT_MAX *
-					      sizeof(struct recv_comp_data));
+	nvscdev->mrc[chn_index].buf = vzalloc(array_size(NETVSC_RECVSLOT_MAX, sizeof(struct recv_comp_data)));
 
 	ret = vmbus_open(new_sc, nvscdev->ring_size * PAGE_SIZE,
 			 nvscdev->ring_size * PAGE_SIZE, NULL, 0,
@@ -1099,8 +1098,7 @@ int rndis_filter_device_add(struct hv_device *dev,
 	if (net_device->num_chn == 1)
 		goto out;
 
-	net_device->sub_cb_buf = vzalloc((net_device->num_chn - 1) *
-					 NETVSC_PACKET_SIZE);
+	net_device->sub_cb_buf = vzalloc(array_size((net_device->num_chn - 1), NETVSC_PACKET_SIZE));
 	if (!net_device->sub_cb_buf) {
 		net_device->num_chn = 1;
 		dev_info(&dev->device, "No memory for subchannels.\n");

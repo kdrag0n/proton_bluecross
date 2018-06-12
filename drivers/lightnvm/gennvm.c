@@ -356,8 +356,7 @@ static int gen_blocks_init(struct nvm_dev *dev, struct gen_dev *gn)
 		return -ENOMEM;
 
 	gen_for_each_lun(gn, lun, lun_iter) {
-		lun->vlun.blocks = vzalloc(sizeof(struct nvm_block) *
-							dev->blks_per_lun);
+		lun->vlun.blocks = vzalloc(array_size(sizeof(struct nvm_block), dev->blks_per_lun));
 		if (!lun->vlun.blocks) {
 			kfree(blks);
 			return -ENOMEM;
