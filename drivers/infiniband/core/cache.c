@@ -1160,10 +1160,9 @@ int ib_cache_setup_one(struct ib_device *device)
 	device->cache.pkey_cache =
 		kzalloc(sizeof *device->cache.pkey_cache *
 			(rdma_end_port(device) - rdma_start_port(device) + 1), GFP_KERNEL);
-	device->cache.lmc_cache = kmalloc(sizeof *device->cache.lmc_cache *
-					  (rdma_end_port(device) -
-					   rdma_start_port(device) + 1),
-					  GFP_KERNEL);
+	device->cache.lmc_cache = kmalloc_array(rdma_end_port(device) - rdma_start_port(device) + 1,
+						sizeof(*device->cache.lmc_cache),
+						GFP_KERNEL);
 	if (!device->cache.pkey_cache ||
 	    !device->cache.lmc_cache) {
 		err = -ENOMEM;

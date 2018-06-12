@@ -784,8 +784,9 @@ int acpi_video_get_levels(struct acpi_device *device,
 		goto out;
 	}
 
-	br->levels = kmalloc((obj->package.count + 2) * sizeof *(br->levels),
-				GFP_KERNEL);
+	br->levels = kmalloc_array(obj->package.count + 2,
+				   sizeof(*(br->levels)),
+				   GFP_KERNEL);
 	if (!br->levels) {
 		result = -ENOMEM;
 		goto out_free;

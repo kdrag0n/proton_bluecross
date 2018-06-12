@@ -260,7 +260,7 @@ static int adf_device_post_config(struct adf_device *dev,
 	}
 
 	if (n_intfs) {
-		intfs = kmalloc(sizeof(intfs[0]) * n_intfs, GFP_KERNEL);
+		intfs = kmalloc_array(n_intfs, sizeof(intfs[0]), GFP_KERNEL);
 		if (!intfs) {
 			ret = -ENOMEM;
 			goto err_get_user;
@@ -579,7 +579,8 @@ static int adf_intf_get_data(struct adf_interface *intf,
 		data.height_mm = 0;
 	}
 
-	modelist = kmalloc(sizeof(modelist[0]) * ADF_MAX_MODES, GFP_KERNEL);
+	modelist = kmalloc_array(ADF_MAX_MODES, sizeof(modelist[0]),
+				 GFP_KERNEL);
 	if (!modelist)
 		return -ENOMEM;
 

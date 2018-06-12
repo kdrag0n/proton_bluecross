@@ -226,7 +226,7 @@ static void amd_cache_gart(void)
 	if (!amd_nb_has_feature(AMD_NB_GART))
 		return;
 
-	flush_words = kmalloc(amd_nb_num() * sizeof(u32), GFP_KERNEL);
+	flush_words = kmalloc_array(amd_nb_num(), sizeof(u32), GFP_KERNEL);
 	if (!flush_words) {
 		amd_northbridges.flags &= ~AMD_NB_GART;
 		pr_notice("Cannot initialize GART flush words, GART support disabled\n");
