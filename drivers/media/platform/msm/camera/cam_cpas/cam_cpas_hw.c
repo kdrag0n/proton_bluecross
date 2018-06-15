@@ -723,7 +723,7 @@ static int cam_cpas_hw_update_axi_vote(struct cam_hw_info *cpas_hw,
 		goto unlock_client;
 	}
 
-	CAM_DBG(CAM_CPAS,
+	CAM_DBG(CAM_PERF,
 		"Client[%d] Requested compressed[%llu], uncompressed[%llu]",
 		client_indx, axi_vote.compressed_bw,
 		axi_vote.uncompressed_bw);
@@ -879,7 +879,7 @@ static int cam_cpas_hw_update_ahb_vote(struct cam_hw_info *cpas_hw,
 		goto unlock_client;
 	}
 
-	CAM_DBG(CAM_CPAS,
+	CAM_DBG(CAM_PERF,
 		"client[%d] : type[%d], level[%d], freq[%ld], applied[%d]",
 		client_indx, ahb_vote.type, ahb_vote.vote.level,
 		ahb_vote.vote.freq,
