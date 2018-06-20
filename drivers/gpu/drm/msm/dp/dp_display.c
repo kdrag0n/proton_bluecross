@@ -1486,6 +1486,7 @@ static struct platform_driver dp_display_driver = {
 	.driver = {
 		.name = "msm-dp-display",
 		.of_match_table = dp_dt_match,
+		.suppress_bind_attrs = true,
 	},
 };
 
