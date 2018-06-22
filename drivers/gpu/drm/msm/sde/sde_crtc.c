@@ -5175,14 +5175,16 @@ static int sde_crtc_atomic_set_property(struct drm_crtc *crtc,
 		_sde_crtc_set_input_fence_timeout(cstate);
 		break;
 	case CRTC_PROP_DIM_LAYER_V1:
-		_sde_crtc_set_dim_layer_v1(cstate, (void __user *)val);
+		_sde_crtc_set_dim_layer_v1(cstate,
+					(void __user *)(uintptr_t)val);
 		break;
 	case CRTC_PROP_ROI_V1:
-		ret = _sde_crtc_set_roi_v1(state, (void __user *)val);
+		ret = _sde_crtc_set_roi_v1(state,
+					(void __user *)(uintptr_t)val);
 		break;
 	case CRTC_PROP_DEST_SCALER:
 		ret = _sde_crtc_set_dest_scaler(sde_crtc, cstate,
-				(void __user *)val);
+				(void __user *)(uintptr_t)val);
 		break;
 	case CRTC_PROP_DEST_SCALER_LUT_ED:
 	case CRTC_PROP_DEST_SCALER_LUT_CIR:
@@ -5214,7 +5216,7 @@ static int sde_crtc_atomic_set_property(struct drm_crtc *crtc,
 			goto exit;
 		}
 
-		ret = copy_to_user((uint64_t __user *)val, &fence_fd,
+		ret = copy_to_user((uint64_t __user *)(uintptr_t)val, &fence_fd,
 				sizeof(uint64_t));
 		if (ret) {
 			SDE_ERROR("copy to user failed rc:%d\n", ret);
@@ -5461,8 +5463,8 @@ static int _sde_debugfs_status_show(struct seq_file *s, void *data)
 
 	if (sde_crtc->vblank_cb_count) {
 		ktime_t diff = ktime_sub(ktime_get(), sde_crtc->vblank_cb_time);
-		s64 diff_ms = ktime_to_ms(diff);
-		s64 fps = diff_ms ? DIV_ROUND_CLOSEST(
+		u32 diff_ms = ktime_to_ms(diff);
+		u64 fps = diff_ms ? DIV_ROUND_CLOSEST(
 				sde_crtc->vblank_cb_count * 1000, diff_ms) : 0;
 
 		seq_printf(s,
