@@ -182,6 +182,13 @@ static int crus_afe_get_param(int port, int module, int param, int length,
 	crus_sp_get_buffer = kzalloc(config->param.payload_size + 16,
 				     GFP_KERNEL);
 
+	if (!crus_sp_get_buffer) {
+		pr_err("%s: kzalloc failed for crus_sp_get_buffer!\n",
+		       __func__);
+		ret = -ENOMEM;
+		goto crus_sp_get_buffer_err;
+	}
+
 	ret = afe_apr_send_pkt_crus(config, index, 0);
 	if (ret)
 		pr_err("%s: crus get_param for port %d failed with code %d\n",
@@ -196,17 +203,20 @@ static int crus_afe_get_param(int port, int module, int param, int length,
 		if (count++ >= 1000) {
 			pr_err("%s: AFE callback timeout\n", __func__);
 			atomic_set(&crus_sp_get_param_flag, 1);
-			return -EINVAL;
+			ret = -EINVAL;
+			goto crus_sp_get_param_err;
 		}
 	}
 
 	/* Copy from dynamic buffer to return buffer */
 	memcpy((u8 *)data, &crus_sp_get_buffer[4], length);
 
+crus_sp_get_param_err:
 	kfree(crus_sp_get_buffer);
+	crus_sp_get_buffer = NULL;
 
+crus_sp_get_buffer_err:
 	mutex_unlock(&crus_sp_get_param_lock);
-
 	kfree(config);
 	return ret;
 }
