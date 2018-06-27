@@ -86,6 +86,7 @@ static int msm_route_ext_ec_ref;
 static bool is_custom_stereo_on;
 static bool is_ds2_on;
 static bool swap_ch;
+static int  flick_sensor_port = SLIMBUS_1_TX;
 
 #define WEIGHT_0_DB 0x4000
 /* all the FEs which can support channel mixer */
@@ -936,6 +937,7 @@ static struct cal_block_data *msm_routing_find_topology(int path,
 
 		cal_info = (struct audio_cal_info_adm_top *)
 			cal_block->cal_info;
+
 		if ((cal_info->path == path)  &&
 			(cal_info->app_type == app_type) &&
 			(cal_info->acdb_id == acdb_id)) {
@@ -985,6 +987,9 @@ static int msm_routing_get_adm_topology(int fedai_id, int session_type,
 	       __func__, fedai_id, session_type, be_id);
 
 	if (cal_data == NULL)
+		goto done;
+
+	if (msm_pcm_routing_is_flick_port(msm_bedais[be_id].port_id))
 		goto done;
 
 	app_type = fe_dai_app_type_cfg[fedai_id][session_type][be_id].app_type;
@@ -1845,6 +1850,74 @@ static int msm_routing_put_audio_mixer(struct snd_kcontrol *kcontrol,
 
 	return 1;
 }
+
+int msm_pcm_routing_is_flick_port(int port_id)
+{
+	int ret = 0;
+
+	if (port_id == flick_sensor_port)
+		ret = 1;
+
+	return ret;
+}
+EXPORT_SYMBOL(msm_pcm_routing_is_flick_port);
+
+static int msm_routing_flick_port_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	int enumidx;
+	mutex_lock(&routing_lock);
+
+	switch (flick_sensor_port) {
+	case SLIMBUS_1_TX:
+		enumidx = 1;
+		break;
+	default:
+		enumidx = 0;
+		break;
+	}
+
+	ucontrol->value.integer.value[0] = enumidx;
+	mutex_unlock(&routing_lock);
+	pr_debug("%s: Flick Port %ld\n", __func__,
+		ucontrol->value.integer.value[0]);
+	return 0;
+};
+
+static int msm_routing_flick_port_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	int enumidx = ucontrol->value.integer.value[0];
+
+	pr_debug("%s: Flick Port %ld\n", __func__,
+		ucontrol->value.integer.value[0]);
+	mutex_lock(&routing_lock);
+
+	switch (enumidx) {
+	case 1:
+		flick_sensor_port = SLIMBUS_1_TX;
+		break;
+	default:
+		flick_sensor_port = 0;
+		break;
+	}
+	mutex_unlock(&routing_lock);
+	return 0;
+};
+
+static const char * const flick_port_text[] = {
+	"None",
+	SLIMBUS_1_TX_TEXT,
+};
+
+static const struct soc_enum flick_port_enum =
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(flick_port_text), flick_port_text);
+
+static const struct snd_kcontrol_new flick_port_control[] = {
+	SOC_ENUM_EXT("Flick Sensor port", flick_port_enum,
+		msm_routing_flick_port_get,
+		msm_routing_flick_port_put)
+};
 
 static int msm_routing_get_listen_mixer(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
@@ -17050,6 +17123,9 @@ static int msm_routing_probe(struct snd_soc_platform *platform)
 					ARRAY_SIZE(aptx_dec_license_controls));
 	snd_soc_add_platform_controls(platform, stereo_channel_reverse_control,
 				ARRAY_SIZE(stereo_channel_reverse_control));
+
+	snd_soc_add_platform_controls(platform, flick_port_control,
+				ARRAY_SIZE(flick_port_control));
 	return 0;
 }
 
