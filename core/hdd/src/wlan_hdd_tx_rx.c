@@ -1095,6 +1095,7 @@ static netdev_tx_t __hdd_hard_start_xmit(struct sk_buff *skb,
 drop_pkt_and_release_skb:
 	qdf_net_buf_debug_release_skb(skb);
 drop_pkt:
+
 	if (skb) {
 		/* track connectivity stats */
 		if (pAdapter->pkt_type_bitmap)
@@ -1103,16 +1104,21 @@ drop_pkt:
 
 		qdf_dp_trace_data_pkt(skb, QDF_DP_TRACE_DROP_PACKET_RECORD, 0,
 				      QDF_TX);
+		kfree_skb(skb);
+		skb = NULL;
 	}
 
 drop_pkt_accounting:
-	++pAdapter->hdd_stats.hddTxRxStats.txXmitRejected;
+
+	++pAdapter->stats.tx_dropped;
+	++pAdapter->hdd_stats.hddTxRxStats.txXmitDropped;
 	if (is_arp) {
 		++pAdapter->hdd_stats.hdd_arp_stats.tx_dropped;
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
 				  "%s : ARP packet dropped", __func__);
 	}
-	return NETDEV_TX_BUSY;
+
+	return NETDEV_TX_OK;
 }
 
 /**
