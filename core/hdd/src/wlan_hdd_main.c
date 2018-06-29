@@ -6876,47 +6876,18 @@ static int hdd_wiphy_init(hdd_context_t *hdd_ctx)
 	return ret_val;
 }
 
-#ifdef MSM_PLATFORM
-
 /**
- * hdd_txrx_display_hdd_stats() - Display HDD stats
- * @hdd_ctx: handle to hdd context
- * @level: Verbosity
+ * hdd_pld_request_bus_bandwidth() - Function to control bus bandwidth
+ * @hdd_ctx - handle to hdd context
+ * @tx_packets - transmit packet count
+ * @rx_packets - receive packet count
  *
- * The periodicity is determined by hdd_ctx->config->periodic_stats_disp_time.
- * Stats show up in wlan driver logs.
+ * The function controls the bus bandwidth and dynamic control of
+ * tcp delayed ack configuration
  *
  * Returns: None
  */
-static void hdd_txrx_display_hdd_stats(hdd_context_t *hdd_ctx,
-				       enum qdf_stats_verb_lvl level)
-{
-	hdd_adapter_t *adapter;
-	hdd_adapter_list_node_t *adapter_node = NULL, *next_adapter = NULL;
-	QDF_STATUS status;
-
-
-	status = hdd_get_front_adapter(hdd_ctx, &adapter_node);
-	while (NULL != adapter_node && QDF_STATUS_SUCCESS == status) {
-		adapter = adapter_node->pAdapter;
-
-		if (hdd_is_interface_up(adapter)) {
-			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO_LOW,
-				"HDD adapter %d STATS |TX: %lu(%lub) (TxCald %u TxOrphan %u Rejected:%u",
-				adapter->device_mode,
-				adapter->stats.tx_packets,
-				adapter->stats.tx_bytes,
-				adapter->hdd_stats.hddTxRxStats.txXmitCalled,
-				adapter->hdd_stats.hddTxRxStats.txXmitOrphaned,
-				adapter->hdd_stats.hddTxRxStats.txXmitRejected);
-		}
-
-		status = hdd_get_next_adapter(hdd_ctx, adapter_node,
-					      &next_adapter);
-		adapter_node = next_adapter;
-	}
-}
-
+#ifdef MSM_PLATFORM
 /**
  * hdd_display_periodic_stats() - Function to display periodic stats
  * @hdd_ctx - handle to hdd context
@@ -6949,8 +6920,6 @@ static inline void hdd_display_periodic_stats(hdd_context_t *hdd_ctx, bool data_
 	if (counter * hdd_ctx->config->busBandwidthComputeInterval >=
 		hdd_ctx->config->periodic_stats_disp_time * 1000) {
 		if (data_in_time_period) {
-			hdd_txrx_display_hdd_stats(hdd_ctx,
-						   QDF_STATS_VERB_LVL_LOW);
 			ol_txrx_display_stats(WLAN_TXRX_STATS,
 				QDF_STATS_VERB_LVL_LOW);
 			wlan_hdd_display_netif_queue_history(hdd_ctx,
@@ -6961,19 +6930,6 @@ static inline void hdd_display_periodic_stats(hdd_context_t *hdd_ctx, bool data_
 		data_in_time_period = false;
 	}
 }
-
-
-/**
- * hdd_pld_request_bus_bandwidth() - Function to control bus bandwidth
- * @hdd_ctx - handle to hdd context
- * @tx_packets - transmit packet count
- * @rx_packets - receive packet count
- *
- * The function controls the bus bandwidth and dynamic control of
- * tcp delayed ack configuration
- *
- * Returns: None
- */
 static void hdd_pld_request_bus_bandwidth(hdd_context_t *hdd_ctx,
 					  const uint64_t tx_packets,
 					  const uint64_t rx_packets)
