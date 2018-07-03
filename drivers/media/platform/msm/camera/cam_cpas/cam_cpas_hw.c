@@ -1188,17 +1188,26 @@ static int cam_cpas_hw_register_client(struct cam_hw_info *cpas_hw,
 
 	rc = cam_common_util_get_string_index(soc_private->client_name,
 		soc_private->num_clients, client_name, &client_indx);
+
+	mutex_lock(&cpas_core->client_mutex[client_indx]);
+
 	if (rc || !CAM_CPAS_CLIENT_VALID(client_indx) ||
 		CAM_CPAS_CLIENT_REGISTERED(cpas_core, client_indx)) {
-		CAM_ERR(CAM_CPAS, "Invalid Client register : %s %d, %d",
+		CAM_ERR(CAM_CPAS,
+			"Inval client %s %d : %d %d %pK %d",
 			register_params->identifier,
-			register_params->cell_index, client_indx);
+			register_params->cell_index,
+			CAM_CPAS_CLIENT_VALID(client_indx),
+			CAM_CPAS_CLIENT_REGISTERED(cpas_core, client_indx),
+			cpas_core->cpas_client[client_indx], rc);
+		mutex_unlock(&cpas_core->client_mutex[client_indx]);
 		mutex_unlock(&cpas_hw->hw_mutex);
 		return -EPERM;
 	}
 
 	cpas_client = kzalloc(sizeof(struct cam_cpas_client), GFP_KERNEL);
 	if (!cpas_client) {
+		mutex_unlock(&cpas_core->client_mutex[client_indx]);
 		mutex_unlock(&cpas_hw->hw_mutex);
 		return -ENOMEM;
 	}
@@ -1210,6 +1219,7 @@ static int cam_cpas_hw_register_client(struct cam_hw_info *cpas_hw,
 			"axi_port_insert failed client_indx=%d, rc=%d",
 			client_indx, rc);
 		kfree(cpas_client);
+		mutex_unlock(&cpas_core->client_mutex[client_indx]);
 		mutex_unlock(&cpas_hw->hw_mutex);
 		return -EINVAL;
 	}
@@ -1221,10 +1231,11 @@ static int cam_cpas_hw_register_client(struct cam_hw_info *cpas_hw,
 	cpas_core->cpas_client[client_indx] = cpas_client;
 	cpas_core->registered_clients++;
 
-	mutex_unlock(&cpas_hw->hw_mutex);
-
 	CAM_DBG(CAM_CPAS, "client_indx=%d, registered_clients=%d",
 		client_indx, cpas_core->registered_clients);
+
+	mutex_unlock(&cpas_core->client_mutex[client_indx]);
+	mutex_unlock(&cpas_hw->hw_mutex);
 
 	return 0;
 }
