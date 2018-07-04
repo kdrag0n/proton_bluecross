@@ -4369,7 +4369,7 @@ int dsi_panel_disable(struct dsi_panel *panel)
 			panel->name);
 
 	/* Avoid sending panel off commands when ESD recovery is underway */
-	if (!panel->esd_recovery_pending) {
+	if (!atomic_read(&panel->esd_recovery_pending)) {
 		rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_OFF);
 		if (rc) {
 			pr_err("[%s] failed to send DSI_CMD_SET_OFF cmds, rc=%d\n",
