@@ -56,7 +56,7 @@
 #define WCD_SPI_AC_REMOTE_ACCESS (0x01)
 #define WCD_SPI_AC_NO_ACCESS (0x02)
 #define WCD_SPI_CTL_INS_ID 0
-#define WCD_SPI_AC_QMI_TIMEOUT_MS 100
+#define WCD_SPI_AC_QMI_TIMEOUT_MS 500
 
 struct wcd_spi_ac_priv {
 
