@@ -3888,8 +3888,7 @@ static int cam_icp_mgr_release_hw(void *hw_mgr_priv, void *release_hw_args)
 	ctx_data->abort_cmd = NULL;
 	kfree(ctx_data->destroy_cmd);
 	ctx_data->destroy_cmd = NULL;
-	CAM_DBG(CAM_ICP, "Release done for ctx_id %d dev %d", ctx_id,
-		ctx_data->icp_dev_acquire_info->dev_type);
+	CAM_DBG(CAM_ICP, "Release done for ctx_id %d", ctx_id);
 	return rc;
 }
 
