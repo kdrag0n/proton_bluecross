@@ -2868,7 +2868,7 @@ void hdd_wlan_get_stats(hdd_adapter_t *pAdapter, uint16_t *length,
 
 	len = scnprintf(buffer, buf_len,
 		"\nTransmit[%lu] - "
-		"called %u, dropped %u orphan %u,"
+		"called %u, dropped %u orphan %u, unshare_failed %u"
 		"\n[dropped]    BK %u, BE %u, VI %u, VO %u"
 		"\n[classified] BK %u, BE %u, VI %u, VO %u"
 		"\n\nReceive[%lu] - "
@@ -2878,6 +2878,7 @@ void hdd_wlan_get_stats(hdd_adapter_t *pAdapter, uint16_t *length,
 		pStats->txXmitCalled,
 		pStats->txXmitDropped,
 		pStats->txXmitOrphaned,
+		pStats->tx_unshare_failed,
 
 		pStats->txXmitDroppedAC[SME_AC_BK],
 		pStats->txXmitDroppedAC[SME_AC_BE],

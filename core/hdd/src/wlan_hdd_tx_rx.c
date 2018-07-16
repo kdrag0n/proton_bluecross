@@ -934,8 +934,10 @@ static netdev_tx_t __hdd_hard_start_xmit(struct sk_buff *skb,
 
 	if (!qdf_nbuf_ipa_owned_get(skb)) {
 		skb = hdd_skb_orphan(pAdapter, skb);
-		if (!skb)
+		if (!skb) {
+			++pAdapter->hdd_stats.hddTxRxStats.tx_unshare_failed;
 			goto drop_pkt_accounting;
+		}
 	}
 
 	/*
