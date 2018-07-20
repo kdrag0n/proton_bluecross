@@ -544,8 +544,10 @@ static netdev_tx_t __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 #endif
 
 		skb = hdd_skb_orphan(pAdapter, skb);
-		if (!skb)
+		if (!skb) {
+			++pAdapter->hdd_stats.hddTxRxStats.tx_unshare_failed;
 			goto drop_pkt_accounting;
+		}
 
 #if defined(IPA_OFFLOAD)
 	} else {
