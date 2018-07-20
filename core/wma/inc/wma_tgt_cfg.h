@@ -28,6 +28,8 @@
 #ifndef WMA_TGT_CFG_H
 #define WMA_TGT_CFG_H
 
+#include "wma_sar_public_structs.h"
+
 /**
  * struct wma_tgt_services - target services
  * @sta_power_save: sta power save
@@ -158,6 +160,7 @@ struct wma_dfs_radar_ind {
  * @bool is_ra_rate_limit_enabled: RA filter support
  * @tx_bfee_8ss_enabled: Tx Beamformee support for 8x8
  * @rcpi_enabled: for checking rcpi support
+ * @sar_version: Version of SAR supported by firmware
  */
 struct wma_tgt_cfg {
 	uint32_t target_fw_version;
@@ -189,5 +192,6 @@ struct wma_tgt_cfg {
 	uint16_t wmi_max_len;
 	bool tx_bfee_8ss_enabled;
 	bool rcpi_enabled;
+	enum sar_version sar_version;
 };
 #endif /* WMA_TGT_CFG_H */
