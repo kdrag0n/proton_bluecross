@@ -1034,6 +1034,15 @@ void cam_ois_shutdown(struct cam_ois_ctrl_t *o_ctrl)
 		o_ctrl->bridge_intf.session_hdl = -1;
 	}
 
+	if (o_ctrl->i2c_mode_data.is_settings_valid == 1)
+		delete_request(&o_ctrl->i2c_mode_data);
+
+	if (o_ctrl->i2c_calib_data.is_settings_valid == 1)
+		delete_request(&o_ctrl->i2c_calib_data);
+
+	if (o_ctrl->i2c_init_data.is_settings_valid == 1)
+		delete_request(&o_ctrl->i2c_init_data);
+
 	o_ctrl->cam_ois_state = CAM_OIS_INIT;
 }
 
@@ -1131,6 +1140,16 @@ int cam_ois_driver_cmd(struct cam_ois_ctrl_t *o_ctrl, void *arg)
 		o_ctrl->bridge_intf.link_hdl = -1;
 		o_ctrl->bridge_intf.session_hdl = -1;
 		o_ctrl->cam_ois_state = CAM_OIS_INIT;
+
+		if (o_ctrl->i2c_mode_data.is_settings_valid == 1)
+			delete_request(&o_ctrl->i2c_mode_data);
+
+		if (o_ctrl->i2c_calib_data.is_settings_valid == 1)
+			delete_request(&o_ctrl->i2c_calib_data);
+
+		if (o_ctrl->i2c_init_data.is_settings_valid == 1)
+			delete_request(&o_ctrl->i2c_init_data);
+
 		break;
 	case CAM_STOP_DEV:
 		if (o_ctrl->cam_ois_state != CAM_OIS_START) {
