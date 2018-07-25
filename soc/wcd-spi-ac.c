@@ -109,7 +109,7 @@ static void wcd_spi_ac_status_change(struct wcd_spi_ac_priv *ac,
 	wmb();
 	xchg(&ac->svc_offline_change, 1);
 	wake_up_interruptible(&ac->svc_poll_wait);
-	dev_err(ac->dev,
+	dev_dbg(ac->dev,
 		"%s request %u offline %u off_change %u\n",
 		__func__, online, ac->svc_offline,
 		ac->svc_offline_change);
@@ -146,7 +146,7 @@ static ssize_t wcd_spi_ac_status_read(struct file *file,
 	offline = ac->svc_offline;
 	/* Make sure the read is complete */
 	rmb();
-	dev_err(ac->dev, "%s: offline = %sline\n",
+	dev_dbg(ac->dev, "%s: offline = %sline\n",
 		__func__, offline ? "off" : "on");
 	len = snprintf(buf, sizeof(buf), "%s\n",
 		       offline ? "OFFLINE" : "ONLINE");
@@ -178,7 +178,7 @@ static unsigned int wcd_spi_ac_status_poll(struct file *file,
 	WCD_SPI_AC_MUTEX_LOCK(ac->dev, ac->status_lock);
 	if (xchg(&ac->svc_offline_change, 0))
 		ret = POLLIN | POLLPRI | POLLRDNORM;
-	dev_err(ac->dev, "%s: ret (%d) from poll_wait\n",
+	dev_dbg(ac->dev, "%s: ret (%d) from poll_wait\n",
 		__func__, ret);
 	WCD_SPI_AC_MUTEX_UNLOCK(ac->dev, ac->status_lock);
 
@@ -268,7 +268,7 @@ static int wcd_spi_ac_request_access(struct wcd_spi_ac_priv *ac)
 			__func__, rsp.resp.result);
 	}
 done:
-	dev_err(ac->dev, "%s: status %d\n", __func__, ret);
+	dev_dbg(ac->dev, "%s: status %d\n", __func__, ret);
 	WCD_SPI_AC_MUTEX_UNLOCK(ac->dev, ac->msg_lock);
 
 	return ret;
@@ -310,7 +310,7 @@ static int wcd_spi_ac_release_access(struct wcd_spi_ac_priv *ac)
 			__func__, rsp.resp.result);
 	}
 done:
-	dev_err(ac->dev, "%s: status %d\n", __func__, ret);
+	dev_dbg(ac->dev, "%s: status %d\n", __func__, ret);
 	WCD_SPI_AC_MUTEX_UNLOCK(ac->dev, ac->msg_lock);
 
 	return ret;
@@ -387,7 +387,7 @@ static int wcd_spi_ac_set_sync(struct wcd_spi_ac_priv *ac,
 	ac->state |= value;
 	/* any non-zero state indicates us to request SPI access */
 	wmb();
-	dev_err(ac->dev,
+	dev_dbg(ac->dev,
 		"%s: value 0x%x cur_state = 0x%x cur_access 0x%x\n",
 		__func__, value, ac->state, ac->current_access);
 	if (ac->current_access == WCD_SPI_AC_REMOTE_ACCESS) {
@@ -404,7 +404,7 @@ static int wcd_spi_ac_set_sync(struct wcd_spi_ac_priv *ac,
 			goto done;
 		}
 
-		dev_err(ac->dev,
+		dev_dbg(ac->dev,
 			"%s: requesting access, state = 0x%x\n",
 			__func__, ac->state);
 		ret = wcd_spi_ac_request_access(ac);
@@ -459,12 +459,12 @@ static int wcd_spi_ac_clear_sync(struct wcd_spi_ac_priv *ac,
 	ac->state &= ~(value);
 	/* make sure value is written before read */
 	wmb();
-	dev_err(ac->dev, "%s: current state = 0x%x, current access 0x%x\n",
+	dev_dbg(ac->dev, "%s: current state = 0x%x, current access 0x%x\n",
 		__func__, ac->state, ac->current_access);
 	/* state should be zero to release SPI access */
 	if (!ac->state &&
 	    ac->current_access == WCD_SPI_AC_LOCAL_ACCESS) {
-		dev_err(ac->dev,
+		dev_dbg(ac->dev,
 			"%s: releasing access, state = 0x%x\n",
 			__func__, ac->state);
 		ret = wcd_spi_ac_release_access(ac);
@@ -513,7 +513,7 @@ int wcd_spi_access_ctl(struct device *dev,
 		return -EINVAL;
 	}
 
-	dev_err(dev, "%s: request = 0x%x, reason = 0x%x\n",
+	dev_dbg(dev, "%s: request = 0x%x, reason = 0x%x\n",
 		__func__, request, reason);
 
 	switch (request) {
@@ -903,7 +903,7 @@ static int wcd_spi_ac_svc_event(struct notifier_block *this,
 		return -EINVAL;
 	}
 
-	dev_err(ac->dev, "%s: event = 0x%lx", __func__, event);
+	dev_dbg(ac->dev, "%s: event = 0x%lx", __func__, event);
 
 	switch (event) {
 	case QMI_SERVER_ARRIVE:
