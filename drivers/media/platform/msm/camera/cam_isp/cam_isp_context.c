@@ -1840,7 +1840,7 @@ static int __cam_isp_ctx_release_dev_in_top_state(struct cam_context *ctx,
 static int __cam_isp_ctx_config_dev_in_top_state(
 	struct cam_context *ctx, struct cam_config_dev_cmd *cmd)
 {
-	int rc = 0;
+	int rc = 0, i;
 	struct cam_ctx_request           *req = NULL;
 	struct cam_isp_ctx_req           *req_isp;
 	uint64_t                          packet_addr;
@@ -1916,6 +1916,15 @@ static int __cam_isp_ctx_config_dev_in_top_state(
 	req_isp->num_fence_map_in = cfg.num_in_map_entries;
 	req_isp->num_acked = 0;
 
+	for (i = 0; i < req_isp->num_fence_map_out; i++) {
+		rc = cam_sync_get_obj_ref(req_isp->fence_map_out[i].sync_id);
+		if (rc) {
+			CAM_ERR(CAM_ISP, "Can't get ref for fence %d",
+				req_isp->fence_map_out[i].sync_id);
+			goto put_ref;
+		}
+	}
+
 	CAM_DBG(CAM_ISP, "num_entry: %d, num fence out: %d, num fence in: %d",
 		req_isp->num_cfg, req_isp->num_fence_map_out,
 		req_isp->num_fence_map_in);
@@ -1957,7 +1966,7 @@ static int __cam_isp_ctx_config_dev_in_top_state(
 		}
 	}
 	if (rc)
-		goto free_req;
+		goto put_ref;
 
 	CAM_DBG(CAM_REQ,
 		"Preprocessing Config req_id %lld successful on ctx %u",
@@ -1965,6 +1974,13 @@ static int __cam_isp_ctx_config_dev_in_top_state(
 
 	return rc;
 
+put_ref:
+	for (--i; i >= 0; i--) {
+		rc = cam_sync_put_obj_ref(req_isp->fence_map_out[i].sync_id);
+		if (rc)
+			CAM_ERR(CAM_CTXT, "Failed to put ref of fence %d",
+				req_isp->fence_map_out[i].sync_id);
+	}
 free_req:
 	spin_lock_bh(&ctx->lock);
 	list_add_tail(&req->list, &ctx->free_req_list);
