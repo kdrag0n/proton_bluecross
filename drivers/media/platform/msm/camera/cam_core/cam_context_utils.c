@@ -503,6 +503,7 @@ int32_t cam_context_flush_ctx_to_hw(struct cam_context *ctx)
 	int rc = 0;
 
 	CAM_DBG(CAM_CTXT, "[%s] E: NRT flush ctx", ctx->dev_name);
+	memset(&flush_args, 0, sizeof(flush_args));
 
 	/*
 	 * flush pending requests, take the sync lock to synchronize with the
@@ -642,6 +643,7 @@ int32_t cam_context_flush_req_to_hw(struct cam_context *ctx,
 
 	CAM_DBG(CAM_CTXT, "[%s] E: NRT flush req", ctx->dev_name);
 
+	memset(&flush_args, 0, sizeof(flush_args));
 	flush_args.num_req_pending = 0;
 	flush_args.num_req_active = 0;
 	mutex_lock(&ctx->sync_mutex);
