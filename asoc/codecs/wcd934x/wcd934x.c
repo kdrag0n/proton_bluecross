@@ -4983,7 +4983,11 @@ static int __tavil_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 		 * so use ref count to handle micbias pullup
 		 * and enable requests
 		 */
+#ifdef CONFIG_WCD_MICBIAS_USE_PULLUP
+		tavil_micbias_control(codec, micb_num, MICB_PULLUP_ENABLE, true);
+#else
 		tavil_micbias_control(codec, micb_num, MICB_ENABLE, true);
+#endif
 		dev_info(codec->dev, "%s: wname: %s: enable\n", __func__, w->name);
 		break;
 	case SND_SOC_DAPM_POST_PMU:
@@ -4991,7 +4995,11 @@ static int __tavil_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 		usleep_range(1000, 1100);
 		break;
 	case SND_SOC_DAPM_POST_PMD:
+#ifdef CONFIG_WCD_MICBIAS_USE_PULLUP
+		tavil_micbias_control(codec, micb_num, MICB_PULLUP_DISABLE, true);
+#else
 		tavil_micbias_control(codec, micb_num, MICB_DISABLE, true);
+#endif
 		dev_info(codec->dev, "%s: wname: %s: disable\n", __func__, w->name);
 		break;
 	};
