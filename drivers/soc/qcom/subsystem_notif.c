@@ -149,7 +149,8 @@ int subsys_notif_queue_notification(void *subsys_handle,
 					enum subsys_notif_type notif_type,
 					void *data)
 {
-	struct subsys_notif_info *subsys = subsys_handle;
+	struct subsys_notif_info *subsys =
+		(struct subsys_notif_info *) subsys_handle;
 
 	if (!subsys)
 		return -EINVAL;
