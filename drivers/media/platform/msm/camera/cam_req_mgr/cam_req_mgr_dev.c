@@ -586,7 +586,6 @@ static int cam_req_mgr_remove(struct platform_device *pdev)
 	kmem_cache_destroy(g_cam_req_mgr_timer_cachep);
 	g_cam_req_mgr_timer_cachep = NULL;
 	cam_req_mgr_core_device_deinit();
-	cam_mem_mgr_deinit();
 	cam_req_mgr_util_deinit();
 	cam_media_device_cleanup();
 	cam_video_device_cleanup();
