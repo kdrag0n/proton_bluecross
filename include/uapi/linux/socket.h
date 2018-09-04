@@ -18,4 +18,11 @@ struct __kernel_sockaddr_storage {
 				/* _SS_MAXSIZE value minus size of ss_family */
 } __attribute__ ((aligned(_K_SS_ALIGNSIZE)));	/* force desired alignment */
 
+
+#ifndef __KERNEL__
+/* This header is exposed as linux/socket.h, so it must provide definition
+ * for sockaddr_storage in place of include/linux/socket.h */
+#define sockaddr_storage __kernel_sockaddr_storage
+#endif
+
 #endif /* _UAPI_LINUX_SOCKET_H */
