@@ -1637,19 +1637,17 @@ int ipa3_put_rt_tbl(u32 rt_tbl_hdl)
 {
 	struct ipa3_rt_tbl *entry;
 	enum ipa_ip_type ip = IPA_IP_MAX;
-	int result = 0;
+	int result = -EINVAL;
 
 	mutex_lock(&ipa3_ctx->lock);
 	entry = ipa3_id_find(rt_tbl_hdl);
 	if (entry == NULL) {
 		IPAERR_RL("lookup failed\n");
-		result = -EINVAL;
 		goto ret;
 	}
 
 	if ((entry->cookie != IPA_RT_TBL_COOKIE) || entry->ref_cnt == 0) {
 		IPAERR_RL("bad parms\n");
-		result = -EINVAL;
 		goto ret;
 	}
 
@@ -1659,7 +1657,6 @@ int ipa3_put_rt_tbl(u32 rt_tbl_hdl)
 		ip = IPA_IP_v6;
 	else {
 		WARN_ON_RATELIMIT_IPA(1);
-		result = -EINVAL;
 		goto ret;
 	}
 

@@ -1083,6 +1083,7 @@ int mnh_mipi_get_top_interrupts(struct device *dev,
 		}
 		break;
 	default:
+		status = 0;
 		break;
 	}
 	return status;
