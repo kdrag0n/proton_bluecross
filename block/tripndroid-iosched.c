@@ -52,7 +52,7 @@ static void tripndroid_merged_requests(struct request_queue *q, struct request *
 	 * and move into next position (next will be deleted) in fifo.
 	 */
 	if (!list_empty(&rq->queuelist) && !list_empty(&next->queuelist)) {
-        if (time_before(next->fifo_time, rq->fifo_time)) {
+        if (time_before((unsigned long)next->fifo_time, (unsigned long)rq->fifo_time)) {
 			list_move(&rq->queuelist, &next->queuelist);
 		    rq->fifo_time = next->fifo_time;
 		}
@@ -81,7 +81,7 @@ static struct request *tripndroid_expired_request(struct tripndroid_data *td, in
 
 	rq = rq_entry_fifo(list->next);
 
-	if (time_after_eq(jiffies,  rq->fifo_time))
+	if (time_after_eq(jiffies, (unsigned long)rq->fifo_time))
 		return rq;
 
 	return NULL;
