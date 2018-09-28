@@ -438,6 +438,14 @@ config MAY_USE_DEVLINK
 
 source "net/ipc_router/Kconfig"
 
+config SYSCTL_NET_BUSY_READ
+	int "Default busy_read value"
+	default 0
+
+config SYSCTL_NET_BUSY_POLL
+	int "Default busy_poll value"
+	default 0
+
 endif   # if NET
 
 # Used by archs to tell that they support BPF JIT compiler plus which flavour.

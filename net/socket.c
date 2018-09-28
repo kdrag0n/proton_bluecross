@@ -112,8 +112,8 @@
 #include <linux/errqueue.h>
 
 #ifdef CONFIG_NET_RX_BUSY_POLL
-unsigned int sysctl_net_busy_read __read_mostly;
-unsigned int sysctl_net_busy_poll __read_mostly;
+unsigned int sysctl_net_busy_read __read_mostly = CONFIG_SYSCTL_NET_BUSY_READ;
+unsigned int sysctl_net_busy_poll __read_mostly = CONFIG_SYSCTL_NET_BUSY_POLL;
 #endif
 
 static ssize_t sock_read_iter(struct kiocb *iocb, struct iov_iter *to);
