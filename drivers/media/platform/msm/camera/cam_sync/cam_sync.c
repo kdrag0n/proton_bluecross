@@ -512,7 +512,7 @@ static int cam_sync_handle_create(struct cam_private_ioctl_arg *k_ioctl)
 		return -EINVAL;
 
 	if (copy_from_user(&sync_create,
-		(void *)k_ioctl->ioctl_ptr,
+		u64_to_user_ptr(k_ioctl->ioctl_ptr),
 		k_ioctl->size))
 		return -EFAULT;
 
@@ -520,7 +520,8 @@ static int cam_sync_handle_create(struct cam_private_ioctl_arg *k_ioctl)
 		sync_create.name);
 
 	if (!result)
-		if (copy_to_user((void *)k_ioctl->ioctl_ptr,
+		if (copy_to_user(
+			u64_to_user_ptr(k_ioctl->ioctl_ptr),
 			&sync_create,
 			k_ioctl->size))
 			return -EFAULT;
@@ -539,7 +540,7 @@ static int cam_sync_handle_signal(struct cam_private_ioctl_arg *k_ioctl)
 		return -EINVAL;
 
 	if (copy_from_user(&sync_signal,
-		(void *)k_ioctl->ioctl_ptr,
+		u64_to_user_ptr(k_ioctl->ioctl_ptr),
 		k_ioctl->size))
 		return -EFAULT;
 
@@ -564,7 +565,7 @@ static int cam_sync_handle_merge(struct cam_private_ioctl_arg *k_ioctl)
 		return -EINVAL;
 
 	if (copy_from_user(&sync_merge,
-		(void *)k_ioctl->ioctl_ptr,
+		u64_to_user_ptr(k_ioctl->ioctl_ptr),
 		k_ioctl->size))
 		return -EFAULT;
 
@@ -578,8 +579,8 @@ static int cam_sync_handle_merge(struct cam_private_ioctl_arg *k_ioctl)
 		return -ENOMEM;
 
 	if (copy_from_user(sync_objs,
-	(void *)sync_merge.sync_objs,
-	sizeof(uint32_t) * sync_merge.num_objs)) {
+		u64_to_user_ptr(sync_merge.sync_objs),
+		sizeof(uint32_t) * sync_merge.num_objs)) {
 		kfree(sync_objs);
 		return -EFAULT;
 	}
@@ -591,7 +592,8 @@ static int cam_sync_handle_merge(struct cam_private_ioctl_arg *k_ioctl)
 		&sync_merge.merged);
 
 	if (!result)
-		if (copy_to_user((void *)k_ioctl->ioctl_ptr,
+		if (copy_to_user(
+			u64_to_user_ptr(k_ioctl->ioctl_ptr),
 			&sync_merge,
 			k_ioctl->size)) {
 			kfree(sync_objs);
@@ -614,7 +616,7 @@ static int cam_sync_handle_wait(struct cam_private_ioctl_arg *k_ioctl)
 		return -EINVAL;
 
 	if (copy_from_user(&sync_wait,
-		(void *)k_ioctl->ioctl_ptr,
+		u64_to_user_ptr(k_ioctl->ioctl_ptr),
 		k_ioctl->size))
 		return -EFAULT;
 
@@ -635,7 +637,7 @@ static int cam_sync_handle_destroy(struct cam_private_ioctl_arg *k_ioctl)
 		return -EINVAL;
 
 	if (copy_from_user(&sync_create,
-		(void *)k_ioctl->ioctl_ptr,
+		u64_to_user_ptr(k_ioctl->ioctl_ptr),
 		k_ioctl->size))
 		return -EFAULT;
 
@@ -659,7 +661,7 @@ static int cam_sync_handle_register_user_payload(
 		return -EINVAL;
 
 	if (copy_from_user(&userpayload_info,
-		(void *)k_ioctl->ioctl_ptr,
+		u64_to_user_ptr(k_ioctl->ioctl_ptr),
 		k_ioctl->size))
 		return -EFAULT;
 
@@ -740,7 +742,7 @@ static int cam_sync_handle_deregister_user_payload(
 	}
 
 	if (copy_from_user(&userpayload_info,
-		(void *)k_ioctl->ioctl_ptr,
+		u64_to_user_ptr(k_ioctl->ioctl_ptr),
 		k_ioctl->size))
 		return -EFAULT;
 
