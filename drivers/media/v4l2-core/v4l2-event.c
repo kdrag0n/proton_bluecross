@@ -258,7 +258,7 @@ int v4l2_event_subscribe(struct v4l2_fh *fh,
 			spin_lock_irqsave(&fh->vdev->fh_lock, flags);
 			__v4l2_event_unsubscribe(sev);
 			spin_unlock_irqrestore(&fh->vdev->fh_lock, flags);
-			kfree(sev);
+			kvfree(sev);
 		}
 	}
 
