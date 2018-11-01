@@ -119,8 +119,14 @@ out/
 # Kdevelop4
 *.kdev4
 
-# fetched Android config fragments
+# Fetched Android config fragments
 kernel/configs/android-*.cfg
 
 # Qualcomm out-of-tree audio drivers
 /techpack/audio
+
+# Flasher
+flasher/dtbs/*.dtb
+flasher/*.dtb
+flasher/Image*
+*.zip
