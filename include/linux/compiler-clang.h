@@ -16,6 +16,14 @@
  */
 #define __UNIQUE_ID(prefix) __PASTE(__PASTE(__UNIQUE_ID_, prefix), __COUNTER__)
 
+#undef __no_sanitize_address
+#define __no_sanitize_address __attribute__((no_sanitize("address")))
+
+/* Clang doesn't have a way to turn it off per-function, yet. */
+#ifdef __noretpoline
+#undef __noretpoline
+#endif
+
 /*
  * GCC does not warn about unused static inline functions for
  * -Wunused-function.  This turns out to avoid the need for complex #ifdef
@@ -48,9 +56,4 @@
 #define __no_sanitize_address __attribute__((no_sanitize("kernel-address")))
 #else
 #define __no_sanitize_address
-#endif
-
-/* Clang doesn't have a way to turn it off per-function, yet. */
-#ifdef __noretpoline
-#undef __noretpoline
 #endif
