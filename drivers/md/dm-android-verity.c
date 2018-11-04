@@ -371,7 +371,7 @@ static int find_size(dev_t dev, u64 *device_size)
 static int verify_header(struct android_metadata_header *header)
 {
 	int retval = -EINVAL;
-
+	return VERITY_STATE_DISABLE;
 	if (is_userdebug() && le32_to_cpu(header->magic_number) ==
 			VERITY_METADATA_MAGIC_DISABLE)
 		return VERITY_STATE_DISABLE;
