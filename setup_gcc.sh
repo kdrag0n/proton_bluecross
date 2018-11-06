@@ -1,28 +1,31 @@
 # Toolchain paths
 
-# Path to the GCC toolchain, including the target prefix.
-tc=/usr/bin/aarch64-linux-gnu-
+# Path to the root of the 64-bit GCC toolchain
+tc=/usr
+
+# Path to the root of the 32-bit GCC toolchain
+tc32=$HOME/toolchains/gcc32-8.x
 
 # Number of parallel jobs to run
-# This should be set to the number of CPU cores on your system.
 # Do not remove, set to 1 for no parallelism.
 jobs=6
 
 # Do not edit below this point
-# -----------------------------
+# ----------------------------
 
-export CROSS_COMPILE=$tc
-export ARCH=arm64
-export SUBARCH=arm64
-export KBUILD_BUILD_USER=kdrag0n
-export KBUILD_BUILD_HOST=proton
-
-export CFLAGS=""
-export CXXFLAGS=""
-export LDFLAGS=""
-
-cc_ver="$(${tc}gcc --version|head -n1|cut -d'(' -f2|tr -d ')'|awk '{$5=""; print $0}'|sed -e 's/[[:space:]]*$//')"
-
-MAKEFLAGS=("KBUILD_COMPILER_STRING=${cc_ver}")
-
+# Load the shared helpers early to prevent duplication
 source helpers.sh
+
+gcc_bin=$tc_gcc/bin
+gcc32_bin=$tc_gcc32/bin
+[ -z $prefix_gcc ] && prefix_gcc=$(get_gcc_prefix $gcc_bin)
+[ -z $prefix_gcc32 ] && prefix_gcc32=$(get_gcc_prefix $gcc32_bin)
+
+export PATH=$gcc_bin:$gcc32_bin:$PATH
+
+MAKEFLAGS+=(
+    CROSS_COMPILE=$prefix_gcc
+    CROSS_COMPILE_ARM32=$prefix_gcc32
+
+    KBUILD_COMPILER_STRING="$(get_gcc_version ${prefix_gcc}gcc)"
+)
