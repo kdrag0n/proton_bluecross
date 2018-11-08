@@ -62,7 +62,6 @@
 		qcom,gpu-quirk-secvid-set-once;
 
 		qcom,idle-timeout = <80>; //msecs
-		qcom,no-nap;
 
 		qcom,highest-bank-bit = <15>;
 
