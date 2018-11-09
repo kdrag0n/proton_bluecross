@@ -765,16 +765,15 @@ static void zram_bio_discard(struct zram *zram, u32 index,
 }
 
 static int zram_bvec_rw(struct zram *zram, struct bio_vec *bvec, u32 index,
-			int offset, bool is_write)
+			int offset, int op)
 {
 	unsigned long start_time = jiffies;
-	int rw_acct = is_write ? REQ_OP_WRITE : REQ_OP_READ;
 	int ret;
 
-	generic_start_io_acct(rw_acct, bvec->bv_len >> SECTOR_SHIFT,
+	generic_start_io_acct(op, bvec->bv_len >> SECTOR_SHIFT,
 			&zram->disk->part0);
 
-	if (!is_write) {
+	if (!op_is_write(op)) {
 		atomic64_inc(&zram->stats.num_reads);
 		ret = zram_bvec_read(zram, bvec, index, offset);
 	} else {
@@ -782,10 +781,10 @@ static int zram_bvec_rw(struct zram *zram, struct bio_vec *bvec, u32 index,
 		ret = zram_bvec_write(zram, bvec, index, offset);
 	}
 
-	generic_end_io_acct(rw_acct, &zram->disk->part0, start_time);
+	generic_end_io_acct(op, &zram->disk->part0, start_time);
 
 	if (unlikely(ret)) {
-		if (!is_write)
+		if (!op_is_write(op))
 			atomic64_inc(&zram->stats.failed_reads);
 		else
 			atomic64_inc(&zram->stats.failed_writes);
@@ -826,17 +825,17 @@ static void __zram_make_request(struct zram *zram, struct bio *bio)
 			bv.bv_offset = bvec.bv_offset;
 
 			if (zram_bvec_rw(zram, &bv, index, offset,
-					 op_is_write(bio_op(bio))) < 0)
+					 bio_op(bio)) < 0)
 				goto out;
 
 			bv.bv_len = bvec.bv_len - max_transfer_size;
 			bv.bv_offset += max_transfer_size;
 			if (zram_bvec_rw(zram, &bv, index + 1, 0,
-					 op_is_write(bio_op(bio))) < 0)
+					 bio_op(bio)) < 0)
 				goto out;
 		} else
 			if (zram_bvec_rw(zram, &bvec, index, offset,
-					 op_is_write(bio_op(bio))) < 0)
+					 bio_op(bio)) < 0)
 				goto out;
 
 		update_position(&index, &offset, &bvec);
@@ -893,7 +892,7 @@ static void zram_slot_free_notify(struct block_device *bdev,
 }
 
 static int zram_rw_page(struct block_device *bdev, sector_t sector,
-		       struct page *page, bool is_write)
+		       struct page *page, int op)
 {
 	int offset, err = -EIO;
 	u32 index;
@@ -917,7 +916,7 @@ static int zram_rw_page(struct block_device *bdev, sector_t sector,
 	bv.bv_len = PAGE_SIZE;
 	bv.bv_offset = 0;
 
-	err = zram_bvec_rw(zram, &bv, index, offset, is_write);
+	err = zram_bvec_rw(zram, &bv, index, offset, op);
 put_zram:
 	zram_meta_put(zram);
 out:
@@ -930,7 +929,7 @@ out:
 	 * (e.g., SetPageError, set_page_dirty and extra works).
 	 */
 	if (err == 0)
-		page_endio(page, is_write, 0);
+		page_endio(page, op, 0);
 	return err;
 }
 
