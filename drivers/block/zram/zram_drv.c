@@ -1299,15 +1299,15 @@ static void zram_bio_discard(struct zram *zram, u32 index,
  * Returns 1 if IO request was successfully submitted.
  */
 static int zram_bvec_rw(struct zram *zram, struct bio_vec *bvec, u32 index,
-			int offset, int rw, struct bio *bio)
+			int offset, int op, struct bio *bio)
 {
 	unsigned long start_time = jiffies;
 	int ret;
 
-	generic_start_io_acct(rw, bvec->bv_len >> SECTOR_SHIFT,
+	generic_start_io_acct(op, bvec->bv_len >> SECTOR_SHIFT,
 			&zram->disk->part0);
 
-	if (rw == READ) {
+	if (!op_is_write(op)) {
 		atomic64_inc(&zram->stats.num_reads);
 		ret = zram_bvec_read(zram, bvec, index, offset, bio);
 		flush_dcache_page(bvec->bv_page);
@@ -1316,14 +1316,14 @@ static int zram_bvec_rw(struct zram *zram, struct bio_vec *bvec, u32 index,
 		ret = zram_bvec_write(zram, bvec, index, offset, bio);
 	}
 
-	generic_end_io_acct(rw, &zram->disk->part0, start_time);
+	generic_end_io_acct(op, &zram->disk->part0, start_time);
 
 	zram_slot_lock(zram, index);
 	zram_accessed(zram, index);
 	zram_slot_unlock(zram, index);
 
 	if (unlikely(ret < 0)) {
-		if (rw == READ)
+		if (!op_is_write(op))
 			atomic64_inc(&zram->stats.failed_reads);
 		else
 			atomic64_inc(&zram->stats.failed_writes);
@@ -1334,7 +1334,7 @@ static int zram_bvec_rw(struct zram *zram, struct bio_vec *bvec, u32 index,
 
 static void __zram_make_request(struct zram *zram, struct bio *bio)
 {
-	int offset, rw;
+	int offset;
 	u32 index;
 	struct bio_vec bvec;
 	struct bvec_iter iter;
@@ -1349,7 +1349,6 @@ static void __zram_make_request(struct zram *zram, struct bio *bio)
 		return;
 	}
 
-	rw = bio_data_dir(bio);
 	bio_for_each_segment(bvec, bio, iter) {
 		struct bio_vec bv = bvec;
 		unsigned int unwritten = bvec.bv_len;
@@ -1357,7 +1356,7 @@ static void __zram_make_request(struct zram *zram, struct bio *bio)
 		do {
 			bv.bv_len = min_t(unsigned int, PAGE_SIZE - offset,
 							unwritten);
-			if (zram_bvec_rw(zram, &bv, index, offset, rw, bio) < 0)
+			if (zram_bvec_rw(zram, &bv, index, offset, bio_op(bio), bio) < 0)
 				goto out;
 
 			bv.bv_offset += bv.bv_len;
@@ -1409,7 +1408,7 @@ static void zram_slot_free_notify(struct block_device *bdev,
 }
 
 static int zram_rw_page(struct block_device *bdev, sector_t sector,
-		       struct page *page, int rw)
+		       struct page *page, int op)
 {
 	int offset, ret;
 	u32 index;
@@ -1431,7 +1430,7 @@ static int zram_rw_page(struct block_device *bdev, sector_t sector,
 	bv.bv_len = PAGE_SIZE;
 	bv.bv_offset = 0;
 
-	ret = zram_bvec_rw(zram, &bv, index, offset, rw, NULL);
+	ret = zram_bvec_rw(zram, &bv, index, offset, op, NULL);
 out:
 	/*
 	 * If I/O fails, just return error(ie, non-zero) without
@@ -1446,7 +1445,7 @@ out:
 
 	switch (ret) {
 	case 0:
-		page_endio(page, rw, 0);
+		page_endio(page, op, 0);
 		break;
 	case 1:
 		ret = 0;
