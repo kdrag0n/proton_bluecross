@@ -43,8 +43,7 @@ mkzip() {
     [ $_RELEASE -eq 0 ] && vprefix=test
     [ $_RELEASE -eq 1 ] && vprefix=v
 
-    cp out/arch/arm64/boot/Image.gz flasher/
-    # TODO: copy the appropriate dtb and/or dtbo(s)
+    cp out/arch/arm64/boot/Image.lz4-dtb flasher/
 
     [ $_RELEASE -eq 0 ] && echo "  • Installing test build $(cat out/.version)" >| flasher/version
     [ $_RELEASE -eq 1 ] && echo "  • Installing version v$(cat out/.version)" >| flasher/version

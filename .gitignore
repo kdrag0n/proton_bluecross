@@ -126,7 +126,6 @@ kernel/configs/android-*.cfg
 /techpack/audio
 
 # Flasher
-flasher/dtbs/*.dtb
 flasher/*.dtb
 flasher/Image*
 flasher/version
