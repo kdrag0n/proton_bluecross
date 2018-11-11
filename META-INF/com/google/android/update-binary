@@ -70,11 +70,9 @@ if [ -f /tmp/anykernel/banner ]; then
 fi;
 
 if [ -f /tmp/anykernel/version ]; then
-  ui_print " ";
   while IFS='' read -r line || $bb [[ -n "$line" ]]; do
     ui_print "$line";
   done < /tmp/anykernel/version;
-  ui_print " ";
 fi;
 
 unmount_all;
@@ -84,19 +82,17 @@ mount /data 2>/dev/null;
 test -f /system/system/build.prop && root=/system;
 
 if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.devicecheck)" == 1 ]; then
-  ui_print "Checking device...";
+  ui_print "  • Checking device";
   device="$(getprop ro.product.device)";
   product="$(getprop ro.build.product)";
   for i in 1 2 3 4 5; do
     testname="$(file_getprop /tmp/anykernel/anykernel.sh device.name$i)";
     test "$testname" || break;
     if [ "$device" == "$testname" -o "$product" == "$testname" ]; then
-      ui_print "$testname";
       match=1;
       break;
     fi;
   done;
-  ui_print " ";
   if [ "$match" != 1 ]; then
     abort "Unsupported device. Aborting...";
   fi;
