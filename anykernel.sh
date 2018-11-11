@@ -31,7 +31,7 @@ dump_boot;
 rm -fr $ramdisk/overlay
 
 if [ -d $ramdisk/.backup ]; then
-  ui_print "  • Patching ramdisk..."
+  ui_print "  • Patching ramdisk"
   patch_cmdline "skip_override" "skip_override"
 
   mv /tmp/anykernel/overlay $ramdisk
