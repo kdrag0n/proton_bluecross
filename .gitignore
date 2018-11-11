@@ -129,4 +129,5 @@ kernel/configs/android-*.cfg
 flasher/dtbs/*.dtb
 flasher/*.dtb
 flasher/Image*
+flasher/version
 *.zip

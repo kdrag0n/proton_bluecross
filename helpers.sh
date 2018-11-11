@@ -46,16 +46,17 @@ mkzip() {
     cp out/arch/arm64/boot/Image.gz flasher/
     # TODO: copy the appropriate dtb and/or dtbo(s)
 
-    echo -n $(date "+%a %b '%y at %H:%M") >| flasher/buildtime
-    echo "$vprefix$(cat out/.version|tr -d '\n')" >| flasher/buildver
-    cd flasher
+    [ $_RELEASE -eq 0 ] && echo "  • Installing test build $(cat out/.version)" >| flasher/version
+    [ $_RELEASE -eq 1 ] && echo "  • Installing version v$(cat out/.version)" >| flasher/version
+    echo "  • Built on $(date "+%a %b '%y at %H:%M")" >> flasher/version
 
     fn="proton_kernel.zip"
     [ "x$1" != "x" ] && fn="$1"
-    rm -f "../$fn"
+    rm -f "$fn"
     echo "  ZIP     $fn"
+    pushd flasher
     zip -qr9 "../$fn" . -x .gitignore
-    cd ..
+    popd
 }
 
 # Create a flashable release zip, ensuring the compiled kernel is up to date
