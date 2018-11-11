@@ -67,11 +67,8 @@ if [ -f /tmp/anykernel/banner ]; then
   while IFS='' read -r line || $bb [[ -n "$line" ]]; do
     ui_print "$line";
   done < /tmp/anykernel/banner;
-  ui_print " ";
-  ui_print " ";
 fi;
 
-ui_print "$(file_getprop /tmp/anykernel/anykernel.sh kernel.string)";
 if [ -f /tmp/anykernel/version ]; then
   ui_print " ";
   while IFS='' read -r line || $bb [[ -n "$line" ]]; do
@@ -79,10 +76,6 @@ if [ -f /tmp/anykernel/version ]; then
   done < /tmp/anykernel/version;
   ui_print " ";
 fi;
-ui_print " ";
-ui_print "AnyKernel2 by osm0sis @ xda-developers";
-ui_print " ";
-ui_print " ";
 
 unmount_all;
 mount -o ro -t auto /system;
@@ -122,7 +115,6 @@ savedpre="$LD_PRELOAD";
 unset LD_LIBRARY_PATH;
 unset LD_PRELOAD;
 
-ui_print "Installing...";
 for i in $($bb --list); do
   $bb ln -s $bb /tmp/anykernel/bin/$i;
 done;
@@ -171,6 +163,4 @@ test "$savedpre" && export LD_PRELOAD="$savedpre";
 
 unmount_all;
 
-ui_print " ";
-ui_print " ";
-ui_print "Done!";
+ui_print "  • Done!";
