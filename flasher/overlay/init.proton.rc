@@ -1,0 +1,111 @@
+on late-fs
+	write /sys/block/sda/queue/scheduler bfq
+	write /sys/block/sda/queue/read_ahead_kb 512
+	write /sys/block/sda/queue/nr_requests 128
+	write /sys/block/dm-0/queue/read_ahead_kb 512
+	write /sys/block/dm-1/queue/read_ahead_kb 512
+
+on property:sys.boot_completed=1
+	# Block
+	write /sys/block/sda/queue/scheduler anxiety
+	write /sys/block/sda/queue/nr_requests 32
+
+on property:sys.boot_completed=1
+	# Profiles
+    setprop fku.profiles 1
+	setprop spectrum.support 1
+	setprop persist.spectrum.kernel Proton
+
+
+# Profiles
+on property:proton.profile=battery
+	setprop proton.big_max 1056000
+	setprop proton.little_max 1516800
+	setprop proton.big_boost 0
+	setprop proton.little_boost 979200
+	setprop proton.boost_duration 64
+	setprop proton.cpu_governor schedutil
+	setprop proton.gpu_governor msm-adreno-tz
+
+on property:proton.profile=balanced
+	setprop proton.big_max 2649600
+	setprop proton.little_max 1766400
+	setprop proton.big_boost 902400
+	setprop proton.little_boost 1056000
+	setprop proton.boost_duration 100
+	setprop proton.cpu_governor schedutil
+	setprop proton.gpu_governor msm-adreno-tz
+
+on property:proton.profile=performance
+	setprop proton.big_max 2803200
+	setprop proton.little_max 1766400
+	setprop proton.big_boost 1363200
+	setprop proton.little_boost 1516800
+	setprop proton.boost_duration 140
+	setprop proton.cpu_governor schedutil
+	setprop proton.gpu_governor msm-adreno-tz
+
+
+# Profile engine
+# Sets the maximum frequency of the big CPU cluster
+on property:proton.big_max=*
+	write /sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq ${proton.big_max}
+
+# Sets the maximum frequency of the little CPU cluster
+on property:proton.little_max=*
+	write /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq ${proton.little_max}
+
+# Sets the input boost frequency of the little CPU cluster
+on property:proton.little_boost=*
+	write /sys/module/cpu_input_boost/parameters/input_boost_freq_lp ${proton.little_boost}
+
+# Sets the input boost frequency of the big CPU cluster
+on property:proton.big_boost=*
+	write /sys/module/cpu_input_boost/parameters/input_boost_freq_hp ${proton.big_boost}
+
+# Sets the length of an input boost
+on property:proton.boost_duration=*
+	write /sys/module/cpu_input_boost/parameters/input_boost_duration ${proton.boost_duration}
+
+# Sets the frequency governor of both CPU clusters
+on property:proton.cpu_governor=*
+	write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ${proton.cpu_governor}
+	write /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor ${proton.cpu_governor}
+
+# Sets the frequency governor of the GPU
+on property:proton.gpu_governor=*
+	write /sys/class/kgsl/kgsl-3d0/devfreq/governor ${proton.cpu_governor}
+
+
+# Profile bridges: Franco Kernel Manager
+on property:fku.perf.profile=0
+	setprop proton.profile battery
+
+on property:fku.perf.profile=1
+	setprop proton.profile balanced
+
+on property:fku.perf.profile=2
+	setprop proton.profile performance
+
+
+# Profile bridges: Spectrum
+# Balanced
+on property:persist.spectrum.profile=0
+	setprop proton.profile balanced
+
+# Performance
+on property:persist.spectrum.profile=1
+	setprop proton.profile performance
+
+# Battery
+on property:persist.spectrum.profile=2
+	setprop proton.profile battery
+
+# Gaming
+on property:persist.spectrum.profile=3
+	setprop proton.profile performance
+
+
+on property:sys.boot_completed=1
+	# First boot default
+	exec u:r:init:s0 root root -- /init.spectrum.sh
