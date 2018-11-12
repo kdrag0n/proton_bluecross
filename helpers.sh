@@ -50,7 +50,7 @@ mkzip() {
     [ $_RELEASE -eq 1 ] && echo "  • Installing version v$(cat out/.version)" >| flasher/version
     echo "  • Built on $(date "+%a %b '%y at %H:%M")" >> flasher/version
 
-    fn="proton_kernel.zip"
+    fn="b1c1_kernel.zip"
     [ "x$1" != "x" ] && fn="$1"
     rm -f "$fn"
     echo "  ZIP     $fn"
@@ -117,7 +117,7 @@ ktest() {
         adb reboot recovery
     fi
 
-    fn="proton_kernel.zip"
+    fn="b1c1_kernel.zip"
     [ "x$1" != "x" ] && fn="$1"
     adb wait-for-usb-recovery && \
     adb push $fn /tmp/kernel.zip && \
@@ -131,18 +131,18 @@ inc() {
 
 # Show differences between the committed defconfig and current config
 dc() {
-    diff arch/arm64/configs/proton_defconfig out/.config
+    diff arch/arm64/configs/b1c1_defconfig out/.config
 }
 
 # Update the defconfig in the git tree
 cpc() {
     # Don't use savedefconfig for readability and diffability
-    cp out/.config arch/arm64/configs/proton_defconfig
+    cp out/.config arch/arm64/configs/b1c1_defconfig
 }
 
 # Reset the current config to the committed defconfig
 mc() {
-    kmake proton_defconfig
+    kmake b1c1_defconfig
 }
 
 # Open an interactive config editor
