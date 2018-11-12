@@ -38,6 +38,7 @@ config MNH_PCIE_MULTIPLE_MSI
 config MNH_SIG
     tristate "MNH signing engine"
     depends on MNH_SM_HOST
+    select SYSTEM_DATA_VERIFICATION
     default "n"
     ---help---
        Adds support for authentication of MNH images
