@@ -1,20 +1,11 @@
-on late-fs
-	write /sys/block/sda/queue/scheduler bfq
-	write /sys/block/sda/queue/read_ahead_kb 512
-	write /sys/block/sda/queue/nr_requests 128
-	write /sys/block/dm-0/queue/read_ahead_kb 512
-	write /sys/block/dm-1/queue/read_ahead_kb 512
-
-on property:sys.boot_completed=1
-	# Block
-	write /sys/block/sda/queue/scheduler anxiety
-	write /sys/block/sda/queue/nr_requests 32
-
 on property:sys.boot_completed=1
 	# Profiles
     setprop fku.profiles 1
 	setprop spectrum.support 1
 	setprop persist.spectrum.kernel Proton
+
+	# First boot defaults
+	exec u:r:init:s0 root root -- /init.proton.sh
 
 
 # Profiles
@@ -104,8 +95,3 @@ on property:persist.spectrum.profile=2
 # Gaming
 on property:persist.spectrum.profile=3
 	setprop proton.profile performance
-
-
-on property:sys.boot_completed=1
-	# First boot default
-	exec u:r:init:s0 root root -- /init.spectrum.sh
