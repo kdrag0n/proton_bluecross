@@ -49,7 +49,7 @@ mkzip() {
     [ $_RELEASE -eq 1 ] && echo "  • Installing version v$(cat out/.version)" >| flasher/version
     echo "  • Built on $(date "+%a %b '%y at %H:%M")" >> flasher/version
 
-    fn="b1c1_kernel.zip"
+    fn="proton_kernel.zip"
     [ "x$1" != "x" ] && fn="$1"
     rm -f "$fn"
     echo "  ZIP     $fn"
@@ -116,7 +116,7 @@ ktest() {
         adb reboot recovery
     fi
 
-    fn="b1c1_kernel.zip"
+    fn="proton_kernel.zip"
     [ "x$1" != "x" ] && fn="$1"
     adb wait-for-usb-recovery && \
     adb push $fn /tmp/kernel.zip && \
