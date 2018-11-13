@@ -24,6 +24,7 @@ ramdisk_compression=auto;
 
 
 ## AnyKernel install
+ui_print "  • Unpacking image"
 dump_boot;
 
 # begin ramdisk changes
