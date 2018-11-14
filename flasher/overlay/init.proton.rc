@@ -1,3 +1,7 @@
+on boot
+	# /vendor/etc/init/hw/init.sdm845.rc sets this to lz4 early, set it back to zstd
+	write /sys/block/zram0/comp_algorithm zstd
+
 on property:sys.boot_completed=1
 	# Profiles
     setprop fku.profiles 1
