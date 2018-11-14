@@ -49,8 +49,7 @@ mkzip() {
     [ $_RELEASE -eq 1 ] && echo "  • Installing version v$(cat out/.version)" >| flasher/version
     echo "  • Built on $(date "+%a %b '%y at %H:%M")" >> flasher/version
 
-    fn="proton_kernel.zip"
-    [ "x$1" != "x" ] && fn="$1"
+    fn="${1:-proton_kernel.zip}"
     rm -f "$fn"
     echo "  ZIP     $fn"
     pushd flasher
@@ -156,5 +155,5 @@ ec() {
 
 # Get a sorted list of the side of various objects in the kernel
 osize() {
-    find out -type f -name '*.o' ! -name 'built-in.o' ! -name 'vmlinux.o' -exec du -h --apparent-size {} + | sort -r -h | head -n 75
+    find out -type f -name '*.o' ! -name 'built-in.o' ! -name 'vmlinux.o' -exec du -h --apparent-size {} + | sort -r -h | head -n "${1:-75}"
 }
