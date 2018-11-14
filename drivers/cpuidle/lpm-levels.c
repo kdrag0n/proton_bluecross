@@ -83,7 +83,7 @@ struct lpm_debug {
 };
 
 static struct system_pm_ops *sys_pm_ops;
-
+static DEFINE_SPINLOCK(bc_timer_lock);
 
 struct lpm_cluster *lpm_root_node;
 
@@ -156,7 +156,7 @@ static uint32_t least_cluster_latency(struct lpm_cluster *cluster,
 	uint32_t latency = 0;
 	int i;
 
-	if (!cluster->list.next) {
+	if (list_empty(&cluster->list)) {
 		for (i = 0; i < cluster->nlevels; i++) {
 			level = &cluster->levels[i];
 			pwr_params = &level->pwr;
@@ -338,6 +338,11 @@ static void histtimer_cancel(void)
 {
 	unsigned int cpu = raw_smp_processor_id();
 	struct hrtimer *cpu_histtimer = &per_cpu(histtimer, cpu);
+	ktime_t time_rem;
+
+	time_rem = hrtimer_get_remaining(cpu_histtimer);
+	if (ktime_to_us(time_rem) <= 0)
+		return;
 
 	hrtimer_try_to_cancel(cpu_histtimer);
 }
@@ -383,11 +388,21 @@ static void clusttimer_cancel(void)
 {
 	int cpu = raw_smp_processor_id();
 	struct lpm_cluster *cluster = per_cpu(cpu_lpm, cpu)->parent;
+	ktime_t time_rem;
 
-	hrtimer_try_to_cancel(&cluster->histtimer);
+	time_rem = hrtimer_get_remaining(&cluster->histtimer);
+	if (ktime_to_us(time_rem) > 0)
+		hrtimer_try_to_cancel(&cluster->histtimer);
 
-	if (cluster->parent)
+	if (cluster->parent) {
+		time_rem = hrtimer_get_remaining(
+			&cluster->parent->histtimer);
+
+		if (ktime_to_us(time_rem) <= 0)
+			return;
+
 		hrtimer_try_to_cancel(&cluster->parent->histtimer);
+	}
 }
 
 static enum hrtimer_restart clusttimer_fn(struct hrtimer *h)
@@ -1011,6 +1026,7 @@ static int cluster_configure(struct lpm_cluster *cluster, int idx,
 	struct lpm_cluster_level *level = &cluster->levels[idx];
 	struct cpumask online_cpus, cpumask;
 	unsigned int cpu;
+	int ret = 0;
 
 	cpumask_and(&online_cpus, &cluster->num_children_in_sync,
 					cpu_online_mask);
@@ -1049,9 +1065,13 @@ static int cluster_configure(struct lpm_cluster *cluster, int idx,
 
 		clear_predict_history();
 		clear_cl_predict_history();
-		if (sys_pm_ops && sys_pm_ops->enter)
-			if ((sys_pm_ops->enter(&cpumask)))
+		if (sys_pm_ops && sys_pm_ops->enter) {
+			spin_lock(&bc_timer_lock);
+			ret = sys_pm_ops->enter(&cpumask);
+			spin_unlock(&bc_timer_lock);
+			if (ret)
 				return -EBUSY;
+		}
 	}
 	/* Notify cluster enter event after successfully config completion */
 	cluster_notify(cluster, level, true);
@@ -1184,8 +1204,11 @@ static void cluster_unprepare(struct lpm_cluster *cluster,
 	level = &cluster->levels[cluster->last_level];
 
 	if (level->notify_rpm)
-		if (sys_pm_ops && sys_pm_ops->exit)
+		if (sys_pm_ops && sys_pm_ops->exit) {
+			spin_lock(&bc_timer_lock);
 			sys_pm_ops->exit();
+			spin_unlock(&bc_timer_lock);
+		}
 
 	update_debug_pc_event(CLUSTER_EXIT, cluster->last_level,
 			cluster->num_children_in_sync.bits[0],
@@ -1280,6 +1303,7 @@ static bool psci_enter_sleep(struct lpm_cpu *cpu, int idx, bool from_idle)
 {
 	int affinity_level = 0, state_id = 0, power_state = 0;
 	bool success = false;
+	int ret = 0;
 	/*
 	 * idx = 0 is the default LPM state
 	 */
@@ -1292,7 +1316,17 @@ static bool psci_enter_sleep(struct lpm_cpu *cpu, int idx, bool from_idle)
 	}
 
 	if (from_idle && cpu->levels[idx].use_bc_timer) {
-		if (tick_broadcast_enter())
+		/*
+		 * tick_broadcast_enter can change the affinity of the
+		 * broadcast timer interrupt, during which interrupt will
+		 * be disabled and enabled back. To avoid system pm ops
+		 * doing any interrupt state save or restore in between
+		 * this window hold the lock.
+		 */
+		spin_lock(&bc_timer_lock);
+		ret = tick_broadcast_enter();
+		spin_unlock(&bc_timer_lock);
+		if (ret)
 			return success;
 	}
 
@@ -1391,11 +1425,11 @@ exit:
 	dev->last_residency = ktime_us_delta(ktime_get(), start);
 	update_history(dev, idx);
 	trace_cpu_idle_exit(idx, success);
-	local_irq_enable();
 	if (lpm_prediction && cpu->lpm_prediction) {
 		histtimer_cancel();
 		clusttimer_cancel();
 	}
+	local_irq_enable();
 	return idx;
 }
 
@@ -1759,6 +1793,7 @@ static struct platform_driver lpm_driver = {
 	.driver = {
 		.name = "lpm-levels",
 		.owner = THIS_MODULE,
+		.suppress_bind_attrs = true,
 		.of_match_table = lpm_mtch_tbl,
 	},
 };
