@@ -5726,6 +5726,9 @@ static int group_idle_state(struct energy_env *eenv, int cpu_idx)
 	for_each_cpu(i, sched_group_cpus(sg))
 		state = min(state, idle_get_state_idx(cpu_rq(i)));
 
+	if (unlikely(state == INT_MAX))
+		return -EINVAL;
+
 	/* Take non-cpuidle idling into account (active idle/arch_cpu_idle()) */
 	state++;
 
@@ -5792,7 +5795,7 @@ end:
  * The required scaling will be performed just one time, by the calling
  * functions, once we accumulated the contributons for all the SGs.
  */
-static void calc_sg_energy(struct energy_env *eenv)
+static int calc_sg_energy(struct energy_env *eenv)
 {
 	struct sched_group *sg = eenv->sg;
 	int busy_energy, idle_energy;
@@ -5821,6 +5824,11 @@ static void calc_sg_energy(struct energy_env *eenv)
 
 		/* Compute IDLE energy */
 		idle_idx = group_idle_state(eenv, cpu_idx);
+		if (unlikely(idle_idx < 0))
+			return idle_idx;
+		if (idle_idx > sg->sge->nr_idle_states - 1)
+			idle_idx = sg->sge->nr_idle_states - 1;
+
 		idle_power = sg->sge->idle_states[idle_idx].power;
 
 		idle_energy   = SCHED_CAPACITY_SCALE - sg_util;
@@ -5829,6 +5837,7 @@ static void calc_sg_energy(struct energy_env *eenv)
 		total_energy = busy_energy + idle_energy;
 		eenv->cpu[cpu_idx].energy += total_energy;
 	}
+	return 0;
 }
 
 /*
@@ -5890,7 +5899,8 @@ static int compute_energy(struct energy_env *eenv)
 				 * CPUs in the current visited SG.
 				 */
 				eenv->sg = sg;
-				calc_sg_energy(eenv);
+				if (calc_sg_energy(eenv))
+					return -EINVAL;
 
 				/* remove CPUs we have just visited */
 				if (!sd->child) {
@@ -6200,13 +6210,14 @@ schedtune_margin(unsigned long signal, long boost)
 	if (boost >= 0) {
 		margin  = SCHED_CAPACITY_SCALE - signal;
 		margin *= boost;
-	} else
+	} else {
 		margin = -signal * boost;
+	}
 
 	margin  = reciprocal_divide(margin, schedtune_spc_rdiv);
-
 	if (boost < 0)
 		margin *= -1;
+
 	return margin;
 }
 
@@ -6277,7 +6288,7 @@ boosted_task_util(struct task_struct *p)
 
 static unsigned long capacity_spare_wake(int cpu, struct task_struct *p)
 {
-	return capacity_orig_of(cpu) - cpu_util_wake(cpu, p);
+	return max_t(long, capacity_of(cpu) - cpu_util_wake(cpu, p), 0);
 }
 
 /*
@@ -6935,6 +6946,8 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 	int target_cpu = -1;
 	int cpu, i;
 	unsigned int active_cpus_count = 0;
+	int isolated_candidate = -1;
+	int prev_cpu = task_cpu(p);
 
 	*backup_cpu = -1;
 
@@ -6980,16 +6993,18 @@ retry:
 			unsigned long wake_util, new_util, min_capped_util;
 
 			cpumask_clear_cpu(i, &search_cpus);
-			if (avoid_prev_cpu && i == task_cpu(p))
-				continue;
-
-			if (!cpu_online(i) || cpu_isolated(i) || is_reserved(i))
-				continue;
-
-			if (walt_cpu_high_irqload(i))
-				continue;
 
 			trace_sched_cpu_util(i);
+			if (!cpu_online(i) || cpu_isolated(i))
+				continue;
+
+			isolated_candidate = i;
+
+			if (avoid_prev_cpu && i == prev_cpu)
+				continue;
+
+			if (walt_cpu_high_irqload(i) || is_reserved(i))
+				continue;
 
 			/*
 			 * p's blocked utilization is still accounted for on prev_cpu
@@ -7059,7 +7074,8 @@ retry:
 					trace_sched_find_best_target(p,
 							prefer_idle, min_util,
 							cpu, best_idle_cpu,
-							best_active_cpu, i);
+							best_active_cpu,
+							i, -1);
 
 					return i;
 				}
@@ -7236,7 +7252,7 @@ retry:
 
 	if (best_idle_cpu != -1 && !is_packing_eligible(p, target_cpu, fbt_env,
 					active_cpus_count, best_idle_cstate)) {
-		if (target_cpu == task_cpu(p))
+		if (target_cpu == prev_cpu)
 			fbt_env->avoid_prev_cpu = true;
 
 		target_cpu = best_idle_cpu;
@@ -7272,9 +7288,31 @@ retry:
 		? best_active_cpu
 		: best_idle_cpu;
 
+	if (target_cpu == -1 && cpu_isolated(prev_cpu) &&
+			isolated_candidate != -1) {
+		target_cpu = isolated_candidate;
+		fbt_env->avoid_prev_cpu = true;
+	}
+
+	/*
+	 * - It is possible for target and backup
+	 *   to select same CPU - if so, drop backup
+	 *
+	 * - The next step of energy evaluation includes
+	 *   prev_cpu. Drop target or backup if it is
+	 *   same as prev_cpu.
+	 */
+	if (*backup_cpu == target_cpu || *backup_cpu == prev_cpu)
+		*backup_cpu = -1;
+
+	if (target_cpu == prev_cpu) {
+		target_cpu = *backup_cpu;
+		*backup_cpu = -1;
+	}
+
 	trace_sched_find_best_target(p, prefer_idle, min_util, cpu,
 				     best_idle_cpu, best_active_cpu,
-				     target_cpu);
+				     target_cpu, *backup_cpu);
 
 	schedstat_inc(p->se.statistics.nr_wakeups_fbt_count);
 	schedstat_inc(this_rq()->eas_stats.fbt_count);
@@ -9735,8 +9773,11 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
 	if (busiest->group_type == group_imbalanced)
 		goto force_balance;
 
-	/* SD_BALANCE_NEWIDLE trumps SMP nice when underutilized */
-	if (env->idle == CPU_NEWLY_IDLE && group_has_capacity(env, local) &&
+	/*
+	 * When dst_cpu is idle, prevent SMP nice and/or asymmetric group
+	 * capacities from resulting in underutilization due to avg_load.
+	 */
+	if (env->idle != CPU_NOT_IDLE && group_has_capacity(env, local) &&
 	    busiest->group_no_capacity)
 		goto force_balance;
 
@@ -10545,8 +10586,12 @@ static inline int find_new_ilb(int type)
 	rcu_read_lock();
 	sd = rcu_dereference_check_sched_domain(rq->sd);
 	if (sd) {
-		cpumask_and(&cpumask, nohz.idle_cpus_mask,
-			    sched_domain_span(sd));
+		if (energy_aware() && rq->misfit_task)
+			cpumask_andnot(&cpumask, nohz.idle_cpus_mask,
+				sched_domain_span(sd));
+		else
+			cpumask_and(&cpumask, nohz.idle_cpus_mask,
+				    sched_domain_span(sd));
 		cpumask_andnot(&cpumask, &cpumask,
 			    cpu_isolated_mask);
 		ilb = cpumask_first(&cpumask);
@@ -10557,7 +10602,7 @@ static inline int find_new_ilb(int type)
 		if (!energy_aware() ||
 		    (capacity_orig_of(cpu) ==
 		     cpu_rq(cpu)->rd->max_cpu_capacity.val ||
-		     cpu_overutilized(cpu))) {
+		     (cpu_overutilized(cpu) && rq->nr_running > 1))) {
 			cpumask_andnot(&cpumask, nohz.idle_cpus_mask,
 			    cpu_isolated_mask);
 			ilb = cpumask_first(&cpumask);
@@ -11847,7 +11892,7 @@ static void walt_check_for_rotation(struct rq *src_rq)
 	if (is_max_capacity_cpu(src_cpu))
 		return;
 
-	wc = ktime_get_ns();
+	wc = sched_ktime_clock();
 	for_each_possible_cpu(i) {
 		struct rq *rq = cpu_rq(i);
 
