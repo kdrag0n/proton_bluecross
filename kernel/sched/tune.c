@@ -981,6 +981,13 @@ boost_write(struct cgroup_subsys_state *css, struct cftype *cft,
 }
 
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
+static int
+boost_write_noop(struct cgroup_subsys_state *css, struct cftype *cft,
+	    s64 boost)
+{
+	return 0;
+}
+
 static s64
 sched_boost_read(struct cgroup_subsys_state *css, struct cftype *cft)
 {
@@ -1058,7 +1065,11 @@ static struct cftype files[] = {
 	{
 		.name = "boost",
 		.read_s64 = boost_read,
+#ifndef CONFIG_DYNAMIC_STUNE_BOOST
 		.write_s64 = boost_write,
+#else
+		.write_s64 = boost_write_noop,
+#endif
 	},
 	{
 		.name = "prefer_idle",
