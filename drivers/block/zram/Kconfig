@@ -1,7 +1,6 @@
 config ZRAM
 	tristate "Compressed RAM block device support"
 	depends on BLOCK && SYSFS && ZPOOL && CRYPTO
-	select ZSMALLOC
 	select CRYPTO_LZO
 	default n
 	help
@@ -39,11 +38,28 @@ config ZRAM_MEMORY_TRACKING
 
 if ZRAM
 
-config ZRAM_DEFAULT_ALLOCATOR
-	string "Default compressed page allocator"
-	default "zsmalloc"
+choice
+	prompt "Default compressed page allocator"
+	default ZRAM_DEFAULT_ZSMALLOC
 	help
 	  Select the default zpool allocator used by zram for the
 	  compressed pages stored in memory.
+
+	config ZRAM_DEFAULT_ZBUD
+		bool "zbud" if ZBUD=y
+
+	config ZRAM_DEFAULT_Z3FOLD
+		bool "z3fold" if Z3FOLD=y
+
+	config ZRAM_DEFAULT_ZSMALLOC
+		bool "zsmalloc"
+		select ZSMALLOC
+endchoice
+
+config ZRAM_DEFAULT_ALLOCATOR
+	string
+	default "zbud" if ZRAM_DEFAULT_ZBUD
+	default "z3fold" if ZRAM_DEFAULT_Z3FOLD
+	default "zsmalloc" if ZRAM_DEFAULT_ZSMALLOC
 
 endif
