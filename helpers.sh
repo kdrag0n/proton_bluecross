@@ -124,7 +124,7 @@ ktest() {
 
 # Incremementally build the kernel, then flash it on the connected device
 inc() {
-    incbuild && ktest
+    incbuild $@ && ktest
 }
 
 # Show differences between the committed defconfig and current config
