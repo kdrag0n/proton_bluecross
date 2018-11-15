@@ -77,6 +77,25 @@ config IOSCHED_ZEN
 	FCFS, dispatches are back-inserted, deadlines ensure fairness.
         Should work best with devices where there is no travel delay.
 
+config IOSCHED_BFQ
+	tristate "BFQ I/O scheduler"
+	default n
+	---help---
+	The BFQ I/O scheduler distributes bandwidth among all
+	processes according to their weights, regardless of the
+	device parameters and with any workload. It also guarantees
+	a low latency to interactive and soft real-time applications.
+	Details in Documentation/block/bfq-iosched.txt
+
+config BFQ_GROUP_IOSCHED
+	bool "BFQ hierarchical scheduling support"
+	depends on IOSCHED_BFQ && BLK_CGROUP
+	default n
+	---help---
+
+	Enable hierarchical scheduling in BFQ, using the blkio
+	(cgroups-v1) or io (cgroups-v2) controller.
+
 choice
 	prompt "Default I/O scheduler"
 	default DEFAULT_CFQ
@@ -105,6 +124,16 @@ choice
 	config DEFAULT_FIOPS
 		bool "FIOPS" if IOSCHED_FIOPS=y
 
+	config DEFAULT_BFQ
+		bool "BFQ" if IOSCHED_BFQ=y
+		help
+		  Selects BFQ as the default I/O scheduler which will be
+		  used by default for all block devices.
+		  The BFQ I/O scheduler aims at distributing the bandwidth
+		  as desired, independently of the disk parameters and with
+		  any workload. It also tries to guarantee low latency to
+		  interactive and soft real-time applications.
+
 endchoice
 
 config DEFAULT_IOSCHED
@@ -116,6 +145,7 @@ config DEFAULT_IOSCHED
 	default "noop" if DEFAULT_NOOP
 	default "maple" if DEFAULT_MAPLE
 	default "sio" if DEFAULT_SIO
+	default "bfq" if DEFAULT_BFQ
 
 endmenu
 
