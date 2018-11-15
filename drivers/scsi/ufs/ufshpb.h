@@ -42,6 +42,7 @@
 #include <linux/spinlock.h>
 #include <linux/circ_buf.h>
 #include <linux/workqueue.h>
+#include <linux/mm.h>
 
 /* Version info*/
 #define UFSHPB_VER				0x0103
@@ -389,16 +390,6 @@ struct ufshpb_sysfs_entry {
 	ssize_t (*show)(struct ufshpb_lu *hpb, char *buf);
 	ssize_t (*store)(struct ufshpb_lu *hpb, const char *, size_t);
 };
-
-static inline void *kvzalloc(size_t size, gfp_t flags)
-{
-	void *ret;
-
-	ret = kzalloc(size, flags | __GFP_NOWARN);
-	if (!ret)
-		ret = __vmalloc(size, flags | __GFP_ZERO, PAGE_KERNEL);
-	return ret;
-}
 
 struct ufshcd_lrb;
 
