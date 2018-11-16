@@ -157,3 +157,12 @@ ec() {
 osize() {
     find out -type f -name '*.o' ! -name 'built-in.o' ! -name 'vmlinux.o' -exec du -h --apparent-size {} + | sort -r -h | head -n "${1:-75}"
 }
+
+# Update the subtrees in the kernel repo
+utree() {
+    git subtree pull --prefix flasher ak2 master # AnyKernel2 fork
+    git subtree pull --prefix techpack/audio msm-extra android-msm-bluecross-4.9-pie-dr1-release # Techpack ASoC audio drivers
+    git subtree pull --prefix drivers/staging/qcacld-3.0 qcacld-3.0 android-msm-bluecross-4.9-pie-dr1-release # QCA CLD 3.0 Wi-Fi drivers
+    git subtree pull --prefix drivers/staging/qca-wifi-host-cmn qca-wfi-host-cmn android-msm-bluecross-4.9-pie-dr1-release # QCA Wi-Fi common files
+    git subtree pull --prefix drivers/staging/fw-api wlan-fw-api android-msm-bluecross-4.9-pie-dr1-release # QCA Wi-Fi firmware API
+}
