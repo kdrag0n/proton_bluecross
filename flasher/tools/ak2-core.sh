@@ -136,7 +136,7 @@ repack_ramdisk() {
     *) compext=$ramdisk_compression;;
   esac;
   case $compext in
-    gz) repackcmd="pigz -p 8";;
+    gz) repackcmd="$bin/pigz -p 8";;
     lzo) repackcmd="lzo";;
     lzma) repackcmd="$bin/xz -Flzma";;
     xz) repackcmd="$bin/xz -Ccrc32";;
