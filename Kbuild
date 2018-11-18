@@ -6,6 +6,9 @@ else
 	KERNEL_BUILD := 0
 endif
 
+TARGET_BUILD_VARIANT := user
+WLAN_DISABLE_BUILD_TAG := y
+
 ifeq ($(CONFIG_CLD_HL_SDIO_CORE), y)
 	CONFIG_QCA_WIFI_SDIO := 1
 endif
@@ -37,7 +40,7 @@ endif
 # Make WLAN as open-source driver by default
 WLAN_OPEN_SOURCE := 1
 
-ifeq ($(KERNEL_BUILD), 0)
+ifeq (1, 1)
 	# These are configurable via Kconfig for kernel-based builds
 	# Need to explicitly configure for Android-based builds
 
