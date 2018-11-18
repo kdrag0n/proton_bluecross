@@ -13,7 +13,7 @@ on property:sys.boot_completed=1
 
 
 # Profiles
-on property:proton.profile=battery
+on property:persist.proton.profile=battery
 	setprop proton.big_max 1056000
 	setprop proton.little_max 1516800
 	setprop proton.big_boost 0
@@ -22,7 +22,7 @@ on property:proton.profile=battery
 	setprop proton.cpu_governor schedutil
 	setprop proton.gpu_governor msm-adreno-tz
 
-on property:proton.profile=balanced
+on property:persist.proton.profile=balanced
 	setprop proton.big_max 2649600
 	setprop proton.little_max 1766400
 	setprop proton.big_boost 902400
@@ -31,7 +31,7 @@ on property:proton.profile=balanced
 	setprop proton.cpu_governor schedutil
 	setprop proton.gpu_governor msm-adreno-tz
 
-on property:proton.profile=performance
+on property:persist.proton.profile=performance
 	setprop proton.big_max 2803200
 	setprop proton.little_max 1766400
 	setprop proton.big_boost 1363200
@@ -73,29 +73,30 @@ on property:proton.gpu_governor=*
 
 
 # Profile bridges: Franco Kernel Manager
+# Update the Spectrum profile, that'll be our primary set
 on property:fku.perf.profile=0
-	setprop proton.profile battery
+	setprop persist.spectrum.profile 2
 
 on property:fku.perf.profile=1
-	setprop proton.profile balanced
+	setprop persist.spectrum.profile 0
 
 on property:fku.perf.profile=2
-	setprop proton.profile performance
+	setprop persist.spectrum.profile 1
 
 
 # Profile bridges: Spectrum
 # Balanced
 on property:persist.spectrum.profile=0
-	setprop proton.profile balanced
+	setprop persist.proton.profile balanced
 
 # Performance
 on property:persist.spectrum.profile=1
-	setprop proton.profile performance
+	setprop persist.proton.profile performance
 
 # Battery
 on property:persist.spectrum.profile=2
-	setprop proton.profile battery
+	setprop persist.proton.profile battery
 
 # Gaming
 on property:persist.spectrum.profile=3
-	setprop proton.profile performance
+	setprop persist.proton.profile performance
