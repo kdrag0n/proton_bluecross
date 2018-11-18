@@ -34,7 +34,6 @@ config ARM_GIC_V3
 	select MULTI_IRQ_HANDLER
 	select IRQ_DOMAIN_HIERARCHY
 	select PARTITION_PERCPU
-	select QCOM_SHOW_RESUME_IRQ
 
 config ARM_GIC_V3_ITS
 	bool
