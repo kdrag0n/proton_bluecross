@@ -110,16 +110,20 @@ dzip() {
 # Flash the latest kernel zip on the connected device via ADB
 ktest() {
     adb wait-for-any && \
-    adb shell ls '/init.recovery*' > /dev/null 2>&1
-    if [ $? -eq 1 ]; then
-        adb reboot recovery
-    fi
 
     fn="proton_kernel.zip"
     [ "x$1" != "x" ] && fn="$1"
-    adb wait-for-usb-recovery && \
-    adb push $fn /tmp/kernel.zip && \
-    adb shell "twrp install /tmp/kernel.zip && reboot"
+
+    is_android=false
+    adb shell pgrep zygote > /dev/null && is_android=true
+    if $is_android; then
+        adb push $fn /data/local/tmp/kernel.zip && \
+        adb shell "su -c 'export PATH=/sbin/.core/busybox:$PATH; unzip -p /data/local/tmp/kernel.zip META-INF/com/google/android/update-binary | /system/bin/sh /proc/self/fd/0 unused 1 /data/local/tmp/kernel.zip'"
+        adb shell rm -f /data/local/tmp/kernel.zip
+    else
+        adb push $fn /tmp/kernel.zip && \
+        adb shell "twrp install /tmp/kernel.zip && reboot"
+    fi
 }
 
 # Incremementally build the kernel, then flash it on the connected device
