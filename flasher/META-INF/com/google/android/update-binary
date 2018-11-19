@@ -8,7 +8,7 @@ DIR=`dirname "$ZIPFILE"`;
 
 ui_print() {
   until [ ! "$1" ]; do
-    echo -e "ui_print $1\nui_print" > $OUTFD;
+    $IS_ANDROID && echo ">>> $1" || echo -e "ui_print $1\nui_print" > $OUTFD;
     shift;
   done;
 }

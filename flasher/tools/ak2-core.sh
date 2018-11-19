@@ -12,7 +12,9 @@ FD=$1;
 OUTFD=/proc/self/fd/$FD;
 
 # ui_print <text>
-ui_print() { echo -e "ui_print $1\nui_print" > $OUTFD; }
+ui_print() {
+  $IS_ANDROID && echo ">>> $1" || echo -e "ui_print $1\nui_print" > $OUTFD;
+}
 
 # contains <string> <substring>
 contains() { test "${1#*$2}" != "$1" && return 0 || return 1; }
