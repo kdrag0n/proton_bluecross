@@ -47,7 +47,7 @@ mkzip() {
 
     [ $_RELEASE -eq 0 ] && echo "  • Installing test build $(cat out/.version)" >| flasher/version
     [ $_RELEASE -eq 1 ] && echo "  • Installing version v$(cat out/.version)" >| flasher/version
-    echo "  • Built on $(date "+%a %b '%y at %H:%M")" >> flasher/version
+    echo "  • Built on $(date "+%a %b %d, %Y")" >> flasher/version
 
     fn="${1:-proton_kernel.zip}"
     rm -f "$fn"
