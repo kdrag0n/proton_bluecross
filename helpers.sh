@@ -72,7 +72,7 @@ rel() {
 
     # Pack zip
     mkdir -p builds
-    mkzip "builds/ProtonKernel-pixel3-v$(cat .version).zip"
+    mkzip "builds/ProtonKernel-pixel3-v$(cat out/.version).zip"
 
     # Revert version
     mv out/.version out/.relversion && \
