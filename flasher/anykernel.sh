@@ -20,7 +20,7 @@ ramdisk_compression=auto;
 
 ## AnyKernel methods (DO NOT CHANGE)
 # import patching functions/variables - see for reference
-. /tmp/anykernel/tools/ak2-core.sh;
+. $TMPDIR/tools/ak2-core.sh;
 
 
 ## AnyKernel install
@@ -35,7 +35,7 @@ if [ -d $ramdisk/.backup ]; then
   ui_print "  • Patching ramdisk"
   patch_cmdline "skip_override" "skip_override"
 
-  mv /tmp/anykernel/overlay $ramdisk
+  mv $TMPDIR/overlay $ramdisk
   cp /system_root/init.rc $ramdisk/overlay
   insert_line $ramdisk/overlay/init.rc "init.proton.rc" after "import /init.usb.rc" "import /init.proton.rc"
 else
