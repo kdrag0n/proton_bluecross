@@ -2,7 +2,6 @@
 # AnyKernel2 Backend
 # osm0sis @ xda-developers
 
-export TMPDIR=/tmp/pflash
 OUTFD=/proc/self/fd/$2;
 ZIPFILE="$3";
 DIR=`dirname "$ZIPFILE"`;
@@ -51,6 +50,11 @@ abort() {
   exit 1;
 }
 
+export TMPDIR=/tmp/pflash
+export IS_ANDROID=false
+pgrep zygote && IS_ANDROID=true
+$IS_ANDROID && export TMPDIR=/data/local/tmp/pflash
+
 show_progress 1.34 25;
 ui_print " ";
 cleanup;
@@ -76,11 +80,13 @@ if [ -f $TMPDIR/version ]; then
   done < $TMPDIR/version;
 fi;
 
-unmount_all;
-mount -o ro -t auto /system;
-mount -o ro -t auto /vendor 2>/dev/null;
-mount /data 2>/dev/null;
-test -f /system/system/build.prop && root=/system;
+if ! $IS_ANDROID; then
+  unmount_all;
+  mount -o ro -t auto /system;
+  mount -o ro -t auto /vendor 2>/dev/null;
+  mount /data 2>/dev/null;
+  test -f /system/system/build.prop && root=/system;
+fi
 
 if [ "$(file_getprop $TMPDIR/anykernel.sh do.devicecheck)" == 1 ]; then
   ui_print "  • Checking device";
