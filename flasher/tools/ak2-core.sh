@@ -11,6 +11,8 @@ mkdir -p $split_img;
 FD=$1;
 OUTFD=/proc/self/fd/$FD;
 
+$IS_ANDROID && cpio=$bin/cpio || cpio=cpio
+
 # ui_print <text>
 ui_print() {
   $IS_ANDROID && echo ">>> $1" || echo -e "ui_print $1\nui_print" > $OUTFD;
@@ -119,7 +121,7 @@ unpack_ramdisk() {
   mkdir -p $ramdisk;
   chmod 755 $ramdisk;
   cd $ramdisk;
-  $unpackcmd -dc $split_img/boot.img-ramdisk.cpio.$compext | EXTRACT_UNSAFE_SYMLINKS=1 cpio -i -d;
+  $unpackcmd -dc $split_img/boot.img-ramdisk.cpio.$compext | EXTRACT_UNSAFE_SYMLINKS=1 $cpio -i -d;
   if [ $? != 0 -o -z "$(ls $ramdisk)" ]; then
     ui_print " "; ui_print "Unpacking ramdisk failed. Aborting..."; exit 1;
   fi;
@@ -150,7 +152,7 @@ repack_ramdisk() {
     $bin/mkbootfs $ramdisk | $repackcmd -9c > $TMPDIR/ramdisk-new.cpio.$compext;
   else
     cd $ramdisk;
-    find . | cpio -H newc -o | $repackcmd -9c > $TMPDIR/ramdisk-new.cpio.$compext;
+    find . | $cpio -H newc -o | $repackcmd -9c > $TMPDIR/ramdisk-new.cpio.$compext;
   fi;
   if [ $? != 0 ]; then
     ui_print " "; ui_print "Repacking ramdisk failed. Aborting..."; exit 1;
