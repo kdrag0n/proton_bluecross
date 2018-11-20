@@ -124,7 +124,7 @@ done;
 if [ $? != 0 -o -z "$(ls $TMPDIR/bin)" ]; then
   abort "Recovery busybox setup failed. Aborting...";
 fi;
-PATH="$TMPDIR/bin" $bb ash $TMPDIR/anykernel.sh $2;
+PATH="$TMPDIR/bin:$PATH" $bb ash $TMPDIR/anykernel.sh $2;
 if [ $? != "0" ]; then
   abort;
 fi;
