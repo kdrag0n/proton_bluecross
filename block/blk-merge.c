@@ -763,6 +763,10 @@ static int attempt_merge(struct request_queue *q, struct request *req,
 
 	if (crypto_not_mergeable(req->bio, next->bio))
 		return 0;
+
+	if (req->ioprio != next->ioprio)
+		return 0;
+
 	/*
 	 * If we are allowed to merge, then append bio list
 	 * from next to rq and release next. merge_requests_fn
@@ -806,7 +810,6 @@ static int attempt_merge(struct request_queue *q, struct request *req,
 	 */
 	blk_account_io_merge(next);
 
-	req->ioprio = ioprio_best(req->ioprio, next->ioprio);
 	if (blk_rq_cpu_valid(next))
 		req->cpu = next->cpu;
 
@@ -871,6 +874,9 @@ bool blk_rq_merge_ok(struct request *rq, struct bio *bio)
 	/* must be using the same buffer */
 	if (req_op(rq) == REQ_OP_WRITE_SAME &&
 	    !blk_write_same_mergeable(rq->bio, bio))
+		return false;
+
+	if (rq->ioprio != bio_prio(bio))
 		return false;
 
 	return true;
