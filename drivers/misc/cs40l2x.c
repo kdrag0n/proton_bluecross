@@ -1571,7 +1571,9 @@ static void cs40l2x_vibe_brightness_set(struct led_classdev *led_cdev,
 void set_vibrate()
 {
 	struct led_classdev *led_dev = &cs40l2x_g->led_dev;
-	cs40l2x_vibe_brightness_set(led_dev, LED_HALF);
+	cs40l2x_vibe_brightness_set(led_dev, LED_FULL);
+	msleep(1);
+	cs40l2x_vibe_brightness_set(led_dev, LED_OFF);
 }
 
 static void cs40l2x_create_led(struct cs40l2x_private *cs40l2x)

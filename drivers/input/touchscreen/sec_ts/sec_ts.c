@@ -1039,7 +1039,7 @@ static irqreturn_t sec_ts_irq_thread(int irq, void *ptr)
 {
 	struct sec_ts_data *ts = (struct sec_ts_data *)ptr;
 
-	if (!wg_switch && sec_ts_set_bus_ref(ts, SEC_TS_BUS_REF_IRQ, true) < 0) {
+	if (sec_ts_set_bus_ref(ts, SEC_TS_BUS_REF_IRQ, true) < 0) {
 		/* Interrupt during bus suspend */
 		input_info(true, &ts->client->dev,
 			   "%s: Skipping stray interrupt since bus is suspended.\n",

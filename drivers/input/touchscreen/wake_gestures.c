@@ -79,16 +79,12 @@
 #define SWEEP_UP		0x04
 #define SWEEP_DOWN		0x08
 
-#define WAKE_GESTURES_ENABLED	1
-
 #define LOGTAG			"WG"
 #define BLUELINE		1
 #define CROSSHATCH		2
 
-#if (WAKE_GESTURES_ENABLED)
 int gestures_switch = WG_DEFAULT;
 static struct input_dev *gesture_dev;
-#endif
 
 /* Resources */
 static int s2w_switch = S2W_DEFAULT;
@@ -158,7 +154,6 @@ static bool is_suspended(void)
 }
 
 /* Wake Gestures */
-#if (WAKE_GESTURES_ENABLED)
 static void report_gesture(int gest)
 {
 	pwrtrigger_time[1] = pwrtrigger_time[0];
@@ -170,7 +165,6 @@ static void report_gesture(int gest)
 	input_report_rel(gesture_dev, WAKE_GESTURE, gest);
 	input_sync(gesture_dev);
 }
-#endif
 
 /* PowerKey work func */
 static void wake_presspwr(struct work_struct * wake_presspwr_work) {
@@ -265,15 +259,11 @@ static void detect_doubletap2wake(int x, int y, bool st)
 		}
 		if ((touch_nr > 1)) {
 			exec_count = false;
-#if (WAKE_GESTURES_ENABLED)
 			if (gestures_switch) {
 				report_gesture(5);
 			} else {
-#endif
 				wake_pwrtrigger();
-#if (WAKE_GESTURES_ENABLED)
 			}
-#endif
 			doubletap2wake_reset();
 		}
 	}
@@ -326,15 +316,11 @@ static void detect_sweep2wake_v(int x, int y, bool st)
 				if (y < prevy) {
 					if (y < (nexty - sweep_y_next)) {
 						if (exec_county && (ktime_to_ms(ktime_get()) - firsty_time < SWEEP_TIMEOUT)) {
-#if (WAKE_GESTURES_ENABLED)
 							if (gestures_switch) {
 								report_gesture(3);
 							} else {
-#endif
 								wake_pwrtrigger();
-#if (WAKE_GESTURES_ENABLED)
 							}		
-#endif								
 							exec_county = false;
 						}
 					}
@@ -355,15 +341,11 @@ static void detect_sweep2wake_v(int x, int y, bool st)
 				if (y > prevy) {
 					if (y > (nexty + sweep_y_next)) {
 						if (exec_county && (ktime_to_ms(ktime_get()) - firsty_time < SWEEP_TIMEOUT)) {
-#if (WAKE_GESTURES_ENABLED)
 							if (gestures_switch) {
 								report_gesture(4);
 							} else {
-#endif
 								wake_pwrtrigger();
-#if (WAKE_GESTURES_ENABLED)
 							}								
-#endif
 							exec_county = false;
 						}
 					}
@@ -415,15 +397,11 @@ static void detect_sweep2wake_h(int x, int y, bool st, bool scr_suspended)
 				if (x > prevx) {
 					if (x > (sweep_x_max - sweep_x_final)) {
 						if (exec_countx && (ktime_to_ms(ktime_get()) - firstx_time < SWEEP_TIMEOUT)) {
-#if (WAKE_GESTURES_ENABLED)
 							if (gestures_switch && scr_suspended) {
 								report_gesture(1);
 							} else {
-#endif
 								wake_pwrtrigger();
-#if (WAKE_GESTURES_ENABLED)
 							}
-#endif							
 							exec_countx = false;
 						}
 					}
@@ -448,15 +426,11 @@ static void detect_sweep2wake_h(int x, int y, bool st, bool scr_suspended)
 				if (x < prevx) {
 					if (x < sweep_x_final) {
 						if (exec_countx) {
-#if (WAKE_GESTURES_ENABLED)
 							if (gestures_switch && scr_suspended) {
 								report_gesture(2);
 							} else {
-#endif
 								wake_pwrtrigger();
-#if (WAKE_GESTURES_ENABLED)
 							}		
-#endif							
 							exec_countx = false;
 						}
 					}
@@ -823,7 +797,6 @@ static int __init wake_gestures_init(void)
 	}
 	INIT_WORK(&dt2w_input_work, dt2w_input_callback);
 		
-#if (WAKE_GESTURES_ENABLED)
 	gesture_dev = input_allocate_device();
 	if (!gesture_dev) {
 		pr_err("Failed to allocate gesture_dev\n");
@@ -839,7 +812,6 @@ static int __init wake_gestures_init(void)
 		pr_err("%s: input_register_device err=%d\n", __func__, rc);
 		goto err_gesture_dev;
 	}
-#endif
 
 	android_touch_kobj = kobject_create_and_add("android_touch", NULL);
 	if (!android_touch_kobj)
@@ -849,43 +821,11 @@ static int __init wake_gestures_init(void)
 	if (rc)
 		pr_warn("%s: sysfs_create_group failed\n", __func__);
 
-
-	/*android_touch_kobj = kobject_create_and_add("wg", kernel_kobj) ;
-	if (android_touch_kobj == NULL) {
-		pr_warn("%s: android_touch_kobj create_and_add failed\n", __func__);
-	}
-	rc = sysfs_create_file(android_touch_kobj, &dev_attr_sweep2wake.attr);
-	if (rc) {
-		pr_warn("%s: sysfs_create_file failed for sweep2wake\n", __func__);
-	}
-	rc = sysfs_create_file(android_touch_kobj, &dev_attr_sweep2sleep.attr);
-	if (rc) {
-		pr_warn("%s: sysfs_create_file failed for sweep2sleep\n", __func__);
-	}
-		rc = sysfs_create_file(android_touch_kobj, &dev_attr_doubletap2wake.attr);
-	if (rc) {
-		pr_warn("%s: sysfs_create_file failed for doubletap2wake\n", __func__);
-	}
-	rc = sysfs_create_file(android_touch_kobj, &dev_attr_wake_vibrate.attr);
-	if (rc) {
-		pr_warn("%s: sysfs_create_file failed for vibrate\n", __func__);
-	}*/
-#if (WAKE_GESTURES_ENABLED)
-/*	rc = sysfs_create_file(android_touch_kobj, &dev_attr_wake_gestures.attr);
-	if (rc) {
-		pr_warn("%s: sysfs_create_file failed for wake_gestures\n", __func__);
-	}*/
-
-
-
-	return 0;
-
 err_gesture_dev:
 	input_free_device(gesture_dev);
 err_input_dev:
 	input_free_device(wake_dev);
 err_alloc_dev:
-#endif
 
 	wg_switch_temp = (s2w_switch || dt2w_switch);
 
@@ -900,10 +840,8 @@ static void __exit wake_gestures_exit(void)
 	destroy_workqueue(dt2w_input_wq);
 	input_unregister_device(wake_dev);
 	input_free_device(wake_dev);
-#if (WAKE_GESTURES_ENABLED)	
 	input_unregister_device(gesture_dev);
 	input_free_device(gesture_dev);
-#endif
 
 	return;
 }
