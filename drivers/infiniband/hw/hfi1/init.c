@@ -133,7 +133,7 @@ int hfi1_create_ctxts(struct hfi1_devdata *dd)
 	/* Control context has to be always 0 */
 	BUILD_BUG_ON(HFI1_CTRL_CTXT != 0);
 
-	dd->rcd = kzalloc_node(dd->num_rcv_contexts * sizeof(*dd->rcd),
+	dd->rcd = kcalloc_node(dd->num_rcv_contexts, sizeof(*dd->rcd),
 			       GFP_KERNEL, dd->node);
 	if (!dd->rcd)
 		goto nomem;
@@ -297,15 +297,14 @@ struct hfi1_ctxtdata *hfi1_create_ctxtdata(struct hfi1_pportdata *ppd, u32 ctxt,
 		 * The resulting value will be rounded down to the closest
 		 * multiple of dd->rcv_entries.group_size.
 		 */
-		rcd->egrbufs.buffers = kzalloc_node(
-			rcd->egrbufs.count * sizeof(*rcd->egrbufs.buffers),
-			GFP_KERNEL, numa);
+		rcd->egrbufs.buffers = kcalloc_node(rcd->egrbufs.count,
+						    sizeof(*rcd->egrbufs.buffers),
+						    GFP_KERNEL, numa);
 		if (!rcd->egrbufs.buffers)
 			goto bail;
-		rcd->egrbufs.rcvtids = kzalloc_node(
-				rcd->egrbufs.count *
-				sizeof(*rcd->egrbufs.rcvtids),
-				GFP_KERNEL, numa);
+		rcd->egrbufs.rcvtids = kcalloc_node(rcd->egrbufs.count,
+						    sizeof(*rcd->egrbufs.rcvtids),
+						    GFP_KERNEL, numa);
 		if (!rcd->egrbufs.rcvtids)
 			goto bail;
 		rcd->egrbufs.size = eager_buffer_size;

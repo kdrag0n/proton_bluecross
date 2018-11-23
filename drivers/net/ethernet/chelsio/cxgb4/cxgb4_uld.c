@@ -467,7 +467,7 @@ int t4_uld_mem_alloc(struct adapter *adap)
 	if (!adap->uld)
 		return -ENOMEM;
 
-	s->uld_rxq_info = kzalloc(CXGB4_ULD_MAX *
+	s->uld_rxq_info = kcalloc(CXGB4_ULD_MAX,
 				  sizeof(struct sge_uld_rxq_info *),
 				  GFP_KERNEL);
 	if (!s->uld_rxq_info)

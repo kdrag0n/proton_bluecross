@@ -43,7 +43,7 @@ static int alloc_ila_locks(struct ila_net *ilan)
 	if (sizeof(spinlock_t) != 0) {
 #ifdef CONFIG_NUMA
 		if (size * sizeof(spinlock_t) > PAGE_SIZE)
-			ilan->locks = vmalloc(size * sizeof(spinlock_t));
+			ilan->locks = vmalloc(array_size(size, sizeof(spinlock_t)));
 		else
 #endif
 		ilan->locks = kmalloc_array(size, sizeof(spinlock_t),

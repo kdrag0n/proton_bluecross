@@ -461,7 +461,7 @@ static int rockchip_dt_node_to_map(struct pinctrl_dev *pctldev,
 	}
 
 	map_num += grp->npins;
-	new_map = devm_kzalloc(pctldev->dev, sizeof(*new_map) * map_num,
+	new_map = devm_kcalloc(pctldev->dev, map_num, sizeof(*new_map),
 								GFP_KERNEL);
 	if (!new_map)
 		return -ENOMEM;
@@ -1561,10 +1561,11 @@ static int rockchip_pinctrl_parse_groups(struct device_node *np,
 
 	grp->npins = size / 4;
 
-	grp->pins = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned int),
+	grp->pins = devm_kcalloc(info->dev, grp->npins, sizeof(unsigned int),
 						GFP_KERNEL);
-	grp->data = devm_kzalloc(info->dev, grp->npins *
-					  sizeof(struct rockchip_pin_config),
+	grp->data = devm_kcalloc(info->dev,
+					grp->npins,
+					sizeof(struct rockchip_pin_config),
 					GFP_KERNEL);
 	if (!grp->pins || !grp->data)
 		return -ENOMEM;
@@ -1616,8 +1617,8 @@ static int rockchip_pinctrl_parse_functions(struct device_node *np,
 	if (func->ngroups <= 0)
 		return 0;
 
-	func->groups = devm_kzalloc(info->dev,
-			func->ngroups * sizeof(char *), GFP_KERNEL);
+	func->groups = devm_kcalloc(info->dev,
+			func->ngroups, sizeof(char *), GFP_KERNEL);
 	if (!func->groups)
 		return -ENOMEM;
 
@@ -1648,7 +1649,8 @@ static int rockchip_pinctrl_parse_dt(struct platform_device *pdev,
 	dev_dbg(&pdev->dev, "nfunctions = %d\n", info->nfunctions);
 	dev_dbg(&pdev->dev, "ngroups = %d\n", info->ngroups);
 
-	info->functions = devm_kzalloc(dev, info->nfunctions *
+	info->functions = devm_kcalloc(dev,
+					      info->nfunctions,
 					      sizeof(struct rockchip_pmx_func),
 					      GFP_KERNEL);
 	if (!info->functions) {
@@ -1656,7 +1658,8 @@ static int rockchip_pinctrl_parse_dt(struct platform_device *pdev,
 		return -EINVAL;
 	}
 
-	info->groups = devm_kzalloc(dev, info->ngroups *
+	info->groups = devm_kcalloc(dev,
+					    info->ngroups,
 					    sizeof(struct rockchip_pin_group),
 					    GFP_KERNEL);
 	if (!info->groups) {
@@ -1696,8 +1699,9 @@ static int rockchip_pinctrl_register(struct platform_device *pdev,
 	ctrldesc->pmxops = &rockchip_pmx_ops;
 	ctrldesc->confops = &rockchip_pinconf_ops;
 
-	pindesc = devm_kzalloc(&pdev->dev, sizeof(*pindesc) *
-			info->ctrl->nr_pins, GFP_KERNEL);
+	pindesc = devm_kcalloc(&pdev->dev,
+			       info->ctrl->nr_pins, sizeof(*pindesc),
+			       GFP_KERNEL);
 	if (!pindesc) {
 		dev_err(&pdev->dev, "mem alloc for pin descriptors failed\n");
 		return -ENOMEM;

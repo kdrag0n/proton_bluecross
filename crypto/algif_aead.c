@@ -460,7 +460,8 @@ static int aead_recvmsg_async(struct socket *sock, struct msghdr *msg,
 	used -= ctx->aead_assoclen;
 
 	/* take over all tx sgls from ctx */
-	areq->tsgl = sock_kmalloc(sk, sizeof(*areq->tsgl) * sgl->cur,
+	areq->tsgl = sock_kmalloc(sk,
+				  array_size(sizeof(*areq->tsgl), sgl->cur),
 				  GFP_KERNEL);
 	if (unlikely(!areq->tsgl))
 		goto free;

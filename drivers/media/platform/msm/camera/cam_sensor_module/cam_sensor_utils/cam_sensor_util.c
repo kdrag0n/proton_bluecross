@@ -11,6 +11,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/vmalloc.h>
 #include "cam_sensor_util.h"
 #include <cam_mem_mgr.h>
 #include "cam_res_mgr_api.h"
@@ -37,8 +38,8 @@ static struct i2c_settings_list*
 		return NULL;
 
 	tmp->i2c_settings.reg_setting = (struct cam_sensor_i2c_reg_array *)
-		kzalloc(sizeof(struct cam_sensor_i2c_reg_array) *
-		size, GFP_KERNEL);
+		kcalloc(size, sizeof(struct cam_sensor_i2c_reg_array),
+				GFP_KERNEL);
 	if (tmp->i2c_settings.reg_setting == NULL) {
 		list_del(&(tmp->list));
 		kfree(tmp);
@@ -972,7 +973,7 @@ int cam_get_dt_power_setting_data(struct device_node *of_node,
 
 	kfree(power_info->power_down_setting);
 	power_info->power_down_setting =
-		kzalloc(sizeof(*ps) * count, GFP_KERNEL);
+		kcalloc(count, sizeof(*ps), GFP_KERNEL);
 
 	if (!power_info->power_down_setting) {
 		CAM_ERR(CAM_SENSOR, "failed");

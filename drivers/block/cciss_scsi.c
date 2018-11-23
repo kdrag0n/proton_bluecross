@@ -220,7 +220,8 @@ scsi_cmd_stack_setup(ctlr_info_t *h, struct cciss_scsi_adapter_data_t *sa)
 		sa->cmd_sg_list = NULL;
 		return -ENOMEM;
 	}
-	stk->elem = kmalloc(sizeof(stk->elem[0]) * stk->nelems, GFP_KERNEL);
+	stk->elem = kmalloc_array(stk->nelems, sizeof(stk->elem[0]),
+				  GFP_KERNEL);
 	if (!stk->elem) {
 		pci_free_consistent(h->pdev, size, stk->pool,
 		stk->cmd_pool_handle);
@@ -532,10 +533,10 @@ adjust_cciss_scsi_table(ctlr_info_t *h, int hostno,
 	int nadded, nremoved;
 	struct Scsi_Host *sh = NULL;
 
-	added = kzalloc(sizeof(*added) * CCISS_MAX_SCSI_DEVS_PER_HBA,
+	added = kcalloc(CCISS_MAX_SCSI_DEVS_PER_HBA, sizeof(*added),
 			GFP_KERNEL);
-	removed = kzalloc(sizeof(*removed) * CCISS_MAX_SCSI_DEVS_PER_HBA,
-			GFP_KERNEL);
+	removed = kcalloc(CCISS_MAX_SCSI_DEVS_PER_HBA, sizeof(*removed),
+			  GFP_KERNEL);
 
 	if (!added || !removed) {
 		dev_warn(&h->pdev->dev,
@@ -1182,8 +1183,9 @@ cciss_update_non_disk_devices(ctlr_info_t *h, int hostno)
 
 	ld_buff = kzalloc(reportlunsize, GFP_KERNEL);
 	inq_buff = kmalloc(OBDR_TAPE_INQ_SIZE, GFP_KERNEL);
-	currentsd = kzalloc(sizeof(*currentsd) *
-			(CCISS_MAX_SCSI_DEVS_PER_HBA+1), GFP_KERNEL);
+	currentsd = kcalloc(CCISS_MAX_SCSI_DEVS_PER_HBA + 1,
+			    sizeof(*currentsd),
+			    GFP_KERNEL);
 	if (ld_buff == NULL || inq_buff == NULL || currentsd == NULL) {
 		printk(KERN_ERR "cciss: out of memory\n");
 		goto out;

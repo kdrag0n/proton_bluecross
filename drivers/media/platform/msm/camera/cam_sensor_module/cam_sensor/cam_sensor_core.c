@@ -626,15 +626,17 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			break;
 		}
 		/* Allocate memory for power up setting */
-		pu = kzalloc(sizeof(struct cam_sensor_power_setting) *
-			MAX_POWER_CONFIG, GFP_KERNEL);
+		pu = kcalloc(MAX_POWER_CONFIG,
+			     sizeof(struct cam_sensor_power_setting),
+			     GFP_KERNEL);
 		if (!pu) {
 			rc = -ENOMEM;
 			goto release_mutex;
 		}
 
-		pd = kzalloc(sizeof(struct cam_sensor_power_setting) *
-			MAX_POWER_CONFIG, GFP_KERNEL);
+		pd = kcalloc(MAX_POWER_CONFIG,
+			     sizeof(struct cam_sensor_power_setting),
+			     GFP_KERNEL);
 		if (!pd) {
 			kfree(pu);
 			rc = -ENOMEM;

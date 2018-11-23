@@ -48,7 +48,7 @@ static __inline__ void *drm_malloc_ab(size_t nmemb, size_t size)
 		return NULL;
 
 	if (size * nmemb <= PAGE_SIZE)
-	    return kmalloc(nmemb * size, GFP_KERNEL);
+	    return kmalloc_array(size, nmemb, GFP_KERNEL);
 
 	return __vmalloc(size * nmemb,
 			 GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL);
@@ -60,11 +60,11 @@ static __inline__ void *drm_malloc_gfp(size_t nmemb, size_t size, gfp_t gfp)
 		return NULL;
 
 	if (size * nmemb <= PAGE_SIZE)
-		return kmalloc(nmemb * size, gfp);
+		return kmalloc_array(size, nmemb, gfp);
 
 	if (gfp & __GFP_RECLAIMABLE) {
-		void *ptr = kmalloc(nmemb * size,
-				    gfp | __GFP_NOWARN | __GFP_NORETRY);
+		void *ptr = kmalloc_array(size, nmemb,
+					  gfp | __GFP_NOWARN | __GFP_NORETRY);
 		if (ptr)
 			return ptr;
 	}

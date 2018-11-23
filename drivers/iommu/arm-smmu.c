@@ -4093,13 +4093,14 @@ static int arm_smmu_parse_impl_def_registers(struct arm_smmu_device *smmu)
 		return -EINVAL;
 	}
 
-	regs = devm_kmalloc(
-		dev, sizeof(*smmu->impl_def_attach_registers) * ntuples,
+	regs = devm_kmalloc_array(
+		dev, ntuples, sizeof(*smmu->impl_def_attach_registers),
 		GFP_KERNEL);
 	if (!regs)
 		return -ENOMEM;
 
-	tuples = devm_kmalloc(dev, sizeof(u32) * ntuples * 2, GFP_KERNEL);
+	tuples = devm_kmalloc(dev, array3_size(sizeof(u32), ntuples, 2),
+			      GFP_KERNEL);
 	if (!tuples)
 		return -ENOMEM;
 
@@ -4137,8 +4138,8 @@ static int arm_smmu_init_clocks(struct arm_smmu_power_resources *pwr)
 		return 0;
 	}
 
-	pwr->clocks = devm_kzalloc(
-		dev, sizeof(*pwr->clocks) * pwr->num_clocks,
+	pwr->clocks = devm_kcalloc(
+		dev, pwr->num_clocks, sizeof(*pwr->clocks),
 		GFP_KERNEL);
 
 	if (!pwr->clocks)
@@ -4248,8 +4249,8 @@ static int arm_smmu_init_regulators(struct arm_smmu_power_resources *pwr)
 		return 0;
 	}
 
-	pwr->gdscs = devm_kzalloc(
-			dev, sizeof(*pwr->gdscs) * pwr->num_gdscs, GFP_KERNEL);
+	pwr->gdscs = devm_kcalloc(
+			dev, pwr->num_gdscs, sizeof(*pwr->gdscs), GFP_KERNEL);
 
 	if (!pwr->gdscs)
 		return -ENOMEM;
@@ -4716,7 +4717,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	smmu->irqs = devm_kzalloc(dev, sizeof(*smmu->irqs) * num_irqs,
+	smmu->irqs = devm_kcalloc(dev, num_irqs, sizeof(*smmu->irqs),
 				  GFP_KERNEL);
 	if (!smmu->irqs) {
 		dev_err(dev, "failed to allocate %d irqs\n", num_irqs);
@@ -5565,7 +5566,7 @@ static int qsmmuv500_parse_errata1(struct arm_smmu_device *smmu)
 	if (len < 0)
 		return 0;
 
-	smrs = devm_kzalloc(dev, sizeof(*smrs) * len, GFP_KERNEL);
+	smrs = devm_kcalloc(dev, len, sizeof(*smrs), GFP_KERNEL);
 	if (!smrs)
 		return -ENOMEM;
 
@@ -5596,7 +5597,7 @@ static int qsmmuv500_read_actlr_tbl(struct arm_smmu_device *smmu)
 	if (len < 0)
 		return 0;
 
-	actlrs = devm_kzalloc(dev, sizeof(*actlrs) * len, GFP_KERNEL);
+	actlrs = devm_kcalloc(dev, len, sizeof(*actlrs), GFP_KERNEL);
 	if (!actlrs)
 		return -ENOMEM;
 

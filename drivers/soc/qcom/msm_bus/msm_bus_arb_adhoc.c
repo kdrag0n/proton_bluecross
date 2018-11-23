@@ -127,9 +127,9 @@ static int gen_lnode(struct device *dev,
 	}
 
 	if (!cur_dev->num_lnodes) {
-		cur_dev->lnode_list = devm_kzalloc(dev,
-				sizeof(struct link_node) * NUM_LNODES,
-								GFP_KERNEL);
+		cur_dev->lnode_list = devm_kcalloc(dev,
+				NUM_LNODES, sizeof(struct link_node),
+				GFP_KERNEL);
 		if (!cur_dev->lnode_list)
 			goto exit_gen_lnode;
 
@@ -907,8 +907,9 @@ static int alloc_handle_lst(int size)
 	struct msm_bus_client **t_cl_list;
 
 	if (!handle_list.num_entries) {
-		t_cl_list = kzalloc(sizeof(struct msm_bus_client *)
-			* NUM_CL_HANDLES, GFP_KERNEL);
+		t_cl_list = kcalloc(NUM_CL_HANDLES,
+				    sizeof(struct msm_bus_client *),
+				    GFP_KERNEL);
 		if (ZERO_OR_NULL_PTR(t_cl_list)) {
 			ret = -ENOMEM;
 			MSM_BUS_ERR("%s: Failed to allocate handles list",
@@ -990,8 +991,9 @@ static uint32_t register_client_adhoc(struct msm_bus_scale_pdata *pdata)
 	}
 	client->src_pnode = lnode;
 
-	client->src_devs = kzalloc(pdata->usecase->num_paths *
-					sizeof(struct device *), GFP_KERNEL);
+	client->src_devs = kcalloc(pdata->usecase->num_paths,
+				   sizeof(struct device *),
+				   GFP_KERNEL);
 	if (IS_ERR_OR_NULL(client->src_devs)) {
 		MSM_BUS_ERR("%s: Error allocating pathnode ptr!", __func__);
 		goto exit_src_dev_malloc_fail;

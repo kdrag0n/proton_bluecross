@@ -617,8 +617,10 @@ static int tegra_gpio_probe(struct platform_device *pdev)
 	if (config->debounce_supported)
 		tgi->gc.set_debounce = tegra_gpio_set_debounce;
 
-	tgi->bank_info = devm_kzalloc(&pdev->dev, tgi->bank_count *
-				      sizeof(*tgi->bank_info), GFP_KERNEL);
+	tgi->bank_info = devm_kcalloc(&pdev->dev,
+				      tgi->bank_count,
+				      sizeof(*tgi->bank_info),
+				      GFP_KERNEL);
 	if (!tgi->bank_info)
 		return -ENODEV;
 

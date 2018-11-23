@@ -1778,7 +1778,7 @@ static int alloc_nand_resource(struct platform_device *pdev)
 	if (pdata->num_cs <= 0)
 		return -ENODEV;
 	info = devm_kzalloc(&pdev->dev,
-			    sizeof(*info) + sizeof(*host) * pdata->num_cs,
+			    CHECKME_struct_size(&*info, *host, pdata->num_cs),
 			    GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;

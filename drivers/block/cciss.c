@@ -312,7 +312,7 @@ static SGDescriptor_struct **cciss_allocate_sg_chain_blocks(
 	if (chainsize <= 0)
 		return NULL;
 
-	cmd_sg_list = kmalloc(sizeof(*cmd_sg_list) * nr_cmds, GFP_KERNEL);
+	cmd_sg_list = kmalloc_array(nr_cmds, sizeof(*cmd_sg_list), GFP_KERNEL);
 	if (!cmd_sg_list)
 		return NULL;
 
@@ -1610,12 +1610,12 @@ static int cciss_bigpassthru(ctlr_info_t *h, void __user *argp)
 		status = -EINVAL;
 		goto cleanup1;
 	}
-	buff = kzalloc(MAXSGENTRIES * sizeof(char *), GFP_KERNEL);
+	buff = kcalloc(MAXSGENTRIES, sizeof(char *), GFP_KERNEL);
 	if (!buff) {
 		status = -ENOMEM;
 		goto cleanup1;
 	}
-	buff_size = kmalloc(MAXSGENTRIES * sizeof(int), GFP_KERNEL);
+	buff_size = kmalloc_array(MAXSGENTRIES, sizeof(int), GFP_KERNEL);
 	if (!buff_size) {
 		status = -ENOMEM;
 		goto cleanup1;
@@ -4624,7 +4624,7 @@ static int controller_reset_failed(CfgTable_struct __iomem *cfgtable)
 	char *driver_ver, *old_driver_ver;
 	int rc, size = sizeof(cfgtable->driver_version);
 
-	old_driver_ver = kmalloc(2 * size, GFP_KERNEL);
+	old_driver_ver = kmalloc_array(2, size, GFP_KERNEL);
 	if (!old_driver_ver)
 		return -ENOMEM;
 	driver_ver = old_driver_ver + size;
@@ -4821,8 +4821,9 @@ static int cciss_init_reset_devices(struct pci_dev *pdev)
 
 static int cciss_allocate_cmd_pool(ctlr_info_t *h)
 {
-	h->cmd_pool_bits = kmalloc(BITS_TO_LONGS(h->nr_cmds) *
-		sizeof(unsigned long), GFP_KERNEL);
+	h->cmd_pool_bits = kmalloc_array(BITS_TO_LONGS(h->nr_cmds),
+					 sizeof(unsigned long),
+					 GFP_KERNEL);
 	h->cmd_pool = pci_alloc_consistent(h->pdev,
 		h->nr_cmds * sizeof(CommandList_struct),
 		&(h->cmd_pool_dhandle));
@@ -4843,14 +4844,16 @@ static int cciss_allocate_scatterlists(ctlr_info_t *h)
 	int i;
 
 	/* zero it, so that on free we need not know how many were alloc'ed */
-	h->scatter_list = kzalloc(h->max_commands *
-				sizeof(struct scatterlist *), GFP_KERNEL);
+	h->scatter_list = kcalloc(h->max_commands,
+				  sizeof(struct scatterlist *),
+				  GFP_KERNEL);
 	if (!h->scatter_list)
 		return -ENOMEM;
 
 	for (i = 0; i < h->nr_cmds; i++) {
-		h->scatter_list[i] = kmalloc(sizeof(struct scatterlist) *
-						h->maxsgentries, GFP_KERNEL);
+		h->scatter_list[i] = kmalloc_array(h->maxsgentries,
+						   sizeof(struct scatterlist),
+						   GFP_KERNEL);
 		if (h->scatter_list[i] == NULL) {
 			dev_err(&h->pdev->dev, "could not allocate "
 				"s/g lists\n");

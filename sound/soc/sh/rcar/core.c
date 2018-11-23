@@ -743,8 +743,8 @@ static int rsnd_dai_probe(struct rsnd_priv *priv)
 		goto rsnd_dai_probe_done;
 	}
 
-	rdrv = devm_kzalloc(dev, sizeof(*rdrv) * nr, GFP_KERNEL);
-	rdai = devm_kzalloc(dev, sizeof(*rdai) * nr, GFP_KERNEL);
+	rdrv = devm_kcalloc(dev, nr, sizeof(*rdrv), GFP_KERNEL);
+	rdai = devm_kcalloc(dev, nr, sizeof(*rdai), GFP_KERNEL);
 	if (!rdrv || !rdai) {
 		ret = -ENOMEM;
 		goto rsnd_dai_probe_done;

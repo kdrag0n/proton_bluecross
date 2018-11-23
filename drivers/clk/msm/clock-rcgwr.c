@@ -325,16 +325,16 @@ static int parse_dt_rcgwr(struct platform_device *pdev, char *prop_name,
 
 	prop_len /= 2;
 
-	*off = devm_kzalloc(&pdev->dev, prop_len * sizeof(u32), GFP_KERNEL);
+	*off = devm_kcalloc(&pdev->dev, prop_len, sizeof(u32), GFP_KERNEL);
 	if (!*off)
 		return -ENOMEM;
 
-	*val = devm_kzalloc(&pdev->dev, prop_len * sizeof(u32), GFP_KERNEL);
+	*val = devm_kcalloc(&pdev->dev, prop_len, sizeof(u32), GFP_KERNEL);
 	if (!*val)
 		return -ENOMEM;
 
 	array = devm_kzalloc(&pdev->dev,
-			prop_len * sizeof(u32) * 2, GFP_KERNEL);
+			array3_size(prop_len, sizeof(u32), 2), GFP_KERNEL);
 	if (!array)
 		return -ENOMEM;
 
@@ -467,7 +467,7 @@ int clock_rcgwr_init(struct platform_device *pdev)
 	if (ret)
 		panic("Cannot read num-clusters from dt (ret:%d)\n", ret);
 
-	rcgwr = devm_kzalloc(&pdev->dev, sizeof(struct rcgwr) * num_clusters,
+	rcgwr = devm_kcalloc(&pdev->dev, num_clusters, sizeof(struct rcgwr),
 				GFP_KERNEL);
 	if (!rcgwr)
 		return -ENOMEM;

@@ -335,7 +335,7 @@ static int xhci_setup_msix(struct xhci_hcd *xhci)
 				HCS_MAX_INTRS(xhci->hcs_params1));
 
 	xhci->msix_entries =
-		kmalloc((sizeof(struct msix_entry))*xhci->msix_count,
+		kmalloc_array(xhci->msix_count, sizeof(struct msix_entry),
 				GFP_KERNEL);
 	if (!xhci->msix_entries)
 		return -ENOMEM;
@@ -1453,7 +1453,7 @@ int xhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags)
 	if (!urb_priv)
 		return -ENOMEM;
 
-	buffer = kzalloc(size * sizeof(struct xhci_td), mem_flags);
+	buffer = kcalloc(size, sizeof(struct xhci_td), mem_flags);
 	if (!buffer) {
 		kfree(urb_priv);
 		return -ENOMEM;

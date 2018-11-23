@@ -3219,9 +3219,9 @@ static void handle_request_ras_comp_num_rsp(union ibmvnic_crq *crq,
 		return;
 	}
 
-	adapter->ras_comp_int = kmalloc(adapter->ras_comp_num *
-					sizeof(struct ibmvnic_fw_comp_internal),
-					GFP_KERNEL);
+	adapter->ras_comp_int = kmalloc_array(adapter->ras_comp_num,
+					      sizeof(struct ibmvnic_fw_comp_internal),
+					      GFP_KERNEL);
 	if (!adapter->ras_comp_int)
 		dma_free_coherent(dev, len, adapter->ras_comps,
 				  adapter->ras_comps_tok);

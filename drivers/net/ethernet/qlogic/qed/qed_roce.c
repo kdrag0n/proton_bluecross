@@ -82,7 +82,7 @@ static int qed_rdma_bmap_alloc(struct qed_hwfn *p_hwfn,
 
 	bmap->max_count = max_count;
 
-	bmap->bitmap = kzalloc(BITS_TO_LONGS(max_count) * sizeof(long),
+	bmap->bitmap = kcalloc(BITS_TO_LONGS(max_count), sizeof(long),
 			       GFP_KERNEL);
 	if (!bmap->bitmap) {
 		DP_NOTICE(p_hwfn,

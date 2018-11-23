@@ -135,8 +135,9 @@ static int tsens_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	tmdev = devm_kzalloc(dev, sizeof(*tmdev) +
-			     data->num_sensors * sizeof(*s), GFP_KERNEL);
+	tmdev = devm_kzalloc(dev,
+			     CHECKME_struct_size(&*tmdev, *s, data->num_sensors),
+			     GFP_KERNEL);
 	if (!tmdev)
 		return -ENOMEM;
 

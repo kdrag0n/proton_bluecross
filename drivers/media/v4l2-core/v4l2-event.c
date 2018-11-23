@@ -26,6 +26,7 @@
 #include <media/v4l2-fh.h>
 #include <media/v4l2-event.h>
 
+#include <linux/mm.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/export.h>
@@ -212,7 +213,7 @@ int v4l2_event_subscribe(struct v4l2_fh *fh,
 	if (elems < 1)
 		elems = 1;
 
-	sev = kzalloc(sizeof(*sev) + sizeof(struct v4l2_kevent) * elems, GFP_KERNEL);
+	sev = kvzalloc(struct_size(sev, events, elems), GFP_KERNEL);
 	if (!sev)
 		return -ENOMEM;
 	for (i = 0; i < elems; i++)
@@ -232,7 +233,7 @@ int v4l2_event_subscribe(struct v4l2_fh *fh,
 
 	if (found_ev) {
 		/* Already listening */
-		kfree(sev);
+		kvfree(sev);
 		goto out_unlock;
 	}
 
@@ -311,7 +312,7 @@ int v4l2_event_unsubscribe(struct v4l2_fh *fh,
 
 	mutex_unlock(&fh->subscribe_lock);
 
-	kfree(sev);
+		kvfree(sev);
 
 	return 0;
 }

@@ -1202,7 +1202,7 @@ static int ena_enable_msix(struct ena_adapter *adapter, int num_queues)
 	netif_dbg(adapter, probe, adapter->netdev,
 		  "trying to enable MSI-X, vectors %d\n", msix_vecs);
 
-	adapter->msix_entries = vzalloc(msix_vecs * sizeof(struct msix_entry));
+	adapter->msix_entries = vzalloc(array_size(msix_vecs, sizeof(struct msix_entry)));
 
 	if (!adapter->msix_entries)
 		return -ENOMEM;

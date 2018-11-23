@@ -228,8 +228,8 @@ static int dp_parser_gpio(struct dp_parser *parser)
 		"qcom,usbplug-cc-gpio",
 	};
 
-	mp->gpio_config = devm_kzalloc(dev,
-		sizeof(struct dss_gpio) * ARRAY_SIZE(dp_gpios), GFP_KERNEL);
+	mp->gpio_config = devm_kcalloc(dev,
+		ARRAY_SIZE(dp_gpios), sizeof(struct dss_gpio), GFP_KERNEL);
 	if (!mp->gpio_config)
 		return -ENOMEM;
 
@@ -291,8 +291,8 @@ static int dp_parser_get_vreg(struct dp_parser *parser,
 		pr_debug("vreg found. count=%d\n", mp->num_vreg);
 	}
 
-	mp->vreg_config = devm_kzalloc(&parser->pdev->dev,
-		sizeof(struct dss_vreg) * mp->num_vreg, GFP_KERNEL);
+	mp->vreg_config = devm_kcalloc(&parser->pdev->dev,
+		mp->num_vreg, sizeof(struct dss_vreg), GFP_KERNEL);
 	if (!mp->vreg_config) {
 		rc = -ENOMEM;
 		goto error;
@@ -484,8 +484,8 @@ static int dp_parser_init_clk_data(struct dp_parser *parser)
 	}
 
 	core_power->num_clk = core_clk_count;
-	core_power->clk_config = devm_kzalloc(dev,
-			sizeof(struct dss_clk) * core_power->num_clk,
+	core_power->clk_config = devm_kcalloc(dev,
+			core_power->num_clk, sizeof(struct dss_clk),
 			GFP_KERNEL);
 	if (!core_power->clk_config) {
 		rc = -EINVAL;
@@ -500,8 +500,8 @@ static int dp_parser_init_clk_data(struct dp_parser *parser)
 	}
 
 	ctrl_power->num_clk = ctrl_clk_count;
-	ctrl_power->clk_config = devm_kzalloc(dev,
-			sizeof(struct dss_clk) * ctrl_power->num_clk,
+	ctrl_power->clk_config = devm_kcalloc(dev,
+			ctrl_power->num_clk, sizeof(struct dss_clk),
 			GFP_KERNEL);
 	if (!ctrl_power->clk_config) {
 		ctrl_power->num_clk = 0;

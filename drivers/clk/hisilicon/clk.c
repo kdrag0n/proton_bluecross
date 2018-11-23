@@ -54,8 +54,9 @@ struct hisi_clock_data *hisi_clk_alloc(struct platform_device *pdev,
 	if (!clk_data->base)
 		return NULL;
 
-	clk_table = devm_kmalloc(&pdev->dev, sizeof(struct clk *) * nr_clks,
-				GFP_KERNEL);
+	clk_table = devm_kmalloc_array(&pdev->dev, nr_clks,
+				       sizeof(struct clk *),
+				       GFP_KERNEL);
 	if (!clk_table)
 		return NULL;
 
@@ -86,7 +87,7 @@ struct hisi_clock_data *hisi_clk_init(struct device_node *np,
 	}
 	clk_data->base = base;
 
-	clk_table = kzalloc(sizeof(struct clk *) * nr_clks, GFP_KERNEL);
+	clk_table = kcalloc(nr_clks, sizeof(struct clk *), GFP_KERNEL);
 	if (!clk_table) {
 		pr_err("%s: could not allocate clock lookup table\n", __func__);
 		goto err_data;
