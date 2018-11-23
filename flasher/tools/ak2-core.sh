@@ -1,5 +1,6 @@
 ## AnyKernel methods (DO NOT CHANGE)
 # set up extracted files and directories
+
 ramdisk=$TMPDIR/ramdisk;
 bin=$TMPDIR/tools;
 split_img=$TMPDIR/split_img;
