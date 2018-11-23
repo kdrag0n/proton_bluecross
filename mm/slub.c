@@ -2374,7 +2374,7 @@ slab_out_of_memory(struct kmem_cache *s, gfp_t gfpflags, int nid)
 
 	pr_warn("SLUB: Unable to allocate memory on node %d, gfp=%#x(%pGg)\n",
 		nid, gfpflags, &gfpflags);
-	pr_warn("  cache: %s, object size: %u, buffer size: %u, default order: %d, min order: %d\n",
+	pr_warn("  cache: %s, object size: %u, buffer size: %d, default order: %d, min order: %d\n",
 		s->name, s->object_size, s->size, oo_order(s->oo),
 		oo_order(s->min));
 
@@ -3601,9 +3601,9 @@ static int kmem_cache_open(struct kmem_cache *s, unsigned long flags)
 	free_kmem_cache_nodes(s);
 error:
 	if (flags & SLAB_PANIC)
-		panic("Cannot create slab %s size=%u realsize=%u order=%u offset=%u flags=%lx\n",
-		      s->name, s->size, s->size,
-		      oo_order(s->oo), s->offset, (unsigned long)flags);
+		panic("Cannot create slab %s size=%lu realsize=%u order=%u offset=%u flags=%lx\n",
+		      s->name, (unsigned long)s->size, s->size,
+		      oo_order(s->oo), s->offset, flags);
 	return -EINVAL;
 }
 
@@ -3791,7 +3791,7 @@ const char *__check_heap_object(const void *ptr, unsigned long n,
 				struct page *page)
 {
 	struct kmem_cache *s;
-	unsigned int offset;
+	unsigned long offset;
 	size_t object_size;
 
 	/* Find object and usable object size. */
@@ -4783,7 +4783,7 @@ struct slab_attribute {
 
 static ssize_t slab_size_show(struct kmem_cache *s, char *buf)
 {
-	return sprintf(buf, "%u\n", s->size);
+	return sprintf(buf, "%d\n", s->size);
 }
 SLAB_ATTR_RO(slab_size);
 
@@ -5542,7 +5542,7 @@ static char *create_unique_id(struct kmem_cache *s)
 		*p++ = 'A';
 	if (p != name + 1)
 		*p++ = '-';
-	p += sprintf(p, "%07u", s->size);
+	p += sprintf(p, "%07d", s->size);
 
 	BUG_ON(p > name + ID_STR_LENGTH - 1);
 	return name;
