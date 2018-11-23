@@ -6,9 +6,12 @@ on boot
 	setprop debug.sqlite.journalmode OFF
 	setprop debug.sqlite.syncmode OFF
 
+	# USB mass storage
+	mkdir /config/usb_gadget/g1/functions/mass_storage.0
+
 on property:sys.boot_completed=1
 	# Profiles
-    setprop fku.profiles 1
+	setprop fku.profiles 1
 	setprop spectrum.support 1
 	setprop persist.spectrum.kernel Proton
 
@@ -104,3 +107,27 @@ on property:persist.spectrum.profile=2
 # Gaming
 on property:persist.spectrum.profile=3
 	setprop persist.proton.profile performance
+
+
+# USB mass storage support
+on property:sys.usb.config=mass_storage && property:sys.usb.configfs=1
+	write /config/usb_gadget/g1/configs/b.1/strings/0x409/configuration "msc"
+	symlink /config/usb_gadget/g1/functions/mass_storage.0 /config/usb_gadget/g1/configs/b.1/f1
+	write /config/usb_gadget/g1/UDC ${sys.usb.controller}
+	setprop sys.usb.state ${sys.usb.config}
+
+on property:sys.usb.config=mass_storage,adb && property:sys.usb.configfs=1
+	start adbd
+
+on property:sys.usb.ffs.ready=1 && property:sys.usb.config=mass_storage,adb && property:sys.usb.configfs=1
+	write /config/usb_gadget/g1/configs/b.1/strings/0x409/configuration "adb_msc"
+	symlink /config/usb_gadget/g1/functions/mass_storage.0 /config/usb_gadget/g1/configs/b.1/f1
+	symlink /config/usb_gadget/g1/functions/ffs.adb /config/usb_gadget/g1/configs/b.1/f2
+	write /config/usb_gadget/g1/UDC ${sys.usb.controller}
+	setprop sys.usb.state ${sys.usb.config}
+
+
+# rm /config/usb_gadget/g1/configs/b.1/function0
+# ln -s /config/usb_gadget/g1/functions/mass_storage.0 function0
+# echo msc > /config/usb_gadget/g1/configs/b.1/strings/0x409/configuration
+# echo a600000.dwc3 > /config/usb_gadget/g1/UDC
