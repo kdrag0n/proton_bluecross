@@ -42,6 +42,11 @@ else
   patch_cmdline "skip_override" ""
 fi
 
+mountpoint -q /data && {
+  mkdir -p /data/adb/magisk_simple/vendor/etc
+  cp $TMPDIR/powerhint.json /data/adb/magisk_simple/vendor/etc
+}
+
 # end ramdisk changes
 
 write_boot;
