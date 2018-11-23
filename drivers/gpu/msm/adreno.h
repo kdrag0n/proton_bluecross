@@ -327,6 +327,29 @@ struct adreno_firmware {
 };
 
 /**
+ * struct adreno_perfcounter_list_node - struct to store perfcounters
+ * allocated by a process on a kgsl fd.
+ * @groupid: groupid of the allocated perfcounter
+ * @countable: countable assigned to the allocated perfcounter
+ * @node: list node for perfcounter_list of a process
+ */
+struct adreno_perfcounter_list_node {
+	unsigned int groupid;
+	unsigned int countable;
+	struct list_head node;
+};
+
+/**
+ * struct adreno_device_private - Adreno private structure per fd
+ * @dev_priv: the kgsl device private structure
+ * @perfcounter_list: list of perfcounters used by the process
+ */
+struct adreno_device_private {
+	struct kgsl_device_private dev_priv;
+	struct list_head perfcounter_list;
+};
+
+/**
  * struct adreno_gpu_core - A specific GPU core definition
  * @gpurev: Unique GPU revision identifier
  * @core: Match for the core version of the GPU
@@ -1869,8 +1892,11 @@ static inline int adreno_perfcntr_active_oob_get(
 		ret = gpudev->oob_set(adreno_dev, OOB_PERFCNTR_SET_MASK,
 				OOB_PERFCNTR_CHECK_MASK,
 				OOB_PERFCNTR_CLEAR_MASK);
-		if (ret)
+		if (ret) {
+			adreno_set_gpu_fault(adreno_dev, ADRENO_GMU_FAULT);
+			adreno_dispatcher_schedule(KGSL_DEVICE(adreno_dev));
 			kgsl_active_count_put(KGSL_DEVICE(adreno_dev));
+		}
 	}
 
 	return ret;
