@@ -118,8 +118,7 @@ ktest() {
     adb shell pgrep zygote > /dev/null && is_android=true
     if $is_android; then
         adb push $fn /data/local/tmp/kernel.zip && \
-        adb shell "su -c 'export PATH=/sbin/.core/busybox:$PATH; unzip -p /data/local/tmp/kernel.zip META-INF/com/google/android/update-binary | /system/bin/sh /proc/self/fd/0 unused 1 /data/local/tmp/kernel.zip'"
-        adb shell rm -f /data/local/tmp/kernel.zip
+        adb shell "su -c 'export PATH=/sbin/.core/busybox:$PATH; unzip -p /data/local/tmp/kernel.zip META-INF/com/google/android/update-binary | /system/bin/sh /proc/self/fd/0 unused 1 /data/local/tmp/kernel.zip && reboot'"
     else
         adb push $fn /tmp/kernel.zip && \
         adb shell "twrp install /tmp/kernel.zip && reboot"
