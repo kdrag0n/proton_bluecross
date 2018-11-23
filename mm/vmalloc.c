@@ -657,7 +657,8 @@ static unsigned long lazy_max_pages(void)
 
 	log = fls(num_online_cpus());
 
-	return log * (32UL * 1024 * 1024 / PAGE_SIZE);
+	return log * (1UL * CONFIG_VMAP_LAZY_PURGING_FACTOR *
+					1024 * 1024 / PAGE_SIZE);
 }
 
 static atomic_t vmap_lazy_nr = ATOMIC_INIT(0);
@@ -2768,6 +2769,9 @@ static int s_show(struct seq_file *m, void *p)
 
 	v = va->vm;
 
+	if (v->flags & VM_LOWMEM)
+		return 0;
+
 	seq_printf(m, "0x%pK-0x%pK %7ld",
 		v->addr, v->addr + v->size, v->size);
 
@@ -2794,9 +2798,6 @@ static int s_show(struct seq_file *m, void *p)
 
 	if (is_vmalloc_addr(v->pages))
 		seq_puts(m, " vpages");
-
-	if (v->flags & VM_LOWMEM)
-		seq_puts(m, " lowmem");
 
 	show_numa_info(m, v);
 	seq_putc(m, '\n');
