@@ -4164,11 +4164,12 @@ __kmem_cache_alias(const char *name, size_t size, size_t align,
 		 * the complete object on kzalloc.
 		 */
 		s->object_size = max(s->object_size, (int)size);
-		s->inuse = max(s->inuse, ALIGN(size, sizeof(void *)));
+		s->inuse = max_t(int, s->inuse, ALIGN(size, sizeof(void *)));
 
 		for_each_memcg_cache(c, s) {
 			c->object_size = s->object_size;
-			c->inuse = max(c->inuse, ALIGN(size, sizeof(void *)));
+			c->inuse = max_t(int, c->inuse,
+					 ALIGN(size, sizeof(void *)));
 		}
 
 		if (sysfs_slab_alias(s, name)) {

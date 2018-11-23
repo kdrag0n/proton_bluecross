@@ -77,7 +77,7 @@ struct kmem_cache {
 	gfp_t allocflags;	/* gfp flags to use on each alloc */
 	int refcount;		/* Refcount for slab cache destroy */
 	void (*ctor)(void *);
-	unsigned int inuse;		/* Offset to metadata */
+	int inuse;		/* Offset to metadata */
 	unsigned int align;		/* Alignment */
 	const char *name;	/* Name (only for display!) */
 	struct list_head list;	/* List of slab caches */
