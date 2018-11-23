@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 4.9.137 Kernel Configuration
+# Linux/arm64 4.9.138 Kernel Configuration
 #
 CONFIG_ARM64=y
 CONFIG_64BIT=y
@@ -4302,6 +4302,7 @@ CONFIG_QSEE_IPC_IRQ_BRIDGE=y
 # CONFIG_CNSS_CRYPTO is not set
 # CONFIG_BIG_CLUSTER_MIN_FREQ_ADJUST is not set
 CONFIG_MODEMSMEM=y
+CONFIG_STATE_NOTIFIER=y
 # CONFIG_SUNXI_SRAM is not set
 # CONFIG_SOC_TI is not set
 CONFIG_PM_DEVFREQ=y
