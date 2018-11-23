@@ -125,9 +125,23 @@ ktest() {
     fi
 }
 
-# Incremementally build the kernel, then flash it on the connected device
+# Flash the latest kernel zip on the device via SSH
+sktest() {
+    fn="proton_kernel.zip"
+    [ "x$1" != "x" ] && fn="$1"
+
+    scp $fn aphone:/data/local/tmp/kernel.zip && \
+    ssh aphone "/sbin/su -c 'export PATH=/sbin/.core/busybox:$PATH; unzip -p /data/local/tmp/kernel.zip META-INF/com/google/android/update-binary | /system/bin/sh /proc/self/fd/0 unused 1 /data/local/tmp/kernel.zip && reboot'"
+}
+
+# Incremementally build the kernel, then flash it on the connected device via ADB
 inc() {
     incbuild $@ && ktest
+}
+
+# Incremementally build the kernel, then flash it on the device via SSH
+sinc() {
+    incbuild $@ && sktest
 }
 
 # Show differences between the committed defconfig and current config
