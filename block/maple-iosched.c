@@ -17,7 +17,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <linux/display_state.h>
+#include <linux/state_notifier.h>
 
 #define MAPLE_IOSCHED_PATCHLEVEL	(8)
 
@@ -78,7 +78,6 @@ maple_add_request(struct request_queue *q, struct request *rq)
 	struct maple_data *mdata = maple_get_data(q);
 	const int sync = rq_is_sync(rq);
 	const int dir = rq_data_dir(rq);
-	const bool display_on = is_display_on();
 
 	/*
 	 * Add request to the proper fifo list and set its
@@ -87,10 +86,10 @@ maple_add_request(struct request_queue *q, struct request *rq)
 
    	/* inrease expiration when device is asleep */
    	unsigned int fifo_expire_suspended = mdata->fifo_expire[sync][dir] * sleep_latency_multiple;
-   	if (display_on && mdata->fifo_expire[sync][dir]) {
+   	if (!state_suspended && mdata->fifo_expire[sync][dir]) {
         rq->fifo_time = jiffies + mdata->fifo_expire[sync][dir];
    		list_add_tail(&rq->queuelist, &mdata->fifo_list[sync][dir]);
-   	} else if (!display_on && fifo_expire_suspended) {
+   	} else if (state_suspended && fifo_expire_suspended) {
         rq->fifo_time = jiffies + fifo_expire_suspended;
    		list_add_tail(&rq->queuelist, &mdata->fifo_list[sync][dir]);
    	}
@@ -206,7 +205,6 @@ maple_dispatch_requests(struct request_queue *q, int force)
 	struct maple_data *mdata = maple_get_data(q);
 	struct request *rq = NULL;
 	int data_dir = READ;
-	const bool display_on = is_display_on();
 
 	/*
 	 * Retrieve any expired request after a batch of
@@ -218,9 +216,9 @@ maple_dispatch_requests(struct request_queue *q, int force)
 	/* Retrieve request */
 	if (!rq) {
 		/* Treat writes fairly while suspended, otherwise allow them to be starved */
-		if (display_on && mdata->starved >= mdata->writes_starved)
+		if (!state_suspended && mdata->starved >= mdata->writes_starved)
 			data_dir = WRITE;
-		else if (!display_on && mdata->starved >= 1)
+		else if (state_suspended && mdata->starved >= 1)
 			data_dir = WRITE;
 
 		rq = maple_choose_request(mdata, data_dir);
