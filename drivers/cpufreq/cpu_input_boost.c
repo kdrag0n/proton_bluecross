@@ -33,9 +33,10 @@ struct boost_drv {
 	struct delayed_work max_unboost;
 	struct notifier_block cpu_notif;
 	struct notifier_block fb_notif;
-	atomic64_t max_boost_expires;
+	unsigned long max_boost_expires;
 	atomic_t max_boost_dur;
 	atomic_t state;
+	spinlock_t lock;
 };
 
 static struct boost_drv *boost_drv_g;
@@ -97,17 +98,17 @@ void cpu_input_boost_kick(void)
 static void __cpu_input_boost_kick_max(struct boost_drv *b,
 	unsigned int duration_ms)
 {
-	unsigned long curr_expires, new_expires;
+	unsigned long new_expires;
 
-	do {
-		curr_expires = atomic64_read(&b->max_boost_expires);
-		new_expires = jiffies + msecs_to_jiffies(duration_ms);
-
-		/* Skip this boost if there's a longer boost in effect */
-		if (time_after(curr_expires, new_expires))
-			return;
-	} while (atomic64_cmpxchg(&b->max_boost_expires, curr_expires,
-		new_expires) != curr_expires);
+	/* Skip this boost if there's already a longer boost in effect */
+	spin_lock(&b->lock);
+	new_expires = jiffies + msecs_to_jiffies(duration_ms);
+	if (time_after(b->max_boost_expires, new_expires)) {
+		spin_unlock(&b->lock);
+		return;
+	}
+	b->max_boost_expires = new_expires;
+	spin_unlock(&b->lock);
 
 	atomic_set(&b->max_boost_dur, duration_ms);
 	queue_work(b->wq, &b->max_boost);
@@ -323,7 +324,7 @@ static int __init cpu_input_boost_init(void)
 		goto free_b;
 	}
 
-	atomic64_set(&b->max_boost_expires, 0);
+	spin_lock_init(&b->lock);
 	INIT_WORK(&b->input_boost, input_boost_worker);
 	INIT_DELAYED_WORK(&b->input_unboost, input_unboost_worker);
 	INIT_WORK(&b->max_boost, max_boost_worker);
