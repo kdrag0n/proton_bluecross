@@ -285,11 +285,6 @@ config CPU_FREQ_GOV_BLU_SCHEDUTIL
 
 	  If in doubt, say N.
 
-config CPU_INPUT_BOOST
-	bool "CPU Input Boost"
-	help
-	  Allows for boosting the CPU on custom events from other kernel drivers.
-
 comment "CPU frequency scaling drivers"
 
 config CPUFREQ_DT
