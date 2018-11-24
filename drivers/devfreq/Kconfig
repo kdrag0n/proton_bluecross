@@ -269,6 +269,17 @@ config DEVFREQ_SPDM
 	  This driver allows any SPDM based client to vote for bandwidth.
 	  Used with the QTI SPDM Hypervisor Governor.
 
+config DEVFREQ_BOOST
+	bool "Devfreq Boost"
+	help
+	  Boosts enumerated devfreq devices upon input, and allows for boosting
+	  specific devfreq devices on other custom events. The boost frequencies
+	  for this driver should be set so that frame drops are near-zero at the
+	  boosted frequencies and power consumption is minimized at said
+	  frequencies. The goal of this driver is to provide an interface to
+	  achieve optimal device performance by requesting boosts on key events,
+	  such as when a frame is ready to rendered to the display.
+
 source "drivers/devfreq/event/Kconfig"
 
 endif # PM_DEVFREQ
