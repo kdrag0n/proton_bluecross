@@ -112,7 +112,7 @@
       "Path": "/dev/stune/top-app/schedtune.boost",
       "Values": [
         "15",
-        "0"
+        "1"
       ],
       "ResetOnInit": true
     },
