@@ -91,12 +91,10 @@ static void dead_zone_enable(void *device_data);
 static void drawing_test_enable(void *device_data);
 static void set_lowpower_mode(void *device_data);
 static void set_wirelesscharger_mode(void *device_data);
-static void spay_enable(void *device_data);
 static void set_aod_rect(void *device_data);
 static void get_aod_rect(void *device_data);
 static void aod_enable(void *device_data);
 static void set_grip_data(void *device_data);
-static void dex_enable(void *device_data);
 static void brush_enable(void *device_data);
 static void force_touch_active(void *device_data);
 static void set_touchable_area(void *device_data);
@@ -185,12 +183,10 @@ static struct sec_cmd sec_cmds[] = {
 	{SEC_CMD("drawing_test_enable", drawing_test_enable),},
 	{SEC_CMD("set_lowpower_mode", set_lowpower_mode),},
 	{SEC_CMD("set_wirelesscharger_mode", set_wirelesscharger_mode),},
-	{SEC_CMD("spay_enable", spay_enable),},
 	{SEC_CMD("set_aod_rect", set_aod_rect),},
 	{SEC_CMD("get_aod_rect", get_aod_rect),},
 	{SEC_CMD("aod_enable", aod_enable),},
 	{SEC_CMD("set_grip_data", set_grip_data),},
-	{SEC_CMD("dex_enable", dex_enable),},
 	{SEC_CMD("brush_enable", brush_enable),},
 	{SEC_CMD("force_touch_active", force_touch_active),},
 	{SEC_CMD("set_touchable_area", set_touchable_area),},
@@ -445,14 +441,10 @@ static ssize_t read_all_touch_count_show(struct device *dev,
 	struct sec_cmd_data *sec = dev_get_drvdata(dev);
 	struct sec_ts_data *ts = container_of(sec, struct sec_ts_data, sec);
 
-	input_info(true, &ts->client->dev, "%s: touch:%d, force:%d, aod:%d, spay:%d\n", __func__,
-			ts->all_finger_count, ts->all_force_count,
-			ts->all_aod_tap_count, ts->all_spay_count);
-
 	return snprintf(buf, SEC_CMD_BUF_SIZE,
-			"\"TTCN\":\"%d\",\"TFCN\":\"%d\",\"TACN\":\"%d\",\"TSCN\":\"%d\"",
+			"\"TTCN\":\"%d\",\"TFCN\":\"%d\",\"TACN\":\"%d\"",
 			ts->all_finger_count, ts->all_force_count,
-			ts->all_aod_tap_count, ts->all_spay_count);
+			ts->all_aod_tap_count);
 }
 
 static ssize_t clear_all_touch_count_store(struct device *dev,
@@ -464,7 +456,6 @@ static ssize_t clear_all_touch_count_store(struct device *dev,
 
 	ts->all_force_count = 0;
 	ts->all_aod_tap_count = 0;
-	ts->all_spay_count = 0;
 
 	input_info(true, &ts->client->dev, "%s: clear\n", __func__);
 
@@ -5818,9 +5809,6 @@ static void set_lowpower_mode(void *device_data)
 		sec->cmd_state = SEC_CMD_STATUS_OK;
 	}
 
-/* set lowpower mode by spay, edge_swipe function.
-	ts->lowpower_mode = sec->cmd_param[0];
-*/
 	sec_cmd_set_cmd_result(sec, buff, strnlen(buff, sizeof(buff)));
 
 	sec_cmd_set_cmd_exit(sec);
@@ -5887,50 +5875,6 @@ NG:
 		__func__, (mode) ? "wireless enable" : "wireless disable", ts->charger_mode);
 
 OUT:
-	snprintf(buff, sizeof(buff), "%s", "NG");
-	sec->cmd_state = SEC_CMD_STATUS_FAIL;
-	sec_cmd_set_cmd_result(sec, buff, strnlen(buff, sizeof(buff)));
-	sec_cmd_set_cmd_exit(sec);
-
-	sec_ts_set_bus_ref(ts, SEC_TS_BUS_REF_SYSFS, false);
-}
-
-static void spay_enable(void *device_data)
-{
-	struct sec_cmd_data *sec = (struct sec_cmd_data *)device_data;
-	struct sec_ts_data *ts = container_of(sec, struct sec_ts_data, sec);
-	char buff[SEC_CMD_STR_LEN] = { 0 };
-
-	sec_ts_set_bus_ref(ts, SEC_TS_BUS_REF_SYSFS, true);
-
-	sec_cmd_set_default_result(sec);
-
-	if (sec->cmd_param[0] < 0 || sec->cmd_param[0] > 1)
-		goto NG;
-
-	if (sec->cmd_param[0]) {
-		if (ts->use_customlib)
-			ts->lowpower_mode |= SEC_TS_MODE_CUSTOMLIB_SPAY;
-	} else {
-		if (ts->use_customlib)
-			ts->lowpower_mode &= ~SEC_TS_MODE_CUSTOMLIB_SPAY;
-	}
-
-	input_info(true, &ts->client->dev, "%s: %02X\n", __func__, ts->lowpower_mode);
-
-	#ifdef SEC_TS_SUPPORT_CUSTOMLIB
-	if (ts->use_customlib)
-		sec_ts_set_custom_library(ts);
-	#endif
-
-	snprintf(buff, sizeof(buff), "%s", "OK");
-	sec->cmd_state = SEC_CMD_STATUS_OK;
-	sec_cmd_set_cmd_result(sec, buff, strnlen(buff, sizeof(buff)));
-	sec_cmd_set_cmd_exit(sec);
-	sec_ts_set_bus_ref(ts, SEC_TS_BUS_REF_SYSFS, false);
-	return;
-
-NG:
 	snprintf(buff, sizeof(buff), "%s", "NG");
 	sec->cmd_state = SEC_CMD_STATUS_FAIL;
 	sec_cmd_set_cmd_result(sec, buff, strnlen(buff, sizeof(buff)));
@@ -6267,80 +6211,6 @@ static void set_grip_data(void *device_data)
 err_grip_data:
 	mutex_unlock(&ts->device_mutex);
 
-	snprintf(buff, sizeof(buff), "%s", "NG");
-	sec->cmd_state = SEC_CMD_STATUS_FAIL;
-	sec_cmd_set_cmd_result(sec, buff, strnlen(buff, sizeof(buff)));
-	sec_cmd_set_cmd_exit(sec);
-	sec_ts_set_bus_ref(ts, SEC_TS_BUS_REF_SYSFS, false);
-}
-
-/*
- * Set/Get Dex Mode 0xE7 
- *  0: Disable dex mode
- *  1: Full screen mode
- *  2: Iris mode
- */
-static void dex_enable(void *device_data)
-{
-	struct sec_cmd_data *sec = (struct sec_cmd_data *)device_data;
-	struct sec_ts_data *ts = container_of(sec, struct sec_ts_data, sec);
-	char buff[SEC_CMD_STR_LEN] = { 0 };
-	int ret;
-
-	sec_ts_set_bus_ref(ts, SEC_TS_BUS_REF_SYSFS, true);
-
-	sec_cmd_set_default_result(sec);
-
-	if (!ts->plat_data->support_dex) {
-		input_err(true, &ts->client->dev, "%s: not support DeX mode\n", __func__);
-		goto NG;
-	}
-
-	if ((sec->cmd_param[0] < 0 || sec->cmd_param[0] > 1) &&
-		(sec->cmd_param[1] < 0 || sec->cmd_param[1] > 1)) {
-		input_err(true, &ts->client->dev, "%s: not support param\n", __func__);
-		goto NG;
-	}
-
-	ts->dex_mode = sec->cmd_param[0];
-	if (ts->dex_mode) {
-		input_err(true, &ts->client->dev, "%s: set DeX touch_pad mode%s\n",
-			__func__, sec->cmd_param[1] ? " & Iris mode" : "");
-		ts->input_dev = ts->input_dev_pad;
-		if (sec->cmd_param[1]) {
-			/* Iris mode */
-			ts->dex_mode = 0x02;
-			ts->dex_name = "[DeXI]";
-		} else {
-			ts->dex_name = "[DeX]";
-		}
-	} else {
-		input_err(true, &ts->client->dev, "%s: set touch mode\n", __func__);
-		ts->input_dev = ts->input_dev_touch;
-		ts->dex_name = "";
-	}
-
-	if (ts->power_status == SEC_TS_STATE_POWER_OFF) {
-		input_err(true, &ts->client->dev, "%s: Touch is stopped!\n", __func__);
-		goto NG;
-	}
-
-	ret = ts->sec_ts_i2c_write(ts, SEC_TS_CMD_SET_DEX_MODE, &ts->dex_mode, 1);
-	if (ret < 0) {
-		input_err(true, &ts->client->dev,
-				"%s: failed to set dex %smode\n", __func__,
-				sec->cmd_param[1] ? "iris " : "");
-		goto NG;
-	}
-
-	snprintf(buff, sizeof(buff), "%s", "OK");
-	sec->cmd_state = SEC_CMD_STATUS_OK;
-	sec_cmd_set_cmd_result(sec, buff, strnlen(buff, sizeof(buff)));
-	sec_cmd_set_cmd_exit(sec);
-	sec_ts_set_bus_ref(ts, SEC_TS_BUS_REF_SYSFS, false);
-	return;
-
-NG:
 	snprintf(buff, sizeof(buff), "%s", "NG");
 	sec->cmd_state = SEC_CMD_STATUS_FAIL;
 	sec_cmd_set_cmd_result(sec, buff, strnlen(buff, sizeof(buff)));

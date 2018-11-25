@@ -256,7 +256,6 @@
 #define SEC_TS_CMD_SET_TOUCH_ENGINE_MODE	0xE1
 #define SEC_TS_CMD_SET_POWER_MODE	0xE4
 #define SEC_TS_CMD_EDGE_DEADZONE	0xE5
-#define SEC_TS_CMD_SET_DEX_MODE		0xE7
 #define SEC_TS_CMD_CALIBRATION_PRESSURE		0xE9
 /* Have to need delay 30msec after writing 0xEA command */
 /* Do not write Zero with 0xEA command */
@@ -294,7 +293,6 @@
 
 #define SEC_TS_EVENT_BUFF_SIZE		8
 #define SEC_TS_SID_GESTURE		0x14
-#define SEC_TS_GESTURE_CODE_SPAY		0x00
 #define SEC_TS_GESTURE_CODE_DOUBLE_TAP		0x01
 
 #define SEC_TS_COORDINATE_ACTION_NONE		0
@@ -468,7 +466,6 @@ enum {
 };
 
 typedef enum {
-	CUSTOMLIB_EVENT_TYPE_SPAY			= 0x04,
 	CUSTOMLIB_EVENT_TYPE_PRESSURE_TOUCHED = 0x05,
 	CUSTOMLIB_EVENT_TYPE_PRESSURE_RELEASED	= 0x06,
 	CUSTOMLIB_EVENT_TYPE_AOD			= 0x08,
@@ -505,11 +502,10 @@ enum {
 #define SEC_TS_I2C_RETRY_CNT		3
 #define SEC_TS_WAIT_RETRY_CNT		100
 
-#define SEC_TS_MODE_CUSTOMLIB_SPAY			(1 << 1)
 #define SEC_TS_MODE_CUSTOMLIB_AOD			(1 << 2)
 #define SEC_TS_MODE_CUSTOMLIB_FORCE_KEY	(1 << 6)
 
-#define SEC_TS_MODE_LOWPOWER_FLAG			(SEC_TS_MODE_CUSTOMLIB_SPAY | SEC_TS_MODE_CUSTOMLIB_AOD \
+#define SEC_TS_MODE_LOWPOWER_FLAG			(SEC_TS_MODE_CUSTOMLIB_AOD \
 											| SEC_TS_MODE_CUSTOMLIB_FORCE_KEY)
 
 #define SEC_TS_AOD_GESTURE_PRESS		(1 << 7)
@@ -691,8 +687,6 @@ struct sec_ts_data {
 
 	u8 lowpower_mode;
 	u8 lowpower_status;
-	u8 dex_mode;
-	char *dex_name;
 	u8 brush_mode;
 	u8 touchable_area;
 	volatile bool input_closed;
@@ -786,7 +780,6 @@ struct sec_ts_data {
 	unsigned int all_finger_count;
 	unsigned int all_force_count;
 	unsigned int all_aod_tap_count;
-	unsigned int all_spay_count;
 	unsigned int max_z_value;
 	unsigned int min_z_value;
 	unsigned int sum_z_value;
@@ -874,7 +867,6 @@ struct sec_ts_plat_data {
 
 	bool regulator_boot_on;
 	bool support_mt_pressure;
-	bool support_dex;
 	bool support_sidegesture;
 };
 
