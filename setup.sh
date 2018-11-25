@@ -29,6 +29,11 @@ gcc32_bin=$tc32/bin
 [ -z $prefix ] && prefix=$(get_gcc_prefix $gcc_bin)
 [ -z $prefix32 ] && prefix32=$(get_gcc_prefix $gcc32_bin)
 
+# Clean up traces of Clang setup script
+unset CROSS_COMPILE
+unset CROSS_COMPILE_ARM32
+unset CLANG_TRIPLE
+
 export PATH=$gcc_bin:$gcc32_bin:$PATH
 
 MAKEFLAGS+=(
