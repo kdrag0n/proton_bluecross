@@ -530,10 +530,6 @@ static void chg_work(struct work_struct *work)
 			if (chg_drv->checked_cv_cnt == 0)
 				chg_drv->checked_cv_cnt = 1;
 
-			pr_info("MSC_FAST vt=%d vb=%d fv_uv=%d->%d vchrg=%d cv_cnt=%d \n",
-				vtier, vbatt, chg_drv->fv_uv, fv_uv,
-				vchrg, chg_drv->checked_cv_cnt);
-
 		} else if (chg_type != POWER_SUPPLY_CHARGE_TYPE_TAPER) {
 		/* Not fast or taper: set checked_cv_cnt=0 to make sure we test
 		 * for current and avoid early termination in case of lack of
@@ -583,13 +579,7 @@ static void chg_work(struct work_struct *work)
 				vtier, vbatt, chg_drv->fv_uv, fv_uv);
 		}
 
-		if (chg_drv->checked_cv_cnt > 0) {
-		/* debounce period on tier switch */
-			pr_info("MSC_WAIT vt=%d vb=%d fv_uv=%d ibatt=%d cv_cnt=%d ov_cnt=%d\n",
-				vtier, vbatt, fv_uv, ibatt,
-				chg_drv->checked_cv_cnt,
-				chg_drv->checked_ov_cnt);
-		} else if (-ibatt > cc_next_max) {
+		if (-ibatt > cc_next_max) {
 		/* current over next tier, reset tier switch count */
 			chg_drv->checked_tier_switch_cnt = 0;
 
