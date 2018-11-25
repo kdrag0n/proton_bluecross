@@ -130,7 +130,7 @@ sktest() {
     fn="proton_kernel.zip"
     [ "x$1" != "x" ] && fn="$1"
 
-    scp $fn aphone:/data/local/tmp/kernel.zip && \
+    echo "put $fn /data/local/tmp/kernel.zip" | sftp aphone && \
     ssh aphone "/sbin/su -c 'export PATH=/sbin/.core/busybox:$PATH; unzip -p /data/local/tmp/kernel.zip META-INF/com/google/android/update-binary | /system/bin/sh /proc/self/fd/0 unused 1 /data/local/tmp/kernel.zip && reboot'"
 }
 
