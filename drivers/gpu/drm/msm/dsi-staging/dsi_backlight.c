@@ -324,9 +324,6 @@ static int dsi_backlight_update_status(struct backlight_device *bd)
 		if (panel->vr_mode && (bl_lvl < bl->bl_vr_min_safe_level))
 			bl_lvl = bl->bl_vr_min_safe_level;
 
-		pr_info("req:%d bl:%d state:0x%x\n",
-			bd->props.brightness, bl_lvl, bd->props.state);
-
 		rc = bl->update_bl(bl, bl_lvl);
 		if (rc) {
 			pr_err("unable to set backlight (%d)\n", rc);
@@ -654,8 +651,6 @@ int dsi_backlight_early_dpms(struct dsi_backlight_config *bl, int power_mode)
 
 	if (!bd)
 		return 0;
-
-	pr_info("power_mode:%d state:0x%0x\n", power_mode, bd->props.state);
 
 	mutex_lock(&bd->ops_lock);
 	state = get_state_after_dpms(bl, power_mode);

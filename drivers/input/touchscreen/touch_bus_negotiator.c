@@ -116,8 +116,6 @@ int tbn_release_bus(struct tbn_context *tbn)
 	struct tbn_kernel_release_bus_v01 req;
 	struct tbn_ssc_acquire_bus_v01 rsp;
 
-	dev_info(tbn->dev, "kernel releasing bus access from SLPI\n");
-
 	if (!tbn || !tbn->qmi_handle)
 		return -EINVAL;
 

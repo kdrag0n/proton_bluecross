@@ -2632,10 +2632,6 @@ DEFINE_SIMPLE_ATTRIBUTE(clock_enable_fops, clock_debug_enable_get,
 do {							\
 	if (m)						\
 		seq_printf(m, fmt, ##__VA_ARGS__);	\
-	else if (c)					\
-		pr_cont(fmt, ##__VA_ARGS__);		\
-	else						\
-		pr_info(fmt, ##__VA_ARGS__);		\
 } while (0)
 
 /*

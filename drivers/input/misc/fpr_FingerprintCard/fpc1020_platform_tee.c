@@ -186,8 +186,6 @@ static int select_pin_ctl(struct fpc1020_data *fpc1020, const char *name)
 					fpc1020->pinctrl_state[i]);
 			if (rc)
 				dev_err(dev, "cannot select '%s'\n", name);
-			else
-				dev_info(dev, "Selected '%s'\n", name);
 			goto exit;
 		}
 	}
@@ -260,7 +258,6 @@ static int hw_reset(struct fpc1020_data *fpc1020)
 	usleep_range(RESET_HIGH_SLEEP2_MIN_US, RESET_HIGH_SLEEP2_MAX_US);
 
 	irq_gpio = gpio_get_value(fpc1020->irq_gpio);
-	dev_info(dev, "IRQ after reset %d\n", irq_gpio);
 
 exit:
 	return rc;

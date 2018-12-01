@@ -115,8 +115,6 @@ int sec_ts_sw_reset(struct sec_ts_data *ts)
 		return 0;
 	}
 
-	input_info(true, &ts->client->dev, "%s: sw_reset\n", __func__);
-
 	/* Sense_on */
 	ret = ts->sec_ts_i2c_write(ts, SEC_TS_CMD_SENSE_ON, NULL, 0);
 	if (ret < 0) {
