@@ -741,8 +741,6 @@ static void sec_ts_read_event(struct sec_ts_data *ts)
 				ts->coord[t_id].z = p_event_coord->z &
 							SEC_TS_PRESSURE_MAX;
 				ts->coord[t_id].ttype = p_event_coord->ttype_3_2 << 2 | p_event_coord->ttype_1_0 << 0;
-				ts->coord[t_id].major = p_event_coord->major;
-				ts->coord[t_id].minor = p_event_coord->minor;
 
 				if (!ts->coord[t_id].palm && (ts->coord[t_id].ttype == SEC_TS_TOUCHTYPE_PALM))
 					ts->coord[t_id].palm_count++;
@@ -779,8 +777,6 @@ static void sec_ts_read_event(struct sec_ts_data *ts)
 							max_force_p = (rbuf[0] & 0xFF) << 8 | (rbuf[1] & 0xFF);
 
 						input_mt_slot(ts->input_dev, t_id);
-						if (ts->plat_data->support_mt_pressure)
-							input_report_abs(ts->input_dev, ABS_MT_PRESSURE, 0);
 						input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER, 0);
 
 						if (ts->touch_count > 0)
@@ -808,14 +804,6 @@ static void sec_ts_read_event(struct sec_ts_data *ts)
 
 						input_report_abs(ts->input_dev, ABS_MT_POSITION_X, ts->coord[t_id].x);
 						input_report_abs(ts->input_dev, ABS_MT_POSITION_Y, ts->coord[t_id].y);
-						input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, ts->coord[t_id].major);
-						input_report_abs(ts->input_dev, ABS_MT_TOUCH_MINOR, ts->coord[t_id].minor);
-						if (ts->brush_mode)
-							input_report_abs(ts->input_dev, ABS_MT_CUSTOM, (ts->coord[t_id].z << 1) | ts->coord[t_id].palm);
-						else
-							input_report_abs(ts->input_dev, ABS_MT_CUSTOM, (BRUSH_Z_DATA << 1) | ts->coord[t_id].palm);
-						if (ts->plat_data->support_mt_pressure)
-							input_report_abs(ts->input_dev, ABS_MT_PRESSURE, ts->coord[t_id].z);
 
 						if ((ts->touch_count > 4) && (ts->check_multi == 0)) {
 							ts->check_multi = 1;
@@ -843,15 +831,7 @@ static void sec_ts_read_event(struct sec_ts_data *ts)
 
 						input_report_abs(ts->input_dev, ABS_MT_POSITION_X, ts->coord[t_id].x);
 						input_report_abs(ts->input_dev, ABS_MT_POSITION_Y, ts->coord[t_id].y);
-						input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, ts->coord[t_id].major);
-						input_report_abs(ts->input_dev, ABS_MT_TOUCH_MINOR, ts->coord[t_id].minor);
-						if (ts->brush_mode)
-							input_report_abs(ts->input_dev, ABS_MT_CUSTOM, (ts->coord[t_id].z << 1) | ts->coord[t_id].palm);
-						else
-							input_report_abs(ts->input_dev, ABS_MT_CUSTOM, (BRUSH_Z_DATA << 1) | ts->coord[t_id].palm);
 
-						if (ts->plat_data->support_mt_pressure)
-							input_report_abs(ts->input_dev, ABS_MT_PRESSURE, ts->coord[t_id].z);
 						ts->coord[t_id].mcount++;
 					}
 				}
@@ -1373,8 +1353,6 @@ static int sec_ts_parse_dt(struct i2c_client *client)
 	pdata->regulator_boot_on = of_property_read_bool(np, "sec,regulator_boot_on");
 	pdata->support_sidegesture = of_property_read_bool(np, "sec,support_sidegesture");
 
-	pdata->support_mt_pressure = true;
-
 	return ret;
 }
 
@@ -1553,12 +1531,6 @@ static void sec_ts_set_input_prop(struct sec_ts_data *ts, struct input_dev *dev,
 
 	input_set_abs_params(dev, ABS_MT_POSITION_X, 0, ts->plat_data->max_x, 0, 0);
 	input_set_abs_params(dev, ABS_MT_POSITION_Y, 0, ts->plat_data->max_y, 0, 0);
-	input_set_abs_params(dev, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);
-	input_set_abs_params(dev, ABS_MT_TOUCH_MINOR, 0, 255, 0, 0);
-	input_set_abs_params(dev, ABS_MT_CUSTOM, 0, 0xFFFF, 0, 0);
-	if (ts->plat_data->support_mt_pressure)
-		input_set_abs_params(dev, ABS_MT_PRESSURE, 0,
-				     SEC_TS_PRESSURE_MAX, 0, 0);
 
 	if (propbit == INPUT_PROP_POINTER)
 		input_mt_init_slots(dev, MAX_SUPPORT_TOUCH_COUNT, INPUT_MT_POINTER);
@@ -2123,8 +2095,8 @@ static void sec_ts_read_info_work(struct work_struct *work)
 	struct sec_ts_test_mode mode;
 	char para = TO_TOUCH_MODE;
 #endif
-#ifdef USE_PRESSURE_SENSOR
 	int ret;
+#ifdef USE_PRESSURE_SENSOR
 	unsigned char data[18] = { 0 };
 #endif
 
@@ -2153,15 +2125,6 @@ static void sec_ts_read_info_work(struct work_struct *work)
 #endif
 
 #ifndef CONFIG_SEC_FACTORY
-	/* run self-test */
-	disable_irq(ts->client->irq);
-	execute_selftest(ts, false);
-	enable_irq(ts->client->irq);
-
-	input_info(true, &ts->client->dev, "%s: %02X %02X %02X %02X\n",
-		__func__, ts->ito_test[0], ts->ito_test[1]
-		, ts->ito_test[2], ts->ito_test[3]);
-
 	ret = ts->sec_ts_i2c_write(ts, SEC_TS_CMD_SET_POWER_MODE, &para, 1);
 	if (ret < 0)
 		 input_err(true, &ts->client->dev, "%s: Failed to set\n", __func__);

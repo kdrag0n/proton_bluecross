@@ -61,7 +61,7 @@
 #undef USE_RESET_EXIT_LPM
 #undef USE_POR_AFTER_I2C_RETRY
 #undef USER_OPEN_DWORK
-#define USE_PRESSURE_SENSOR
+#undef USE_PRESSURE_SENSOR
 #define PAT_CONTROL
 
 #if defined(USE_RESET_DURING_POWER_ON) || defined(USE_POR_AFTER_I2C_RETRY) || defined(USE_RESET_EXIT_LPM)
@@ -903,8 +903,6 @@ int sec_ts_read_information(struct sec_ts_data *ts);
 void set_pat_magic_number(struct sec_ts_data *ts);
 #endif
 void sec_ts_run_rawdata_all(struct sec_ts_data *ts, bool full_read);
-int execute_selftest(struct sec_ts_data *ts, bool save_result);
-int execute_p2ptest(struct sec_ts_data *ts);
 int sec_ts_read_raw_data(struct sec_ts_data *ts,
 		struct sec_cmd_data *sec, struct sec_ts_test_mode *mode);
 
