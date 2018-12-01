@@ -254,7 +254,7 @@ static int __init rmem_cma_setup(struct reserved_mem *rmem)
 		return -EINVAL;
 
 	if ((rmem->base & mask) || (rmem->size & mask)) {
-		pr_err("Reserved memory: incorrect alignment of CMA region\n");
+		pr_err("Reserved memory: incorrect alignment of CMA region %s at %pa, size %ld\n", rmem->name, &rmem->base, (unsigned long)rmem->size / SZ_1M);
 		return -EINVAL;
 	}
 
