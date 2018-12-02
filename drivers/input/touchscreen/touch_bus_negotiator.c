@@ -80,8 +80,6 @@ int tbn_request_bus(struct tbn_context *tbn)
 	struct tbn_kernel_request_bus_v01 req;
 	struct tbn_ssc_release_bus_v01 rsp;
 
-	dev_info(tbn->dev, "kernel requesting bus access from SLPI\n");
-
 	if (!tbn || !tbn->qmi_handle)
 		return -EINVAL;
 

@@ -911,9 +911,6 @@ static irqreturn_t sec_ts_irq_thread(int irq, void *ptr)
 
 	if (sec_ts_set_bus_ref(ts, SEC_TS_BUS_REF_IRQ, true) < 0) {
 		/* Interrupt during bus suspend */
-		input_info(true, &ts->client->dev,
-			   "%s: Skipping stray interrupt since bus is suspended.\n",
-			   __func__);
 		return IRQ_HANDLED;
 	}
 
@@ -982,9 +979,6 @@ int sec_ts_glove_mode_enables(struct sec_ts_data *ts, int mode)
 		input_err(true, &ts->client->dev, "%s: Failed to send command", __func__);
 		goto glove_enable_err;
 	}
-
-	input_info(true, &ts->client->dev, "%s: glove:%d, status:%x\n", __func__,
-		mode, ts->touch_functions);
 
 	return 0;
 
@@ -2003,14 +1997,6 @@ void sec_ts_locked_release_all_finger(struct sec_ts_data *ts)
 			(ts->coord[i].action == SEC_TS_COORDINATE_ACTION_MOVE)) {
 
 			ts->coord[i].action = SEC_TS_COORDINATE_ACTION_RELEASE;
-			input_info(true, &ts->client->dev,
-					"%s: [RA] tID:%d mc: %d tc:%d, v:%02X%02X, cal:%X(%X|%X), id(%d,%d), p:%d\n",
-					__func__, i, ts->coord[i].mcount, ts->touch_count,
-					ts->plat_data->img_version_of_ic[2],
-					ts->plat_data->img_version_of_ic[3],
-					ts->cal_status, ts->nv, ts->cal_count, ts->tspid_val,
-					ts->tspicid_val, ts->coord[i].palm_count);
-
 			do_gettimeofday(&ts->time_released[i]);
 			
 			if (ts->time_longest < (ts->time_released[i].tv_sec - ts->time_pressed[i].tv_sec))
