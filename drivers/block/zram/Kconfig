@@ -1,7 +1,7 @@
 config ZRAM
 	tristate "Compressed RAM block device support"
 	depends on BLOCK && SYSFS && CRYPTO
-	select CRYPTO_LZO
+	depends on CRYPTO_LZO || CRYPTO_ZSTD || CRYPTO_LZ4 || CRYPTO_LZ4HC
 	select ZPOOL
 	default n
 	help
