@@ -488,6 +488,11 @@ static void sec_ts_reinit(struct sec_ts_data *ts)
 						__func__, SEC_TS_CMD_SET_TOUCHFUNCTION);
 	}
 
+	ret = sec_ts_glove_mode_enables(ts, 0);
+	if (ret < 0)
+		input_err(true, &ts->client->dev, "%s: Failed to enable glove mode",
+			  __func__);
+
 	#ifdef SEC_TS_SUPPORT_CUSTOMLIB
 	if (ts->use_customlib)
 		sec_ts_set_custom_library(ts);
@@ -2632,6 +2637,11 @@ static void sec_ts_resume_work(struct work_struct *work)
 	if (ret < 0)
 		input_err(true, &ts->client->dev,
 			  "%s: Failed to send touch function command.",
+			  __func__);
+
+	ret = sec_ts_glove_mode_enables(ts, 1);
+	if (ret < 0)
+		input_err(true, &ts->client->dev, "%s: Failed to enable glove mode",
 			  __func__);
 
 #ifdef SEC_TS_SUPPORT_CUSTOMLIB
