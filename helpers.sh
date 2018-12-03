@@ -96,18 +96,18 @@ incbuild() {
     kmake $@ && mkzip
 }
 
-# Incrementally build the kernel and package it as a flashable beta release zip
+# Incrementally build the kernel and package it as a flashable test release zip
 dbuild() {
     kmake $@ && dzip
 }
 
-# Create a flashable beta release zip
+# Create a flashable test release zip
 dzip() {
     mkdir -p builds
     mkzip "builds/ProtonKernel-pixel3-test$(cat out/.version).zip"
 }
 
-# Create a flashable beta release zip, then upload it to transfer.sh
+# Create a flashable test release zip, then upload it to transfer.sh
 tzip() {
     dzip && transfer "builds/ProtonKernel-pixel3-test$(cat out/.version).zip"
 }
