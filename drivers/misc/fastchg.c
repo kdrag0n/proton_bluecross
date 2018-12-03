@@ -1,7 +1,7 @@
 /*
  * Author: Chad Froebel <chadfroebel@gmail.com>
  *
- * Port to cheeseburger: engstk <eng.stk@sapo.pt>
+ * Port to bluecross: kdrag0n <dragon@khronodragon.com>
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -15,7 +15,7 @@
  */
 
 /*
- * Possible values for "force_fast_charge" are :
+ * Possible values for "force_fast_charge" are:
  *
  *   0 - Disabled (default)
  *   1 - Force faster charge
@@ -63,12 +63,12 @@ static struct kobj_attribute force_fast_charge_attribute =
 __ATTR(force_fast_charge, 0664, force_fast_charge_show, force_fast_charge_store);
 
 static struct attribute *force_fast_charge_attrs[] = {
-&force_fast_charge_attribute.attr,
-NULL,
+	&force_fast_charge_attribute.attr,
+	NULL,
 };
 
 static struct attribute_group force_fast_charge_attr_group = {
-.attrs = force_fast_charge_attrs,
+	.attrs = force_fast_charge_attrs,
 };
 
 /* Initialize fast charge sysfs folder */
@@ -80,13 +80,11 @@ int force_fast_charge_init(void)
 
 	force_fast_charge_kobj = kobject_create_and_add("fast_charge", kernel_kobj);
 	if (!force_fast_charge_kobj) {
-			return -ENOMEM;
+		return -ENOMEM;
 	}
 
-	force_fast_charge_retval = sysfs_create_group(force_fast_charge_kobj, &force_fast_charge_attr_group);
-
-	if (force_fast_charge_retval)
-		kobject_put(force_fast_charge_kobj);
+	force_fast_charge_retval = sysfs_create_group(force_fast_charge_kobj,
+				   &force_fast_charge_attr_group);
 
 	if (force_fast_charge_retval)
 		kobject_put(force_fast_charge_kobj);
