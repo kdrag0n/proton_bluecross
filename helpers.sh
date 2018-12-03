@@ -107,6 +107,11 @@ dzip() {
     mkzip "builds/ProtonKernel-pixel3-test$(cat out/.version).zip"
 }
 
+# Create a flashable beta release zip, then upload it to transfer.sh
+tzip() {
+    dzip && transfer "builds/ProtonKernel-pixel3-test$(cat out/.version).zip"
+}
+
 # Flash the latest kernel zip on the connected device via ADB
 ktest() {
     adb wait-for-any && \
