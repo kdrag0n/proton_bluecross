@@ -1,5 +1,8 @@
 # Shared interactive kernel build helpers
 
+# Root of the kernel repository for use in helpers
+kroot="$(dirname "$0")"
+
 # Determine the prefix of a cross-compiling toolchain (@nathanchance)
 get_gcc_prefix() {
     local gcc_path="${1}gcc"
@@ -43,17 +46,18 @@ mkzip() {
     [ $_RELEASE -eq 0 ] && vprefix=test
     [ $_RELEASE -eq 1 ] && vprefix=v
 
-    cp out/arch/arm64/boot/Image.lz4-dtb flasher/
+    cp "$kroot/out/arch/arm64/boot/Image.lz4-dtb" "$kroot/flasher/"
 
-    [ $_RELEASE -eq 0 ] && echo "  • Installing test build $(cat out/.version)" >| flasher/version
-    [ $_RELEASE -eq 1 ] && echo "  • Installing version v$(cat out/.version)" >| flasher/version
-    echo "  • Built on $(date "+%a %b %d, %Y")" >> flasher/version
+    [ $_RELEASE -eq 0 ] && echo "  • Installing test build $(cat "$kroot/out/.version")" >| "$kroot/flasher/version"
+    [ $_RELEASE -eq 1 ] && echo "  • Installing version v$(cat "$kroot/out/.version")" >| "$kroot/flasher/version"
+    echo "  • Built on $(date "+%a %b %d, %Y")" >> "$kroot/flasher/version"
 
     fn="${1:-proton_kernel.zip}"
     rm -f "$fn"
     echo "  ZIP     $fn"
-    pushd flasher
-    zip -qr9 "../$fn" . -x .gitignore
+    oldpwd="$(pwd)"
+    pushd "$kroot/flasher"
+    zip -qr9 "$oldpwd/$fn" . -x .gitignore
     popd
 }
 
@@ -62,9 +66,9 @@ rel() {
     _RELEASE=1
 
     # Swap out version files
-    [ ! -f out/.relversion ] && echo 0 > out/.relversion
-    mv out/.version out/.devversion && \
-    mv out/.relversion out/.version
+    [ ! -f "$kroot/out/.relversion" ] && echo 0 > "$kroot/out/.relversion"
+    mv "$kroot/out/.version" "$kroot/out/.devversion" && \
+    mv "$kroot/out/.relversion" "$kroot/out/.version"
 
     # Compile kernel
     kmake oldconfig # solve a "cached" config
@@ -72,18 +76,18 @@ rel() {
 
     # Pack zip
     mkdir -p builds
-    mkzip "builds/ProtonKernel-pixel3-v$(cat out/.version).zip"
+    mkzip "builds/ProtonKernel-pixel3-v$(cat "$kroot/out/.version").zip"
 
     # Revert version
-    mv out/.version out/.relversion && \
-    mv out/.devversion out/.version
+    mv "$kroot/out/.version" "$kroot/out/.relversion" && \
+    mv "$kroot/out/.devversion" "$kroot/out/.version"
 
     _RELEASE=0
 }
 
 # Reset the version (compile number)
 zerover() {
-    echo 0 >| out/.version
+    echo 0 >| "$kroot/out/.version"
 }
 
 # Make a clean build of the kernel and package it as a flashable zip
@@ -104,12 +108,12 @@ dbuild() {
 # Create a flashable test release zip
 dzip() {
     mkdir -p builds
-    mkzip "builds/ProtonKernel-pixel3-test$(cat out/.version).zip"
+    mkzip "builds/ProtonKernel-pixel3-test$(cat "$kroot/out/.version").zip"
 }
 
 # Create a flashable test release zip, then upload it to transfer.sh
 tzip() {
-    dzip && transfer "builds/ProtonKernel-pixel3-test$(cat out/.version).zip"
+    dzip && transfer "builds/ProtonKernel-pixel3-test$(cat "$kroot/out/.version").zip"
 }
 
 # Flash the latest kernel zip on the connected device via ADB
@@ -122,10 +126,10 @@ ktest() {
     is_android=false
     adb shell pgrep gatekeeperd > /dev/null && is_android=true
     if $is_android; then
-        adb push $fn /data/local/tmp/kernel.zip && \
+        adb push "$fn" /data/local/tmp/kernel.zip && \
         adb shell "su -c 'export PATH=/sbin/.core/busybox:$PATH; unzip -p /data/local/tmp/kernel.zip META-INF/com/google/android/update-binary | /system/bin/sh /proc/self/fd/0 unused 1 /data/local/tmp/kernel.zip && reboot'"
     else
-        adb push $fn /tmp/kernel.zip && \
+        adb push "$fn" /tmp/kernel.zip && \
         adb shell "twrp install /tmp/kernel.zip && reboot"
     fi
 }
@@ -135,7 +139,7 @@ sktest() {
     fn="proton_kernel.zip"
     [ "x$1" != "x" ] && fn="$1"
 
-    echo "put $fn /data/local/tmp/kernel.zip" | sftp aphone && \
+    echo "put \"$fn\" /data/local/tmp/kernel.zip" | sftp aphone && \
     ssh aphone "/sbin/su -c 'export PATH=/sbin/.core/busybox:$PATH; unzip -p /data/local/tmp/kernel.zip META-INF/com/google/android/update-binary | /system/bin/sh /proc/self/fd/0 unused 1 /data/local/tmp/kernel.zip && reboot'"
 }
 
@@ -151,13 +155,13 @@ sinc() {
 
 # Show differences between the committed defconfig and current config
 dc() {
-    diff arch/arm64/configs/b1c1_defconfig out/.config
+    diff arch/arm64/configs/b1c1_defconfig "$kroot/out/.config"
 }
 
 # Update the defconfig in the git tree
 cpc() {
     # Don't use savedefconfig for readability and diffability
-    cp out/.config arch/arm64/configs/b1c1_defconfig
+    cp "$kroot/out/.config" arch/arm64/configs/b1c1_defconfig
 }
 
 # Reset the current config to the committed defconfig
@@ -172,12 +176,12 @@ cf() {
 
 # Edit the raw text config
 ec() {
-    ${EDITOR:-vim} out/.config
+    ${EDITOR:-vim} "$kroot/out/.config"
 }
 
 # Get a sorted list of the side of various objects in the kernel
 osize() {
-    find out -type f -name '*.o' ! -name 'built-in.o' ! -name 'vmlinux.o' -exec du -h --apparent-size {} + | sort -r -h | head -n "${1:-75}"
+    find "$kroot/out" -type f -name '*.o' ! -name 'built-in.o' ! -name 'vmlinux.o' -exec du -h --apparent-size {} + | sort -r -h | head -n "${1:-75}"
 }
 
 # Update the subtrees in the kernel repo
