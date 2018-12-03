@@ -52,7 +52,7 @@ abort() {
 
 export TMPDIR=/tmp/pflash
 export IS_ANDROID=false
-pgrep zygote && IS_ANDROID=true
+pgrep gatekeeperd && IS_ANDROID=true
 $IS_ANDROID && export TMPDIR=/data/local/tmp/pflash
 
 show_progress 1.34 25;
