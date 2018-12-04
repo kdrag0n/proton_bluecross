@@ -659,6 +659,8 @@ ifdef CONFIG_LTO_CLANG
 ifeq ($(ld-name),gold)
 LDFLAGS		+= -plugin LLVMgold.so
 endif
+LDFLAGS		+= -plugin-opt=-function-sections
+LDFLAGS		+= -plugin-opt=-data-sections
 # use llvm-ar for building symbol tables from IR files, and llvm-dis instead
 # of objdump for processing symbol versions and exports
 LLVM_AR		:= llvm-ar
