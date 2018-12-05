@@ -105,6 +105,11 @@ dbuild() {
     kmake $@ && dzip
 }
 
+# Incrementally build the kernel, package it as a flashable test release zip, then upload it to transfer.sh
+tbuild() {
+    kmake $@ && tzip
+}
+
 # Create a flashable test release zip
 dzip() {
     mkdir -p builds
