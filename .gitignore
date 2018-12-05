@@ -127,6 +127,7 @@ kernel/configs/android-*.cfg
 
 # Flasher
 flasher/*.dtb
+flasher/dtbo.img
 flasher/Image*
 flasher/version
 *.zip
