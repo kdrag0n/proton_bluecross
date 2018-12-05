@@ -634,11 +634,6 @@ LDFLAGS		+= -plugin LLVMgold.so
 LLVM_AR		:= llvm-ar
 LLVM_DIS	:= llvm-dis
 export LLVM_AR LLVM_DIS
-else
-ifdef CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
-LDFINAL_vmlinux := $(LD)
-LD		:= $(LDGOLD)
-endif
 endif
 
 KBUILD_CFLAGS	+= $(call cc-option,-fno-PIE)
@@ -1241,12 +1236,6 @@ ifdef safestack-flags
   ifeq ($(call cc-option, $(safestack-flags)),)
 	@echo Cannot use CONFIG_SAFESTACK: $(safestack-flags) not supported by \
 		compiler >&2 && exit 1
-  endif
-endif
-ifdef CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
-  ifneq ($(call gold-ifversion, -ge, 112000000, y), y)
-	@echo Cannot use CONFIG_LD_DEAD_CODE_ELIMINATION: requires GNU gold \
-		1.12 or later >&2 && exit 1
   endif
 endif
 	@:
