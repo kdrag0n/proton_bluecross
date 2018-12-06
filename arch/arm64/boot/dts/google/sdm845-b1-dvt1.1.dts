@@ -19,7 +19,7 @@
 #include "sdm845-b1-usb-v3.dtsi"
 
 / {
-	model = "Google Inc. MSM sdm845 B1 DVT1.1";
+	model = "Google Pixel 3";
 	compatible = "google,b1c1-sdm845", "qcom,sdm845";
 	qcom,board-id = <0x00021505 0>;
 };
