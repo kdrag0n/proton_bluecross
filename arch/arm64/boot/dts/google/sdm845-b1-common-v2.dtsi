@@ -1,5 +1,0 @@
-#include "sdm845-b1-common.dtsi"
-
-/ {
-	qcom,msm-id = <321 0x20000>;
-};
