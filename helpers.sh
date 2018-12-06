@@ -3,6 +3,11 @@
 # Root of the kernel repository for use in helpers
 kroot="$(dirname "$0")"
 
+# Go to the root of the kernel repository
+croot() {
+    cd "$kroot"
+}
+
 # Determine the prefix of a cross-compiling toolchain (@nathanchance)
 get_gcc_prefix() {
     local gcc_path="${1}gcc"
