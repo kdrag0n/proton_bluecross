@@ -88,7 +88,7 @@
 					39 01 00 00 00 00 03 F0 A5 A5 /* Lock */
 					05 01 00 00 00 00 01 29    /* display on */
 				];
-				qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
+				qcom,mdss-dsi-on-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-off-command = [
 					05 01 00 00 0A 00 02 28 00 /* display off */
 					05 01 00 00 00 00 02 10 00 /* sleep in */
