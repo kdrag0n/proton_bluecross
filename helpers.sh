@@ -1,7 +1,7 @@
 # Shared interactive kernel build helpers
 
 # Root of the kernel repository for use in helpers
-kroot="$(dirname "$0")"
+kroot="$(pwd)/$(dirname "$0")"
 
 # Go to the root of the kernel repository
 croot() {
