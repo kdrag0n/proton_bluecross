@@ -80,7 +80,7 @@
 				qcom,mdss-dsi-v-bottom-border = <0>;
 				qcom,mdss-dsi-on-command = [
 					07 01 00 00 00 00 01 01    /* Compression Enable */
-					05 01 00 00 78 00 01 11    /* sleep out, Wait 120 ms */
+					05 01 00 00 0A 00 01 11    /* sleep out, Wait 10 ms */
 					15 01 00 00 00 00 02 53 20 /* Write Control Display */
 					05 01 00 00 00 00 02 35 00 /* TE on */
 					39 01 00 00 00 00 03 F0 5A 5A /* Unlock */
