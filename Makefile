@@ -745,8 +745,10 @@ else
 KBUILD_CFLAGS	+= -O3 -ffast-math -funsafe-math-optimizations
 ifeq ($(cc-name),gcc)
 KBUILD_CFLAGS	+= -mcpu=cortex-a75.cortex-a55 -mtune=cortex-a75.cortex-a55 \
-		   -floop-nest-optimize -fgraphite-identity \
-		   -ftree-loop-distribution -mno-fix-cortex-a53-835769 -fgcse-sm
+		   -floop-nest-optimize -fgraphite-identity -fgcse-sm -fwrapv \
+		   -ftree-loop-distribution -mno-fix-cortex-a53-835769 \
+		   -fgcse-las -fbranch-target-load-optimize -fipa-pta -ftracer \
+		   -flive-range-shrinkage -fvariable-expansion-in-unroller
 else
 KBUILD_CFLAGS	+= -mcpu=cortex-a55 -mtune=cortex-a55
 endif
