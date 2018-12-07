@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 4.9.142 Kernel Configuration
+# Linux/arm64 4.9.143 Kernel Configuration
 #
 CONFIG_ARM64=y
 CONFIG_64BIT=y
@@ -648,7 +648,7 @@ CONFIG_CPU_FREQ_GOV_POWERSAVE=y
 # CONFIG_CPU_BOOST is not set
 CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
 CONFIG_CPU_FREQ_GOV_BLU_SCHEDUTIL=y
-CONFIG_CPU_FREQ_GOV_SMURFUTIL=y
+# CONFIG_CPU_FREQ_GOV_SMURFUTIL is not set
 
 #
 # CPU frequency scaling drivers
