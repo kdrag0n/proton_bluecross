@@ -22,10 +22,14 @@
 
 static unsigned int input_boost_freq_lp = CONFIG_INPUT_BOOST_FREQ_LP;
 static unsigned int input_boost_freq_hp = CONFIG_INPUT_BOOST_FREQ_PERF;
+static unsigned int input_boost_return_freq_lp = CONFIG_REMOVE_INPUT_BOOST_FREQ_LP;
+static unsigned int input_boost_return_freq_hp = CONFIG_REMOVE_INPUT_BOOST_FREQ_PERF;
 static unsigned short input_boost_duration = CONFIG_INPUT_BOOST_DURATION_MS;
 
 module_param(input_boost_freq_lp, uint, 0644);
 module_param(input_boost_freq_hp, uint, 0644);
+module_param(input_boost_return_freq_lp, uint, 0644);
+module_param(input_boost_return_freq_hp, uint, 0644);
 module_param(input_boost_duration, short, 0644);
 
 /* Available bits for boost_drv state */
@@ -60,9 +64,9 @@ static u32 get_boost_freq(struct boost_drv *b, u32 cpu)
 static u32 get_min_freq(struct boost_drv *b, u32 cpu)
 {
 	if (cpumask_test_cpu(cpu, cpu_lp_mask))
-		return CONFIG_REMOVE_INPUT_BOOST_FREQ_LP;
+		return input_boost_return_freq_lp;
 
-	return CONFIG_REMOVE_INPUT_BOOST_FREQ_PERF;
+	return input_boost_return_freq_hp;
 }
 
 static u32 get_boost_state(struct boost_drv *b)
