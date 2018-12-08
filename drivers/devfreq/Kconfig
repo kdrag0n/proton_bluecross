@@ -280,6 +280,28 @@ config DEVFREQ_BOOST
 	  achieve optimal device performance by requesting boosts on key events,
 	  such as when a frame is ready to rendered to the display.
 
+if DEVFREQ_BOOST
+
+config DEVFREQ_INPUT_BOOST_DURATION_MS
+	int "Input boost duration"
+	default "100"
+	help
+	  Input boost duration in milliseconds for all boostable devices.
+
+config DEVFREQ_WAKE_BOOST_DURATION_MS
+	int "Wake boost duration"
+	default "1000"
+	help
+	  Wake boost duration in milliseconds for all boostable devices.
+
+config DEVFREQ_MSM_CPUBW_BOOST_FREQ
+	int "Boost freq for cpubw device"
+	default "0"
+	help
+	  Boost frequency for the MSM DDR bus.
+
+endif
+
 source "drivers/devfreq/event/Kconfig"
 
 endif # PM_DEVFREQ
