@@ -37,7 +37,7 @@ if [ -d $ramdisk/.backup ]; then
 
   mv $TMPDIR/overlay $ramdisk
   cp /system_root/init.rc $ramdisk/overlay
-  insert_line $ramdisk/overlay/init.rc "init.proton.rc" after "import /init.usb.rc" "import /init.proton.rc"
+  insert_line $ramdisk/overlay/init.rc "init.proton.rc" after "import /init.usb.configfs.rc" "import /init.proton.rc"
 else
   patch_cmdline "skip_override" ""
 fi
