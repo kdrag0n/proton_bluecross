@@ -50,6 +50,7 @@
 #include <linux/vmpressure.h>
 #include <linux/freezer.h>
 #include <linux/devfreq_boost.h>
+#include <linux/cpu_input_boost.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/almk.h>
@@ -499,6 +500,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 
 	selected_oom_score_adj = min_score_adj;
 
+	cpu_input_boost_kick_max(250);
 	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 250);
 
 	rcu_read_lock();
