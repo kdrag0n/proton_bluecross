@@ -35,8 +35,7 @@ module_param(input_boost_duration, short, 0644);
 /* Available bits for boost_drv state */
 #define SCREEN_AWAKE		BIT(0)
 #define INPUT_BOOST		BIT(1)
-#define WAKE_BOOST		BIT(2)
-#define MAX_BOOST		BIT(3)
+#define MAX_BOOST		BIT(2)
 
 struct boost_drv {
 	struct workqueue_struct *wq;
@@ -101,7 +100,7 @@ static void unboost_all_cpus(struct boost_drv *b)
 		!cancel_delayed_work_sync(&b->max_unboost))
 		return;
 
-	clear_boost_bit(b, INPUT_BOOST | WAKE_BOOST | MAX_BOOST);
+	clear_boost_bit(b, INPUT_BOOST | MAX_BOOST);
 	update_online_cpu_policy();
 }
 
@@ -184,7 +183,7 @@ static void max_unboost_worker(struct work_struct *work)
 	struct boost_drv *b =
 		container_of(to_delayed_work(work), typeof(*b), max_unboost);
 
-	clear_boost_bit(b, WAKE_BOOST | MAX_BOOST);
+	clear_boost_bit(b, MAX_BOOST);
 	update_online_cpu_policy();
 }
 
