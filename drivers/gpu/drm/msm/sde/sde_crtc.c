@@ -3625,7 +3625,7 @@ void sde_crtc_commit_kickoff(struct drm_crtc *crtc,
 
 	SDE_ATRACE_BEGIN("crtc_commit");
 
-	cpu_input_boost_kick();
+	cpu_input_boost_kick_general(100);
 	devfreq_boost_kick(DEVFREQ_MSM_CPUBW);
 
 	is_error = _sde_crtc_prepare_for_kickoff_rot(dev, crtc);
