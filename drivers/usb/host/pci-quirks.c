@@ -107,6 +107,8 @@ struct amd_chipset_type {
 	u8 rev;
 };
 
+#ifndef CONFIG_PCI_DISABLE_COMMON_QUIRKS
+
 static struct amd_chipset_info {
 	struct pci_dev	*nb_dev;
 	struct pci_dev	*smbus_dev;
@@ -511,6 +513,10 @@ void usb_amd_dev_put(void)
 }
 EXPORT_SYMBOL_GPL(usb_amd_dev_put);
 
+#endif /* CONFIG_PCI_DISABLE_COMMON_QUIRKS */
+
+#if IS_ENABLED(CONFIG_USB_UHCI_HCD)
+
 /*
  * Make sure the controller is completely inactive, unable to
  * generate interrupts or do DMA.
@@ -590,7 +596,16 @@ reset_needed:
 	uhci_reset_hc(pdev, base);
 	return 1;
 }
+#else
+int uhci_check_and_reset_hc(struct pci_dev *pdev, unsigned long base)
+{
+	return 0;
+}
+
+#endif
 EXPORT_SYMBOL_GPL(uhci_check_and_reset_hc);
+
+#ifndef CONFIG_PCI_DISABLE_COMMON_QUIRKS
 
 static inline int io_type_enabled(struct pci_dev *pdev, unsigned int mask)
 {
@@ -1158,3 +1173,4 @@ static void quirk_usb_early_handoff(struct pci_dev *pdev)
 }
 DECLARE_PCI_FIXUP_CLASS_FINAL(PCI_ANY_ID, PCI_ANY_ID,
 			PCI_CLASS_SERIAL_USB, 8, quirk_usb_early_handoff);
+#endif
