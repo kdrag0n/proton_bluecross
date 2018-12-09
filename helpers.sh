@@ -38,6 +38,7 @@ MAKEFLAGS=(
     KBUILD_BUILD_USER=kdrag0n
     KBUILD_BUILD_HOST=proton
 )
+export KBUILD_BUILD_TIMESTAMP="$(date "+%B %Y")"
 
 # Make wrapper for kernel compilation
 kmake() {
