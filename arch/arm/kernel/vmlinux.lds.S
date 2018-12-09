@@ -17,7 +17,7 @@
 #define PROC_INFO							\
 	. = ALIGN(4);							\
 	VMLINUX_SYMBOL(__proc_info_begin) = .;				\
-	KEEP(*(.proc.info.init))					\
+	*(.proc.info.init)						\
 	VMLINUX_SYMBOL(__proc_info_end) = .;
 
 #define HYPERVISOR_TEXT							\
@@ -28,11 +28,11 @@
 #define IDMAP_TEXT							\
 	ALIGN_FUNCTION();						\
 	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
-	KEEP(*(.idmap.text))						\
+	*(.idmap.text)							\
 	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
 	. = ALIGN(PAGE_SIZE);						\
 	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
-	KEEP(*(.hyp.idmap.text))					\
+	*(.hyp.idmap.text)						\
 	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -105,7 +105,7 @@ SECTIONS
 		_stext = .;		/* Text and read-only data	*/
 			IDMAP_TEXT
 			__exception_text_start = .;
-			KEEP(*(.exception.text))
+			*(.exception.text)
 			__exception_text_end = .;
 			IRQENTRY_TEXT
 			SOFTIRQENTRY_TEXT
@@ -134,7 +134,7 @@ SECTIONS
 	__ex_table : AT(ADDR(__ex_table) - LOAD_OFFSET) {
 		__start___ex_table = .;
 #ifdef CONFIG_MMU
-		KEEP(*(__ex_table))
+		*(__ex_table)
 #endif
 		__stop___ex_table = .;
 	}
@@ -146,12 +146,12 @@ SECTIONS
 	. = ALIGN(8);
 	.ARM.unwind_idx : {
 		__start_unwind_idx = .;
-		KEEP(*(.ARM.exidx*))
+		*(.ARM.exidx*)
 		__stop_unwind_idx = .;
 	}
 	.ARM.unwind_tab : {
 		__start_unwind_tab = .;
-		KEEP(*(.ARM.extab*))
+		*(.ARM.extab*)
 		__stop_unwind_tab = .;
 	}
 #endif
@@ -171,14 +171,14 @@ SECTIONS
 	 */
 	__vectors_start = .;
 	.vectors 0xffff0000 : AT(__vectors_start) {
-		KEEP(*(.vectors))
+		*(.vectors)
 	}
 	. = __vectors_start + SIZEOF(.vectors);
 	__vectors_end = .;
 
 	__stubs_start = .;
 	.stubs ADDR(.vectors) + 0x1000 : AT(__stubs_start) {
-		KEEP(*(.stubs))
+		*(.stubs)
 	}
 	. = __stubs_start + SIZEOF(.stubs);
 	__stubs_end = .;
@@ -194,24 +194,24 @@ SECTIONS
 	}
 	.init.arch.info : {
 		__arch_info_begin = .;
-		KEEP(*(.arch.info.init))
+		*(.arch.info.init)
 		__arch_info_end = .;
 	}
 	.init.tagtable : {
 		__tagtable_begin = .;
-		KEEP(*(.taglist.init))
+		*(.taglist.init)
 		__tagtable_end = .;
 	}
 #ifdef CONFIG_SMP_ON_UP
 	.init.smpalt : {
 		__smpalt_begin = .;
-		KEEP(*(.alt.smp.init))
+		*(.alt.smp.init)
 		__smpalt_end = .;
 	}
 #endif
 	.init.pv_table : {
 		__pv_table_begin = .;
-		KEEP(*(.pv_table))
+		*(.pv_table)
 		__pv_table_end = .;
 	}
 	.init.data : {
