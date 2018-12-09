@@ -2973,8 +2973,10 @@ static struct module *setup_load_info(struct load_info *info, int flags)
 
 static int check_modinfo(struct module *mod, struct load_info *info, int flags)
 {
-	const char *modmagic = get_modinfo(info, "vermagic");
 	int err;
+
+#ifndef CONFIG_MODULE_STRIPPED
+	const char *modmagic = get_modinfo(info, "vermagic");
 
 	if (flags & MODULE_INIT_IGNORE_VERMAGIC)
 		modmagic = NULL;
@@ -2996,6 +2998,7 @@ static int check_modinfo(struct module *mod, struct load_info *info, int flags)
 				mod->name);
 		add_taint_module(mod, TAINT_OOT_MODULE, LOCKDEP_STILL_OK);
 	}
+#endif
 
 	check_modinfo_retpoline(mod, info);
 

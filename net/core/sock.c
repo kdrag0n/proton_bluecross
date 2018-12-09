@@ -1465,9 +1465,11 @@ void sk_destruct(struct sock *sk)
 
 static void __sk_free(struct sock *sk)
 {
+#ifdef CONFIG_SOCK_DIAG
 	if (unlikely(sk->sk_net_refcnt && sock_diag_has_destroy_listeners(sk)))
 		sock_diag_broadcast_destroy(sk);
 	else
+#endif
 		sk_destruct(sk);
 }
 
@@ -3093,6 +3095,8 @@ static __net_initdata struct pernet_operations proto_net_ops = {
 
 static int __init proto_init(void)
 {
+	if (IS_ENABLED(CONFIG_PROC_STRIPPED))
+		return 0;
 	return register_pernet_subsys(&proto_net_ops);
 }
 
