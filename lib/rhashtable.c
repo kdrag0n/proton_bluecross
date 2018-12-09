@@ -44,7 +44,11 @@ static u32 head_hashfn(struct rhashtable *ht,
 
 int lockdep_rht_mutex_is_held(struct rhashtable *ht)
 {
+#ifdef CONFIG_DEBUG_KERNEL
 	return (debug_locks) ? lockdep_is_held(&ht->mutex) : 1;
+#else
+	return 1;
+#endif
 }
 EXPORT_SYMBOL_GPL(lockdep_rht_mutex_is_held);
 
@@ -52,7 +56,11 @@ int lockdep_rht_bucket_is_held(const struct bucket_table *tbl, u32 hash)
 {
 	spinlock_t *lock = rht_bucket_lock(tbl, hash);
 
+#ifdef CONFIG_DEBUG_KERNEL
 	return (debug_locks) ? lockdep_is_held(lock) : 1;
+#else
+	return 1;
+#endif
 }
 EXPORT_SYMBOL_GPL(lockdep_rht_bucket_is_held);
 #else

@@ -25,10 +25,13 @@
 /*
  * Change this to 1 if you want to see the failure printouts:
  */
+#ifdef CONFIG_DEBUG_KERNEL
 static unsigned int debug_locks_verbose;
+#endif
 
 static DEFINE_WW_CLASS(ww_lockdep);
 
+#ifdef CONFIG_DEBUG_KERNEL
 static int __init setup_debug_locks_verbose(char *str)
 {
 	get_option(&str, &debug_locks_verbose);
@@ -37,6 +40,7 @@ static int __init setup_debug_locks_verbose(char *str)
 }
 
 __setup("debug_locks_verbose=", setup_debug_locks_verbose);
+#endif
 
 #define FAILURE		0
 #define SUCCESS		1
@@ -977,14 +981,18 @@ static void dotest(void (*testcase_fn)(void), int expected, int lockclass_mask)
 	/*
 	 * Filter out expected failures:
 	 */
-#ifndef CONFIG_PROVE_LOCKING
+#if !defined(CONFIG_PROVE_LOCKING) && defined(CONFIG_DEBUG_KERNEL)
 	if (expected == FAILURE && debug_locks) {
 		expected_testcase_failures++;
 		pr_cont("failed|");
 	}
 	else
 #endif
+#ifdef CONFIG_DEBUG_KERNEL
 	if (debug_locks != expected) {
+#else
+	if (expected) {
+#endif
 		unexpected_testcase_failures++;
 		pr_cont("FAILED|");
 
@@ -995,9 +1003,11 @@ static void dotest(void (*testcase_fn)(void), int expected, int lockclass_mask)
 	}
 	testcase_total++;
 
+#ifdef CONFIG_DEBUG_KERNEL
 	if (debug_locks_verbose)
 		pr_cont(" lockclass mask: %x, debug_locks: %d, expected: %d\n",
 			lockclass_mask, debug_locks, expected);
+#endif
 	/*
 	 * Some tests (e.g. double-unlock) might corrupt the preemption
 	 * count, so restore it:
@@ -1797,12 +1807,16 @@ void locking_selftest(void)
 	/*
 	 * Got a locking failure before the selftest ran?
 	 */
+#ifdef CONFIG_DEBUG_FS
 	if (!debug_locks) {
+#endif
 		printk("----------------------------------\n");
 		printk("| Locking API testsuite disabled |\n");
 		printk("----------------------------------\n");
 		return;
+#ifdef CONFIG_DEBUG_FS
 	}
+#endif
 
 	/*
 	 * Run the testsuite:
@@ -1814,7 +1828,9 @@ void locking_selftest(void)
 	printk("  --------------------------------------------------------------------------\n");
 
 	init_shared_classes();
+#ifdef CONFIG_DEBUG_KERNEL
 	debug_locks_silent = !debug_locks_verbose;
+#endif
 
 	DO_TESTCASE_6R("A-A deadlock", AA);
 	DO_TESTCASE_6R("A-B-B-A deadlock", ABBA);
@@ -1873,6 +1889,7 @@ void locking_selftest(void)
 
 	ww_tests();
 
+#ifdef CONFIG_DEBUG_KERNEL
 	if (unexpected_testcase_failures) {
 		printk("-----------------------------------------------------------------\n");
 		debug_locks = 0;
@@ -1899,4 +1916,5 @@ void locking_selftest(void)
 		debug_locks = 1;
 	}
 	debug_locks_silent = 0;
+#endif
 }
