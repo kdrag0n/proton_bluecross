@@ -41,6 +41,7 @@ static void quirk_mmio_always_on(struct pci_dev *dev)
 DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_ANY_ID, PCI_ANY_ID,
 				PCI_CLASS_BRIDGE_HOST, 8, quirk_mmio_always_on);
 
+#ifndef CONFIG_PCI_DISABLE_COMMON_QUIRKS
 /* The Mellanox Tavor device gives false positive parity errors
  * Mark this device with a broken_parity_status, to allow
  * PCI scanning code to "skip" this now blacklisted device.
@@ -3038,6 +3039,7 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x65f8, quirk_intel_mc_errata);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x65f9, quirk_intel_mc_errata);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x65fa, quirk_intel_mc_errata);
 
+#endif /* !CONFIG_PCI_DISABLE_COMMON_QUIRKS */
 
 /*
  * Ivytown NTB BAR sizes are misreported by the hardware due to an erratum.  To
@@ -3094,6 +3096,8 @@ static void fixup_debug_report(struct pci_dev *dev, ktime_t calltime,
 	}
 }
 
+#ifndef CONFIG_PCI_DISABLE_COMMON_QUIRKS
+
 /*
  * Some BIOS implementations leave the Intel GPU interrupts enabled,
  * even though no one is handling them (f.e. i915 driver is never loaded).
@@ -3131,6 +3135,8 @@ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, 0x0102, disable_igfx_irq);
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, 0x0106, disable_igfx_irq);
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, 0x010a, disable_igfx_irq);
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, 0x0152, disable_igfx_irq);
+
+#endif /* !CONFIG_PCI_DISABLE_COMMON_QUIRKS */
 
 /*
  * PCI devices which are on Intel chips can skip the 10ms delay
