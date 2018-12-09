@@ -264,17 +264,7 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 	/* Boost when the screen turns on and unboost when it turns off */
 	screen_awake = *blank == MSM_DRM_BLANK_UNBLANK;
 	devfreq_disable_boosting(d, !screen_awake);
-	if (screen_awake) {
-		int i;
-
-		for (i = 0; i < DEVFREQ_MAX; i++)
-			__devfreq_boost_kick_max(d->devices + i,
-				CONFIG_DEVFREQ_WAKE_BOOST_DURATION_MS);
-
-#ifdef CONFIG_DEVFREQ_BOOST_DEBUG
-		pr_info("kicked max wake boost due to unblank event\n");
-#endif
-	} else {
+	if (!screen_awake) {
 		devfreq_unboost_all(d);
 #ifdef CONFIG_DEVFREQ_BOOST_DEBUG
 		pr_info("cleared all boosts due to blank event\n");

@@ -294,12 +294,6 @@ config DEVFREQ_INPUT_BOOST_DURATION_MS
 	help
 	  Input boost duration in milliseconds for all boostable devices.
 
-config DEVFREQ_WAKE_BOOST_DURATION_MS
-	int "Wake boost duration"
-	default "1000"
-	help
-	  Wake boost duration in milliseconds for all boostable devices.
-
 config DEVFREQ_MSM_CPUBW_BOOST_FREQ
 	int "Boost freq for cpubw device"
 	default "0"
