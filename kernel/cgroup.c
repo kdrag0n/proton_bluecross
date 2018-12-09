@@ -2967,6 +2967,10 @@ static ssize_t __cgroup_procs_write(struct kernfs_open_file *of, char *buf,
 		!ret) {
 		cpu_input_boost_kick_max(500);
 		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 500);
+#if defined(CONFIG_CPU_INPUT_BOOST_DEBUG) || defined(CONFIG_DEVFREQ_BOOST_DEBUG)
+		pr_info("cgroup: kicked max cpu and cpubw boost for 500 ms for top-app %s\n",
+			tsk->comm);
+#endif
 	}
 
 	put_task_struct(tsk);

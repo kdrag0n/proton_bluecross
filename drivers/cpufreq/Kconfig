@@ -323,6 +323,12 @@ config CPU_INPUT_BOOST
 
 if CPU_INPUT_BOOST
 
+config CPU_INPUT_BOOST_DEBUG
+	bool "Input boost debugging"
+	help
+	  Log all boosting events to the kernel log buffer for debugging
+	  purposes.
+
 config INPUT_BOOST_DURATION_MS
 	int "Input boost duration"
 	default "100"
