@@ -20,6 +20,8 @@
 #include <linux/moduleparam.h>
 #include <linux/slab.h>
 
+unsigned long last_input_time;
+
 static __read_mostly unsigned int input_boost_freq_lp = CONFIG_INPUT_BOOST_FREQ_LP;
 static __read_mostly unsigned int input_boost_freq_hp = CONFIG_INPUT_BOOST_FREQ_PERF;
 static __read_mostly unsigned int input_boost_return_freq_lp = CONFIG_REMOVE_INPUT_BOOST_FREQ_LP;
@@ -333,6 +335,8 @@ static void cpu_input_boost_input_event(struct input_handle *handle,
 		return;
 
 	queue_work(b->wq, &b->input_boost);
+
+	last_input_time = jiffies;
 }
 
 static int cpu_input_boost_input_connect(struct input_handler *handler,
