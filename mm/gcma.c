@@ -38,9 +38,11 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 
+#ifdef CONFIG_FRONTSWAP
 #define BITS_FS_DMEM_HASH	8
 #define NR_FS_DMEM_HASH_BUCKS	(1 << BITS_FS_DMEM_HASH)
 #define BYTES_FS_DMEM_KEY	(sizeof(struct frontswap_dmem_key))
+#endif
 
 #define BITS_CC_DMEM_HASH	8
 #define NR_CC_DMEM_HASH_BUCKS	(1 << BITS_CC_DMEM_HASH)
@@ -108,9 +110,11 @@ struct dmem {
 	int (*compare)(void *lkey, void *rkey);
 };
 
+#ifdef CONFIG_FRONTSWAP
 struct frontswap_dmem_key {
 	pgoff_t key;
 };
+#endif
 
 struct cleancache_dmem_key {
 	u8 key[sizeof(pgoff_t) + sizeof(struct cleancache_filekey)];
@@ -118,19 +122,24 @@ struct cleancache_dmem_key {
 
 static struct kmem_cache *dmem_entry_cache;
 
+#ifdef CONFIG_FRONTSWAP
 static struct dmem fs_dmem;	/* dmem for frontswap backend */
+#endif
 
 static struct dmem cc_dmem;	/* dmem for cleancache backend */
 static atomic_t nr_cleancache_fses = ATOMIC_INIT(0);
 
 /* configs from kernel parameter */
+#ifdef CONFIG_FRONTSWAP
 static bool fs_disabled __read_mostly;
 module_param_named(fs_disabled, fs_disabled, bool, 0444);
+#endif
 
 static bool cc_disabled __read_mostly;
 module_param_named(cc_disabled, cc_disabled, bool, 0444);
 
 /* For statistics */
+#ifdef CONFIG_FRONTSWAP
 static atomic_t gcma_fs_inits = ATOMIC_INIT(0);
 static atomic_t gcma_fs_stored_pages = ATOMIC_INIT(0);
 static atomic_t gcma_fs_loaded_pages = ATOMIC_INIT(0);
@@ -138,6 +147,7 @@ static atomic_t gcma_fs_evicted_pages = ATOMIC_INIT(0);
 static atomic_t gcma_fs_reclaimed_pages = ATOMIC_INIT(0);
 static atomic_t gcma_fs_invalidated_pages = ATOMIC_INIT(0);
 static atomic_t gcma_fs_invalidated_areas = ATOMIC_INIT(0);
+#endif
 
 static atomic_t gcma_cc_inits = ATOMIC_INIT(0);
 static atomic_t gcma_cc_stored_pages = ATOMIC_INIT(0);
@@ -495,9 +505,11 @@ static unsigned long dmem_evict_lru(struct dmem *dmem, unsigned long nr_pages)
 		spin_unlock(&buck->lock);
 	}
 
+#ifdef CONFIG_FRONTSWAP
 	if (dmem == &fs_dmem)
 		atomic_add(evicted, &gcma_fs_evicted_pages);
 	else
+#endif
 		atomic_add(evicted, &gcma_cc_evicted_pages);
 	return evicted;
 }
@@ -568,9 +580,11 @@ int dmem_init_pool(struct dmem *dmem, unsigned pool_id)
 		 * inversion dependency report.
 		 * Avoid the situation using this ugly, simple hack.
 		 */
+#ifdef CONFIG_FRONTSWAP
 		if (dmem == &fs_dmem)
 			spin_lock_init(&buck->lock);
 		else
+#endif
 			spin_lock_init(&buck->lock);
 	}
 
@@ -802,6 +816,7 @@ int dmem_invalidate_pool(struct dmem *dmem, unsigned pool_id)
 }
 
 
+#ifdef CONFIG_FRONTSWAP
 static int frontswap_compare(void *lkey, void *rkey)
 {
 	return *(pgoff_t *)lkey - *(pgoff_t *)rkey;
@@ -863,7 +878,7 @@ static struct frontswap_ops gcma_frontswap_ops = {
 	.invalidate_page = gcma_frontswap_invalidate_page,
 	.invalidate_area = gcma_frontswap_invalidate_area
 };
-
+#endif
 
 static int cleancache_compare(void *lkey, void *rkey)
 {
@@ -1152,9 +1167,12 @@ next_page:
 		if (lru_lock == &cc_dmem.lru_lock) {
 			local_irq_restore(flags);
 			atomic_inc(&gcma_cc_reclaimed_pages);
-		} else {
+		}
+#ifdef CONFIG_FRONTSWAP
+		else {
 			atomic_inc(&gcma_fs_reclaimed_pages);
 		}
+#endif
 	}
 
 	start_pfn = isolate_interrupted(gcma, orig_start, orig_start + size);
@@ -1198,6 +1216,7 @@ static int __init gcma_debugfs_init(void)
 	if (!gcma_debugfs_root)
 		return -ENOMEM;
 
+#ifdef CONFIG_FRONTSWAP
 	debugfs_create_atomic_t("fs_inits", S_IRUGO,
 			gcma_debugfs_root, &gcma_fs_inits);
 	debugfs_create_atomic_t("fs_stored_pages", S_IRUGO,
@@ -1212,6 +1231,7 @@ static int __init gcma_debugfs_init(void)
 			gcma_debugfs_root, &gcma_fs_invalidated_pages);
 	debugfs_create_atomic_t("fs_invalidated_areas", S_IRUGO,
 			gcma_debugfs_root, &gcma_fs_invalidated_areas);
+#endif
 
 	debugfs_create_atomic_t("cc_inits", S_IRUGO,
 			gcma_debugfs_root, &gcma_cc_inits);
@@ -1252,6 +1272,7 @@ static int __init init_gcma(void)
 	if (dmem_entry_cache == NULL)
 		return -ENOMEM;
 
+#ifdef CONFIG_FRONTSWAP
 	if (fs_disabled) {
 		pr_info("gcma frontswap is disabled. skip it\n");
 		goto init_cleancache;
@@ -1284,6 +1305,7 @@ static int __init init_gcma(void)
 	frontswap_register_ops(&gcma_frontswap_ops);
 
 init_cleancache:
+#endif
 	if (cc_disabled) {
 		pr_info("gcma cleancache is disabled. skip it\n");
 		goto init_debugfs;
