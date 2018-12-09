@@ -254,6 +254,33 @@ struct ipt_entry *ipt_next_entry(const struct ipt_entry *entry)
 	return (void *)entry + entry->next_offset;
 }
 
+static bool
+ipt_handle_default_rule(struct ipt_entry *e, unsigned int *verdict)
+{
+	struct xt_entry_target *t;
+	struct xt_standard_target *st;
+
+	if (e->target_offset != sizeof(struct ipt_entry))
+		return false;
+
+	if (!(e->ip.flags & IPT_F_NO_DEF_MATCH))
+		return false;
+
+	t = ipt_get_target(e);
+	if (t->u.kernel.target->target)
+		return false;
+
+	st = (struct xt_standard_target *) t;
+	if (st->verdict == XT_RETURN)
+		return false;
+
+	if (st->verdict >= 0)
+		return false;
+
+	*verdict = (unsigned)(-st->verdict) - 1;
+	return true;
+}
+
 /* Returns one of the generic firewall policies, like NF_ACCEPT. */
 unsigned int
 ipt_do_table(struct sk_buff *skb,
@@ -274,10 +301,45 @@ ipt_do_table(struct sk_buff *skb,
 	unsigned int addend;
 
 	/* Initialization */
+	IP_NF_ASSERT(table->valid_hooks & (1 << hook));
+	local_bh_disable();
+	private = table->private;
+	cpu        = smp_processor_id();
+	/*
+	 * Ensure we load private-> members after we've fetched the base
+	 * pointer.
+	 */
+	smp_read_barrier_depends();
+	table_base = private->entries;
+
+	e = get_entry(table_base, private->hook_entry[hook]);
+	if (ipt_handle_default_rule(e, &verdict)) {
+		struct xt_counters *counter;
+
+		counter = xt_get_this_cpu_counter(&e->counters);
+		ADD_COUNTER(*counter, skb->len, 1);
+		local_bh_enable();
+		return verdict;
+	}
+
 	stackidx = 0;
 	ip = ip_hdr(skb);
 	indev = state->in ? state->in->name : nulldevname;
 	outdev = state->out ? state->out->name : nulldevname;
+
+	addend = xt_write_recseq_begin();
+	jumpstack  = (struct ipt_entry **)private->jumpstack[cpu];
+
+	/* Switch to alternate jumpstack if we're being invoked via TEE.
+	 * TEE issues XT_CONTINUE verdict on original skb so we must not
+	 * clobber the jumpstack.
+	 *
+	 * For recursion via REJECT or SYNPROXY the stack will be clobbered
+	 * but it is no problem since absolute verdict is issued by these.
+	 */
+	if (static_key_false(&xt_tee_enabled))
+		jumpstack += private->stacksize * __this_cpu_read(nf_skb_duplicated);
+
 	/* We handle fragments by dealing with the first fragment as
 	 * if it was a normal packet.  All other fragments are treated
 	 * normally, except that they will NEVER match rules that ask
@@ -292,31 +354,6 @@ ipt_do_table(struct sk_buff *skb,
 	acpar.out     = state->out;
 	acpar.family  = NFPROTO_IPV4;
 	acpar.hooknum = hook;
-
-	IP_NF_ASSERT(table->valid_hooks & (1 << hook));
-	local_bh_disable();
-	addend = xt_write_recseq_begin();
-	private = table->private;
-	cpu        = smp_processor_id();
-	/*
-	 * Ensure we load private-> members after we've fetched the base
-	 * pointer.
-	 */
-	smp_read_barrier_depends();
-	table_base = private->entries;
-	jumpstack  = (struct ipt_entry **)private->jumpstack[cpu];
-
-	/* Switch to alternate jumpstack if we're being invoked via TEE.
-	 * TEE issues XT_CONTINUE verdict on original skb so we must not
-	 * clobber the jumpstack.
-	 *
-	 * For recursion via REJECT or SYNPROXY the stack will be clobbered
-	 * but it is no problem since absolute verdict is issued by these.
-	 */
-	if (static_key_false(&xt_tee_enabled))
-		jumpstack += private->stacksize * __this_cpu_read(nf_skb_duplicated);
-
-	e = get_entry(table_base, private->hook_entry[hook]);
 
 	do {
 		const struct xt_entry_target *t;
