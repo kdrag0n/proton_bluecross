@@ -1254,7 +1254,7 @@ static int __init gcma_debugfs_init(void)
 	debugfs_create_atomic_t("cc_invalidate_failed_fses", S_IRUGO,
 			gcma_debugfs_root, &gcma_cc_invalidate_failed_fses);
 
-	pr_info("gcma debufs init\n");
+	pr_info("gcma debugfs initialized\n");
 	return 0;
 }
 #else
@@ -1266,7 +1266,7 @@ static int __init gcma_debugfs_init(void)
 
 static int __init init_gcma(void)
 {
-	pr_info("loading gcma\n");
+	pr_info("initializing gcma\n");
 
 	dmem_entry_cache = KMEM_CACHE(dmem_entry, 0);
 	if (dmem_entry_cache == NULL)

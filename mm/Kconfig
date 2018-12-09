@@ -561,7 +561,7 @@ config GCMA
 	  interacts heavily with memory reclaim.
 
 config GCMA_DEFAULT
-	bool "Set GCMA as default CMA facility (EXPERIMENTA)"
+	bool "Set GCMA as default CMA facility (EXPERIMENTAL)"
 	default n
 	depends on GCMA
 	help
