@@ -161,11 +161,6 @@ void cpu_input_boost_kick_max(unsigned int duration_ms)
 	__cpu_input_boost_kick_max(b, duration_ms);
 }
 
-void cpu_input_boost_kick_wake(void)
-{
-	cpu_input_boost_kick_max(CONFIG_WAKE_BOOST_DURATION_MS);
-}
-
 static void __cpu_input_boost_kick_general(struct boost_drv *b,
 	unsigned int duration_ms)
 {
@@ -308,10 +303,6 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 	/* Boost when the screen turns on and unboost when it turns off */
 	if (*blank == MSM_DRM_BLANK_UNBLANK) {
 		set_boost_bit(b, SCREEN_AWAKE);
-		__cpu_input_boost_kick_max(b, CONFIG_WAKE_BOOST_DURATION_MS);
-#ifdef CONFIG_CPU_INPUT_BOOST_DEBUG
-		pr_info("kicked max wake boost due to unblank event\n");
-#endif
 	} else {
 		clear_boost_bit(b, SCREEN_AWAKE);
 		unboost_all_cpus(b);
