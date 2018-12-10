@@ -177,8 +177,7 @@ static int __init cma_activate_area(struct cma *cma)
 	else
 		fail = free_reserved_pages(cma->base_pfn, cma->count);
 	if (fail != 0) {
-		kfree(cma->bitmap);
-		return -EINVAL;
+		goto err;
 	}
 	mutex_init(&cma->lock);
 
