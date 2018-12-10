@@ -268,6 +268,9 @@ int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
 	cma->base_pfn = PFN_DOWN(base);
 	cma->count = size >> PAGE_SHIFT;
 	cma->order_per_bit = order_per_bit;
+#ifdef CONFIG_GCMA_DEFAULT
+	cma->gcma = IS_GCMA;
+#endif
 	*res_cma = cma;
 	cma_area_count++;
 	totalcma_pages += (size / PAGE_SIZE);
