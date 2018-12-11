@@ -146,7 +146,7 @@ module_param_named(cc_disabled, cc_disabled, bool, 0444);
 #endif
 
 /* For statistics */
-#ifdef CONFIG_FRONTSWAP
+#if defined(CONFIG_FRONTSWAP) && defined(CONFIG_GCMA_STATS)
 static atomic_t gcma_fs_inits = ATOMIC_INIT(0);
 static atomic_t gcma_fs_stored_pages = ATOMIC_INIT(0);
 static atomic_t gcma_fs_loaded_pages = ATOMIC_INIT(0);
@@ -156,7 +156,7 @@ static atomic_t gcma_fs_invalidated_pages = ATOMIC_INIT(0);
 static atomic_t gcma_fs_invalidated_areas = ATOMIC_INIT(0);
 #endif
 
-#ifdef CONFIG_CLEANCACHE
+#if defined(CONFIG_CLEANCACHE) && defined(CONFIG_GCMA_STATS)
 static atomic_t gcma_cc_inits = ATOMIC_INIT(0);
 static atomic_t gcma_cc_stored_pages = ATOMIC_INIT(0);
 static atomic_t gcma_cc_loaded_pages = ATOMIC_INIT(0);
@@ -514,6 +514,7 @@ static unsigned long dmem_evict_lru(struct dmem *dmem, unsigned long nr_pages)
 		spin_unlock(&buck->lock);
 	}
 
+#ifdef CONFIG_GCMA_STATS
 #ifdef CONFIG_FRONTSWAP
 	if (dmem == &fs_dmem)
 		atomic_add(evicted, &gcma_fs_evicted_pages);
@@ -523,6 +524,7 @@ static unsigned long dmem_evict_lru(struct dmem *dmem, unsigned long nr_pages)
 #endif
 #ifdef CONFIG_CLEANCACHE
 		atomic_add(evicted, &gcma_cc_evicted_pages);
+#endif
 #endif
 	return evicted;
 }
@@ -843,7 +845,9 @@ static unsigned frontswap_hash_key(void *key)
 void gcma_frontswap_init(unsigned type)
 {
 	dmem_init_pool(&fs_dmem, type);
+#ifdef CONFIG_GCMA_STATS
 	atomic_inc(&gcma_fs_inits);
+#endif
 }
 
 int gcma_frontswap_store(unsigned type, pgoff_t offset,
@@ -852,8 +856,10 @@ int gcma_frontswap_store(unsigned type, pgoff_t offset,
 	int ret;
 
 	ret = dmem_store_page(&fs_dmem, type, (void *)&offset, page);
+#ifdef CONFIG_GCMA_STATS
 	if (ret == 0)
 		atomic_inc(&gcma_fs_stored_pages);
+#endif
 	return ret;
 }
 
@@ -867,21 +873,31 @@ int gcma_frontswap_load(unsigned type, pgoff_t offset,
 	int ret;
 
 	ret = dmem_load_page(&fs_dmem, type, (void *)&offset, page);
+#ifdef CONFIG_GCMA_STATS
 	if (ret == 0)
 		atomic_inc(&gcma_fs_loaded_pages);
+#endif
 	return ret;
 }
 
 void gcma_frontswap_invalidate_page(unsigned type, pgoff_t offset)
 {
 	if (dmem_invalidate_entry(&fs_dmem, type, (void *)&offset) == 0)
+#ifdef CONFIG_GCMA_STATS
 		atomic_inc(&gcma_fs_invalidated_pages);
+#else
+		return;
+#endif
 }
 
 void gcma_frontswap_invalidate_area(unsigned type)
 {
 	if (dmem_invalidate_pool(&fs_dmem, type) == 0)
+#ifdef CONFIG_GCMA_STATS
 		atomic_inc(&gcma_fs_invalidated_areas);
+#else
+		return;
+#endif
 }
 
 static struct frontswap_ops gcma_frontswap_ops = {
@@ -932,7 +948,9 @@ int gcma_cleancache_init_fs(size_t pagesize)
 	if (err != 0)
 		return err;
 
+#ifdef CONFIG_GCMA_STATS
 	atomic_inc(&gcma_cc_inits);
+#endif
 	return pool_id;
 }
 
@@ -953,10 +971,12 @@ int gcma_cleancache_get_page(int pool_id, struct cleancache_filekey fkey,
 	local_irq_save(flags);
 	ret = dmem_load_page(&cc_dmem, pool_id, &key, page);
 	local_irq_restore(flags);
+#ifdef CONFIG_GCMA_STATS
 	if (ret == 0)
 		atomic_inc(&gcma_cc_loaded_pages);
 	else
 		atomic_inc(&gcma_cc_load_failed_pages);
+#endif
 	return ret;
 }
 
@@ -970,7 +990,11 @@ void gcma_cleancache_put_page(int pool_id, struct cleancache_filekey fkey,
 
 	local_irq_save(flags);
 	if (dmem_store_page(&cc_dmem, pool_id, &key, page) == 0)
+#ifdef CONFIG_GCMA_STATS
 		atomic_inc(&gcma_cc_stored_pages);
+#else
+		do {} while (0);
+#endif
 	local_irq_restore(flags);
 }
 
@@ -985,7 +1009,11 @@ void gcma_cleancache_invalidate_page(int pool_id,
 
 	local_irq_save(flags);
 	if (dmem_invalidate_entry(&cc_dmem, pool_id, &key) == 0)
+#ifdef CONFIG_GCMA_STATS
 		atomic_inc(&gcma_cc_invalidated_pages);
+#else
+		do {} while (0);
+#endif
 	local_irq_restore(flags);
 }
 
@@ -1007,12 +1035,18 @@ void gcma_cleancache_invalidate_fs(int pool_id)
 	if (pool_id < 0 || pool_id >= atomic_read(&nr_cleancache_fses)) {
 		pr_warn("%s received wrong pool id %d\n",
 				__func__, pool_id);
+#ifdef CONFIG_GCMA_STATS
 		atomic_inc(&gcma_cc_invalidate_failed_fses);
+#endif
 		return;
 	}
 	local_irq_save(flags);
 	if (dmem_invalidate_pool(&cc_dmem, pool_id) == 0)
+#ifdef CONFIG_GCMA_STATS
 		atomic_inc(&gcma_cc_invalidated_fses);
+#else
+		do {} while (0);
+#endif
 	local_irq_restore(flags);
 }
 
@@ -1185,7 +1219,9 @@ next_page:
 #ifdef CONFIG_CLEANCACHE
 		if (lru_lock == &cc_dmem.lru_lock) {
 			local_irq_restore(flags);
+#ifdef CONFIG_GCMA_STATS
 			atomic_inc(&gcma_cc_reclaimed_pages);
+#endif
 		}
 #endif
 #if defined(CONFIG_CLEANCACHE) && defined(CONFIG_FRONTSWAP)
@@ -1193,7 +1229,9 @@ next_page:
 #endif
 #ifdef CONFIG_FRONTSWAP
 		{
+#ifdef CONFIG_GCMA_STATS
 			atomic_inc(&gcma_fs_reclaimed_pages);
+#endif
 		}
 #endif
 	}
@@ -1239,7 +1277,7 @@ static int __init gcma_debugfs_init(void)
 	if (!gcma_debugfs_root)
 		return -ENOMEM;
 
-#ifdef CONFIG_FRONTSWAP
+#if defined(CONFIG_FRONTSWAP) && defined(CONFIG_GCMA_STATS)
 	debugfs_create_atomic_t("fs_inits", S_IRUGO,
 			gcma_debugfs_root, &gcma_fs_inits);
 	debugfs_create_atomic_t("fs_stored_pages", S_IRUGO,
@@ -1256,7 +1294,7 @@ static int __init gcma_debugfs_init(void)
 			gcma_debugfs_root, &gcma_fs_invalidated_areas);
 #endif
 
-#ifdef CONFIG_CLEANCACHE
+#if defined(CONFIG_CLEANCACHE) && defined(CONFIG_GCMA_STATS)
 	debugfs_create_atomic_t("cc_inits", S_IRUGO,
 			gcma_debugfs_root, &gcma_cc_inits);
 	debugfs_create_atomic_t("cc_stored_pages", S_IRUGO,

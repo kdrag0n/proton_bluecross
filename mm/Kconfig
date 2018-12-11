@@ -566,6 +566,14 @@ config GCMA_DEFAULT
 	  Set older CMA interfaces to work as GCMA rather than CMA without any
 	  client code change.
 
+config GCMA_STATS
+	bool "Keep statistics for cleancache and frontswap usage"
+	default y
+	depends on GCMA && DEBUG_FS
+	help
+	  Account and expose statistics about various events related to
+	  cleancache and frontcache usage of the free GCMA pool via debugfs.
+
 config MEM_SOFT_DIRTY
 	bool "Track memory changes"
 	depends on CHECKPOINT_RESTORE && HAVE_ARCH_SOFT_DIRTY && PROC_FS
