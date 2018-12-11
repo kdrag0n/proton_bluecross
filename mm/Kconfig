@@ -547,8 +547,6 @@ config CMA_AREAS
 config GCMA
 	bool "Guaranteed Contiguous Memory Allocator (EXPERIMENTAL)"
 	default n
-	select FRONTSWAP if SWAP
-	select CLEANCACHE
 	select CMA
 	help
 	  A contiguous memory allocator which guarantees success and
