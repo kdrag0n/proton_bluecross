@@ -2004,10 +2004,17 @@ retry:
 		 * Below we call drm_atomic_state_free for it.
 		 */
 		ret = drm_atomic_check_only(state);
-	} else if (arg->flags & DRM_MODE_ATOMIC_NONBLOCK) {
-		ret = drm_atomic_nonblocking_commit(state);
 	} else {
-		ret = drm_atomic_commit(state);
+		if (!dev->bridges_enabled) {
+			kthread_queue_work(&dev->bridge_enable_worker,
+					   &dev->bridge_enable_work);
+			dev->bridges_enabled = true;
+		}
+
+		if (arg->flags & DRM_MODE_ATOMIC_NONBLOCK)
+			ret = drm_atomic_nonblocking_commit(state);
+		else
+			ret = drm_atomic_commit(state);
 	}
 
 out:
