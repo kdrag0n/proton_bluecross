@@ -10130,6 +10130,9 @@ done:
 }
 
 #ifdef CONFIG_SOUND_CONTROL
+#include "../cs35l36.h"
+
+struct snd_soc_codec *cs35l36_codec;
 static struct snd_soc_codec *sound_control_codec_ptr;
 
 static ssize_t mic_gain_show(struct kobject *kobj,
@@ -10137,6 +10140,7 @@ static ssize_t mic_gain_show(struct kobject *kobj,
 {
 	return snprintf(buf, PAGE_SIZE, "%d\n",
 		snd_soc_read(sound_control_codec_ptr, WCD934X_CDC_TX7_TX_VOL_CTL));
+
 }
 static ssize_t mic_gain_store(struct kobject *kobj,
 		struct kobj_attribute *attr, const char *buf, size_t count)
@@ -10146,15 +10150,49 @@ static ssize_t mic_gain_store(struct kobject *kobj,
 	if (input < -10 || input > 20)
 		input = 0;
 	snd_soc_write(sound_control_codec_ptr, WCD934X_CDC_TX7_TX_VOL_CTL, input);
+
 	return count;
 }
+
 static struct kobj_attribute mic_gain_attribute =
 	__ATTR(mic_gain, 0664,
 		mic_gain_show,
 		mic_gain_store);
 
+static ssize_t speaker_gain_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	int val, tmp;
+	val = snd_soc_read(cs35l36_codec, CS35L36_AMP_DIG_VOL_CTRL);
+
+	if (val == 0x0008000)
+		tmp = 0;
+	else
+		tmp = val/100;
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", tmp);
+}
+static ssize_t speaker_gain_store(struct kobject *kobj,
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int input, val;
+	sscanf(buf, "%d", &input);
+	if (input < -8 || input > 8)
+		input = 0;
+
+	snd_soc_write(cs35l36_codec, CS35L36_AMP_DIG_VOL_CTRL, input * 100);
+
+	return count;
+}
+
+static struct kobj_attribute speaker_gain_attribute =
+	__ATTR(speaker_gain, 0664,
+		speaker_gain_show,
+		speaker_gain_store);
+
 static struct attribute *sound_control_attrs[] = {
 		&mic_gain_attribute.attr,
+		&speaker_gain_attribute.attr,
 		NULL,
 };
 static struct attribute_group sound_control_attr_group = {
