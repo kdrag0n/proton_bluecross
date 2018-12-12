@@ -898,6 +898,10 @@ boost_write(struct cgroup_subsys_state *css, struct cftype *cft,
 
 	if (boost < -100 || boost > 100)
 		return -EINVAL;
+
+	if (boost <= 10)
+		boost = 0;
+
 	boost_pct = boost;
 
 	/*
