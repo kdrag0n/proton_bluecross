@@ -10175,7 +10175,7 @@ static ssize_t speaker_gain_show(struct kobject *kobj,
 static ssize_t speaker_gain_store(struct kobject *kobj,
 		struct kobj_attribute *attr, const char *buf, size_t count)
 {
-	int input, val;
+	int input;
 	sscanf(buf, "%d", &input);
 	if (input < -8 || input > 8)
 		input = 0;
