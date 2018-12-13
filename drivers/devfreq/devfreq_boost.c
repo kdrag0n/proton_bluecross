@@ -1,14 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2018, Sultan Alsawaf <sultanxda@gmail.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 and
- * only version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Copyright (C) 2018 Sultan Alsawaf <sultan@kerneltoast.com>.
  */
 
 #define pr_fmt(fmt) "devfreq_boost: " fmt
@@ -50,7 +42,7 @@ void devfreq_boost_kick(enum df_device device)
 }
 
 static void __devfreq_boost_kick_max(struct boost_dev *b,
-	unsigned int duration_ms)
+				     unsigned int duration_ms)
 {
 	unsigned long flags, new_expires;
 
@@ -250,7 +242,7 @@ static void devfreq_max_unboost(struct work_struct *work)
 }
 
 static int msm_drm_notifier_cb(struct notifier_block *nb,
-	unsigned long action, void *data)
+			       unsigned long action, void *data)
 {
 	struct df_boost_drv *d = container_of(nb, typeof(*d), msm_drm_notif);
 	struct msm_drm_notifier *evdata = data;
@@ -275,7 +267,8 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 }
 
 static void devfreq_boost_input_event(struct input_handle *handle,
-	unsigned int type, unsigned int code, int value)
+				      unsigned int type, unsigned int code,
+				      int value)
 {
 	struct df_boost_drv *d = handle->handler->private;
 	int i;
@@ -285,7 +278,8 @@ static void devfreq_boost_input_event(struct input_handle *handle,
 }
 
 static int devfreq_boost_input_connect(struct input_handler *handler,
-	struct input_dev *dev, const struct input_device_id *id)
+				       struct input_dev *dev,
+				       const struct input_device_id *id)
 {
 	struct input_handle *handle;
 	int ret;
@@ -330,7 +324,7 @@ static const struct input_device_id devfreq_boost_ids[] = {
 		.evbit = { BIT_MASK(EV_ABS) },
 		.absbit = { [BIT_WORD(ABS_MT_POSITION_X)] =
 			BIT_MASK(ABS_MT_POSITION_X) |
-			BIT_MASK(ABS_MT_POSITION_Y) },
+			BIT_MASK(ABS_MT_POSITION_Y) }
 	},
 	/* Touchpad */
 	{
@@ -338,12 +332,12 @@ static const struct input_device_id devfreq_boost_ids[] = {
 			INPUT_DEVICE_ID_MATCH_ABSBIT,
 		.keybit = { [BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH) },
 		.absbit = { [BIT_WORD(ABS_X)] =
-			BIT_MASK(ABS_X) | BIT_MASK(ABS_Y) },
+			BIT_MASK(ABS_X) | BIT_MASK(ABS_Y) }
 	},
 	/* Keypad */
 	{
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
-		.evbit = { BIT_MASK(EV_KEY) },
+		.evbit = { BIT_MASK(EV_KEY) }
 	},
 	{ }
 };
