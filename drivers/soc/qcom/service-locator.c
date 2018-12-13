@@ -253,7 +253,6 @@ static int service_locator_send_msg(struct pd_qmi_client_data *pd)
 	req->domain_offset_valid = true;
 	req->domain_offset = 0;
 
-	pd->domain_list = NULL;
 	do {
 		req->domain_offset += domains_read;
 		rc = servreg_loc_send_msg(&req_desc, &resp_desc, req, resp,
@@ -417,6 +416,7 @@ static void pd_locator_work(struct work_struct *work)
 								pd_loc_work);
 
 	data = pdqw->pdc;
+	data->domain_list = NULL;
 	rc = init_service_locator();
 	if (rc) {
 		pr_err("Unable to connect to service locator!, rc = %d\n", rc);
