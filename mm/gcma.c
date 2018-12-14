@@ -450,7 +450,9 @@ static void dmem_put(struct dmem_hashbucket *buck,
 {
 	int refcount = atomic_dec_return(&entry->refcount);
 
-	if (refcount <= 0) {
+	BUG_ON(refcount < 0);
+
+	if (refcount == 0) {
 		struct page *page = entry->page;
 
 		dmem_erase_entry(buck, entry);
