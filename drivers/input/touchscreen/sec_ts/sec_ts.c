@@ -1901,7 +1901,6 @@ err_allocate_gaintable:
 err_allocate_frame:
 err_init:
 	sec_ts_power(ts, false);
-err_allocate_input_dev_pad:
 	if (ts->input_dev)
 		input_free_device(ts->input_dev);
 err_allocate_input_dev:

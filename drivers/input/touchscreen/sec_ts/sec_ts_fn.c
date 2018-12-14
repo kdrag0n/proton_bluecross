@@ -2949,7 +2949,6 @@ static int sec_ts_read_frame_p2p(struct sec_ts_data *ts,
 
 	kfree(temp);
 ErrorAlloctemp:
-ErrorP2PTest:
 	ret = ts->sec_ts_i2c_write(ts, SEC_TS_CMD_SET_POWER_MODE, &para, 1);
 	if (ret < 0)
 		input_err(true, &ts->client->dev, "%s: Set powermode failed\n",
@@ -3724,16 +3723,6 @@ static void sec_ts_swap(u8 *a, u8 *b)
 
 	*a = *b;
 	*b = temp;
-}
-
-static void rearrange_sft_result(u8 *data, int length)
-{
-	int i;
-
-	for(i = 0; i < length; i += 4) {
-		sec_ts_swap(&data[i], &data[i + 3]);
-		sec_ts_swap(&data[i + 1], &data[i + 2]);
-	}
 }
 
 static void run_fs_cal_pre_press(void *device_data)
