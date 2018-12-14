@@ -23,7 +23,7 @@ config IOSCHED_DEADLINE
 
 config IOSCHED_MAPLE
 	tristate "Maple I/O scheduler"
-	default y
+	default n
 
 config IOSCHED_TRIPNDROID
 	tristate "TripNDroid IO Scheduler"
@@ -46,7 +46,7 @@ config IOSCHED_CFQ
 
 config IOSCHED_FIOPS
 	tristate "IOPS based I/O scheduler"
-	default y
+	default n
 	---help---
 	  This is an IOPS based I/O scheduler. It will try to distribute
           IOPS equally among all processes in the system. It's mainly for
@@ -54,7 +54,7 @@ config IOSCHED_FIOPS
 
 config IOSCHED_SIO
 	tristate "Simple I/O scheduler"
-	default y
+	default n
 	---help---
 	  The Simple I/O scheduler is an extremely simple scheduler,
 	  based on noop and deadline, that relies on deadlines to
@@ -64,7 +64,7 @@ config IOSCHED_SIO
 
 config IOSCHED_ANXIETY
 	tristate "Anxiety I/O scheduler"
-	default y
+	default n
 	---help---
 	  The Anxiety I/O scheduler prioritizes latency over everything
 	  else. It uses a simple algorithm that selects from FIFO queues
@@ -80,7 +80,7 @@ config CFQ_GROUP_IOSCHED
 	  
 config IOSCHED_FIOPS
 	tristate "IOPS based I/O scheduler"
-	default y
+	default n
 	---help---
 	  This is an IOPS based I/O scheduler. It will try to distribute
           IOPS equally among all processes in the system. It's mainly for
@@ -89,29 +89,28 @@ config IOSCHED_FIOPS
 
 config IOSCHED_ZEN
 	tristate "Zen I/O scheduler"
-	default y
+	default n
 	---help---
-	FCFS, dispatches are back-inserted, deadlines ensure fairness.
-        Should work best with devices where there is no travel delay.
+	  FCFS, dispatches are back-inserted, deadlines ensure fairness.
+          Should work best with devices where there is no travel delay.
 
 config IOSCHED_BFQ
 	tristate "BFQ I/O scheduler"
 	default n
 	---help---
-	The BFQ I/O scheduler distributes bandwidth among all
-	processes according to their weights, regardless of the
-	device parameters and with any workload. It also guarantees
-	a low latency to interactive and soft real-time applications.
-	Details in Documentation/block/bfq-iosched.txt
+	  The BFQ I/O scheduler distributes bandwidth among all
+	  processes according to their weights, regardless of the
+	  device parameters and with any workload. It also guarantees
+	  a low latency to interactive and soft real-time applications.
+	  Details in Documentation/block/bfq-iosched.txt
 
 config BFQ_GROUP_IOSCHED
 	bool "BFQ hierarchical scheduling support"
 	depends on IOSCHED_BFQ && BLK_CGROUP
 	default n
 	---help---
-
-	Enable hierarchical scheduling in BFQ, using the blkio
-	(cgroups-v1) or io (cgroups-v2) controller.
+	  Enable hierarchical scheduling in BFQ, using the blkio
+	  (cgroups-v1) or io (cgroups-v2) controller.
 
 choice
 	prompt "Default I/O scheduler"
@@ -170,7 +169,6 @@ config DEFAULT_IOSCHED
 	default "maple" if DEFAULT_MAPLE
 	default "sio" if DEFAULT_SIO
 	default "bfq" if DEFAULT_BFQ
-
 endmenu
 
 endif
