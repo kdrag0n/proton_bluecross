@@ -743,7 +743,8 @@ static void sec_ts_read_event(struct sec_ts_data *ts)
 				ts->coord[t_id].action = p_event_coord->tchsta;
 				ts->coord[t_id].x = (p_event_coord->x_11_4 << 4) | (p_event_coord->x_3_0);
 				ts->coord[t_id].y = (p_event_coord->y_11_4 << 4) | (p_event_coord->y_3_0);
-				ts->coord[t_id].z = p_event_coord->z & 0x3F;
+				ts->coord[t_id].z = p_event_coord->z &
+							SEC_TS_PRESSURE_MAX;
 				ts->coord[t_id].ttype = p_event_coord->ttype_3_2 << 2 | p_event_coord->ttype_1_0 << 0;
 
 				if (!ts->coord[t_id].palm && (ts->coord[t_id].ttype == SEC_TS_TOUCHTYPE_PALM))
@@ -1212,7 +1213,7 @@ static int sec_ts_parse_dt(struct i2c_client *client)
 
 	if (of_property_read_u32(np, "sec,irq_type", &pdata->irq_type)) {
 		input_err(true, dev, "%s: Failed to get irq_type property\n", __func__);
-		pdata->irq_type = IRQF_TRIGGER_LOW | IRQF_ONESHOT | IRQF_PERF_CRITICAL;
+		pdata->irq_type = IRQF_TRIGGER_LOW | IRQF_ONESHOT;
 	}
 
 	if (of_property_read_u32(np, "sec,i2c-burstmax", &pdata->i2c_burstmax)) {
@@ -2605,6 +2606,11 @@ static void sec_ts_resume_work(struct work_struct *work)
 	sec_ts_locked_release_all_finger(ts);
 
 	ts->power_status = SEC_TS_STATE_POWER_ON;
+
+	ret = sec_ts_sw_reset(ts);
+	if (ret < 0)
+		input_err(true, &ts->client->dev,
+			  "%s: software reset failed!\n", __func__);
 
 	if (ts->plat_data->enable_sync)
 		ts->plat_data->enable_sync(true);

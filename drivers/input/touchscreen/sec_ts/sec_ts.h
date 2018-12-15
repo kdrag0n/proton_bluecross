@@ -113,6 +113,7 @@
 #define SEC_TS_FW_BLK_SIZE_MAX		(512)
 #define SEC_TS_FW_BLK_SIZE_DEFAULT	(256)
 #define SEC_TS_SELFTEST_REPORT_SIZE	80
+#define SEC_TS_PRESSURE_MAX		0x3f
 
 #define I2C_WRITE_BUFFER_SIZE		(256 - 1)//10
 
@@ -871,6 +872,7 @@ struct sec_ts_plat_data {
 
 int sec_ts_stop_device(struct sec_ts_data *ts);
 int sec_ts_start_device(struct sec_ts_data *ts);
+int sec_ts_sw_reset(struct sec_ts_data *ts);
 int sec_ts_set_lowpowermode(struct sec_ts_data *ts, u8 mode);
 int sec_ts_firmware_update_on_probe(struct sec_ts_data *ts, bool force_update);
 int sec_ts_firmware_update_on_hidden_menu(struct sec_ts_data *ts, int update_type);
