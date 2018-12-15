@@ -3029,8 +3029,8 @@ static int fts_interrupt_install(struct fts_ts_info *info)
 	}
 
 	error = request_threaded_irq(info->client->irq, NULL,
-			fts_interrupt_handler, IRQF_ONESHOT | IRQF_TRIGGER_LOW |
-			IRQF_PERF_CRITICAL, FTS_TS_DRV_NAME, info);
+			fts_interrupt_handler, IRQF_ONESHOT | IRQF_TRIGGER_LOW,
+			FTS_TS_DRV_NAME, info);
 
 	if (error) {
 		pr_err("Request irq failed\n");
