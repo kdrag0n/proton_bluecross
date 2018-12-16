@@ -125,9 +125,10 @@ kernel/configs/android-*.cfg
 # Qualcomm out-of-tree audio drivers
 /techpack/audio
 
-# Flasher
+# Proton kernel
 flasher/*.dtb
 flasher/dtbo.img
 flasher/Image*
 flasher/version
 *.zip
+builds/sm/*.map
