@@ -861,7 +861,7 @@ static int rhine_napipoll(struct napi_struct *napi, int budget)
 	}
 
 	if (work_done < budget) {
-		napi_complete_done(napi, work_done);
+		napi_complete(napi);
 		iowrite16(enable_mask, ioaddr + IntrEnable);
 		mmiowb();
 	}

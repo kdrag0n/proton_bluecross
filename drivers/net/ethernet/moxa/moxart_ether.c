@@ -270,7 +270,7 @@ rx_next:
 	}
 
 	if (rx < budget) {
-		napi_complete_done(napi, rx);
+		napi_complete(napi);
 	}
 
 	priv->reg_imr |= RPKT_FINISH_M;

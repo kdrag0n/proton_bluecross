@@ -939,7 +939,7 @@ static int netcp_rx_poll(struct napi_struct *napi, int budget)
 
 	netcp_rxpool_refill(netcp);
 	if (packets < budget) {
-		napi_complete_done(&netcp->rx_napi, packets);
+		napi_complete(&netcp->rx_napi);
 		knav_queue_enable_notify(netcp->rx_queue);
 	}
 

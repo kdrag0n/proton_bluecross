@@ -417,7 +417,7 @@ static int w5300_napi_poll(struct napi_struct *napi, int budget)
 	}
 
 	if (rx_count < budget) {
-		napi_complete_done(napi, rx_count);
+		napi_complete(napi);
 		w5300_write(priv, W5300_IMR, IR_S0);
 		mmiowb();
 	}

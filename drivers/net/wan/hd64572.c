@@ -341,7 +341,7 @@ static int sca_poll(struct napi_struct *napi, int budget)
 		received = sca_rx_done(port, budget);
 
 	if (received < budget) {
-		napi_complete_done(napi, received);
+		napi_complete(napi);
 		enable_intr(port);
 	}
 

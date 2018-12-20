@@ -1070,7 +1070,7 @@ err:
 	if (work_done < budget) {
 		int more_to_do = 0;
 
-		napi_complete_done(napi, work_done);
+		napi_complete(napi);
 
 		RING_FINAL_CHECK_FOR_RESPONSES(&queue->rx, more_to_do);
 		if (more_to_do)

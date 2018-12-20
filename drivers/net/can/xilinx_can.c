@@ -838,7 +838,7 @@ static int xcan_rx_poll(struct napi_struct *napi, int quota)
 	}
 
 	if (work_done < quota) {
-		napi_complete_done(napi, work_done);
+		napi_complete(napi);
 		ier = priv->read_reg(priv, XCAN_IER_OFFSET);
 		ier |= XCAN_IXR_RXNEMP_MASK;
 		priv->write_reg(priv, XCAN_IER_OFFSET, ier);

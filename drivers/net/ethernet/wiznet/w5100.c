@@ -915,7 +915,7 @@ static int w5100_napi_poll(struct napi_struct *napi, int budget)
 	}
 
 	if (rx_count < budget) {
-		napi_complete_done(napi, rx_count);
+		napi_complete(napi);
 		w5100_enable_intr(priv);
 	}
 

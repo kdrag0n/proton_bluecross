@@ -575,7 +575,7 @@ static int ucc_hdlc_poll(struct napi_struct *napi, int budget)
 	howmany += hdlc_rx_done(priv, budget - howmany);
 
 	if (howmany < budget) {
-		napi_complete_done(napi, howmany);
+		napi_complete(napi);
 		qe_setbits32(priv->uccf->p_uccm,
 			     (UCCE_HDLC_RX_EVENTS | UCCE_HDLC_TX_EVENTS) << 16);
 	}

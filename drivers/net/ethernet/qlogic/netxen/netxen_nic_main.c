@@ -2391,7 +2391,7 @@ static int netxen_nic_poll(struct napi_struct *napi, int budget)
 		work_done = budget;
 
 	if (work_done < budget) {
-		napi_complete_done(&sds_ring->napi, work_done);
+		napi_complete(&sds_ring->napi);
 		if (test_bit(__NX_DEV_UP, &adapter->state))
 			netxen_nic_enable_int(sds_ring);
 	}
