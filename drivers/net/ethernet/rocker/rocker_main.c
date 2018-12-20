@@ -2480,7 +2480,7 @@ static int rocker_port_poll_rx(struct napi_struct *napi, int budget)
 	}
 
 	if (credits < budget)
-		napi_complete_done(napi, credits);
+		napi_complete(napi);
 
 	rocker_dma_ring_credits_set(rocker, &rocker_port->rx_ring, credits);
 

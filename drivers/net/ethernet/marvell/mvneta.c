@@ -2702,9 +2702,11 @@ static int mvneta_poll(struct napi_struct *napi, int budget)
 			rx_done = mvneta_rx_swbm(pp, budget, &pp->rxqs[rx_queue]);
 	}
 
-	if (rx_done < budget) {
+	budget -= rx_done;
+
+	if (budget > 0) {
 		cause_rx_tx = 0;
-		napi_complete_done(&port->napi, rx_done);
+		napi_complete(&port->napi);
 		enable_percpu_irq(pp->dev->irq, 0);
 	}
 

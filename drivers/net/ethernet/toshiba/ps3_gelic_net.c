@@ -1109,7 +1109,7 @@ static int gelic_net_poll(struct napi_struct *napi, int budget)
 	}
 
 	if (packets_done < budget) {
-		napi_complete_done(napi, packets_done);
+		napi_complete(napi);
 		gelic_card_rx_irq_on(card);
 	}
 	return packets_done;

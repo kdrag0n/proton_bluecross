@@ -3521,7 +3521,7 @@ static int bnx2_poll_msix(struct napi_struct *napi, int budget)
 		rmb();
 		if (likely(!bnx2_has_fast_work(bnapi))) {
 
-			napi_complete_done(napi, work_done);
+			napi_complete(napi);
 			BNX2_WR(bp, BNX2_PCICFG_INT_ACK_CMD, bnapi->int_num |
 				BNX2_PCICFG_INT_ACK_CMD_INDEX_VALID |
 				bnapi->last_status_idx);
@@ -3558,7 +3558,7 @@ static int bnx2_poll(struct napi_struct *napi, int budget)
 
 		rmb();
 		if (likely(!bnx2_has_work(bnapi))) {
-			napi_complete_done(napi, work_done);
+			napi_complete(napi);
 			if (likely(bp->flags & BNX2_FLAG_USING_MSI_OR_MSIX)) {
 				BNX2_WR(bp, BNX2_PCICFG_INT_ACK_CMD,
 					BNX2_PCICFG_INT_ACK_CMD_INDEX_VALID |

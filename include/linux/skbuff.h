@@ -751,8 +751,7 @@ struct sk_buff {
 #ifdef CONFIG_NET_SWITCHDEV
 	__u8			offload_fwd_mark:1;
 #endif
-	__u8			gro_skip:1;
-	/* 1, 3 or 4 bit hole */
+	/* 2, 4 or 5 bit hole */
 
 #ifdef CONFIG_NET_SCHED
 	__u16			tc_index;	/* traffic control index */
@@ -2481,7 +2480,7 @@ static inline struct sk_buff *netdev_alloc_skb_ip_align(struct net_device *dev,
 
 static inline void skb_free_frag(void *addr)
 {
-	page_frag_free(addr);
+	__free_page_frag(addr);
 }
 
 void *napi_alloc_frag(unsigned int fragsz);

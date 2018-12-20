@@ -7576,7 +7576,7 @@ static int rtl8169_poll(struct napi_struct *napi, int budget)
 	}
 
 	if (work_done < budget) {
-		napi_complete_done(napi, work_done);
+		napi_complete(napi);
 
 		rtl_irq_enable(tp, enable_mask);
 		mmiowb();

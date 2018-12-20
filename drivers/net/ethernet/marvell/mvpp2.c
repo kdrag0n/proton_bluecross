@@ -5406,7 +5406,7 @@ static int mvpp2_poll(struct napi_struct *napi, int budget)
 
 	if (budget > 0) {
 		cause_rx = 0;
-		napi_complete_done(napi, rx_done);
+		napi_complete(napi);
 
 		mvpp2_interrupts_enable(port);
 	}

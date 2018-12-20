@@ -156,21 +156,24 @@ ltq_etop_poll_rx(struct napi_struct *napi, int budget)
 {
 	struct ltq_etop_chan *ch = container_of(napi,
 				struct ltq_etop_chan, napi);
-	int work_done = 0;
+	int rx = 0;
+	int complete = 0;
 
-	while (work_done < budget) {
+	while ((rx < budget) && !complete) {
 		struct ltq_dma_desc *desc = &ch->dma.desc_base[ch->dma.desc];
 
-		if ((desc->ctl & (LTQ_DMA_OWN | LTQ_DMA_C)) != LTQ_DMA_C)
-			break;
-		ltq_etop_hw_receive(ch);
-		work_done++;
+		if ((desc->ctl & (LTQ_DMA_OWN | LTQ_DMA_C)) == LTQ_DMA_C) {
+			ltq_etop_hw_receive(ch);
+			rx++;
+		} else {
+			complete = 1;
+		}
 	}
-	if (work_done < budget) {
-		napi_complete_done(&ch->napi, work_done);
+	if (complete || !rx) {
+		napi_complete(&ch->napi);
 		ltq_dma_ack_irq(&ch->dma);
 	}
-	return work_done;
+	return rx;
 }
 
 static int
