@@ -61,9 +61,9 @@ ip_packet_match(const struct iphdr *ip,
 	if (ipinfo->flags & IPT_F_NO_DEF_MATCH)
 		return true;
 
-	if (NF_INVF(ipinfo, IPT_INV_SRCIP, ipinfo->smsk.s_addr &&
+	if (NF_INVF(ipinfo, IPT_INV_SRCIP,
 		    (ip->saddr & ipinfo->smsk.s_addr) != ipinfo->src.s_addr) ||
-	    NF_INVF(ipinfo, IPT_INV_DSTIP, ipinfo->dmsk.s_addr &&
+	    NF_INVF(ipinfo, IPT_INV_DSTIP,
 		    (ip->daddr & ipinfo->dmsk.s_addr) != ipinfo->dst.s_addr))
 		return false;
 
