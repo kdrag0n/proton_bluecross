@@ -885,7 +885,6 @@ void tcp_wfree(struct sk_buff *skb)
 
 	for (oval = READ_ONCE(tp->tsq_flags);; oval = nval) {
 		struct tsq_tasklet *tsq;
-		bool empty;
 
 		if (!(oval & TSQF_THROTTLED) || (oval & TSQF_QUEUED))
 			goto out;
@@ -898,10 +897,8 @@ void tcp_wfree(struct sk_buff *skb)
 		/* queue this socket to tasklet queue */
 		local_irq_save(flags);
 		tsq = this_cpu_ptr(&tsq_tasklet);
-		empty = list_empty(&tsq->head);
 		list_add(&tp->tsq_node, &tsq->head);
-		if (empty)
-			tasklet_schedule(&tsq->tasklet);
+		tasklet_schedule(&tsq->tasklet);
 		local_irq_restore(flags);
 		return;
 	}
