@@ -63,9 +63,9 @@ mkzip() {
     rm -f "$fn"
     echo "  ZIP     $fn"
     oldpwd="$(pwd)"
-    pushd "$kroot/flasher"
+    pushd -q "$kroot/flasher"
     zip -qr9 "$oldpwd/$fn" . -x .gitignore
-    popd
+    popd -q
 }
 
 # Create a flashable release zip, ensuring the compiled kernel is up to date
