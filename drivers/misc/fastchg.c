@@ -27,7 +27,21 @@
 #include <linux/string.h>
 #include <linux/module.h>
 
-int force_fast_charge = 1;
+int force_fast_charge;
+
+static int __init get_fastcharge_opt(char *ffc)
+{
+	if (strcmp(ffc, "0") == 0) {
+		force_fast_charge = 0;
+	} else if (strcmp(ffc, "1") == 0) {
+		force_fast_charge = 1;
+	} else {
+		force_fast_charge = 1;
+	}
+	return 1;
+}
+
+__setup("ffc=", get_fastcharge_opt);
 
 static ssize_t force_fast_charge_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
