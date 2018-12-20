@@ -1960,26 +1960,26 @@ static bool tcp_can_coalesce_send_queue_head(struct sock *sk, int len)
  */
 static int tcp_mtu_probe(struct sock *sk)
 {
-	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
+	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct sk_buff *skb, *nskb, *next;
 	struct net *net = sock_net(sk);
+	int len;
 	int probe_size;
 	int size_needed;
-	int copy, len;
+	int copy;
 	int mss_now;
 	int interval;
 
 	/* Not currently probing/verifying,
 	 * not in recovery,
 	 * have enough cwnd, and
-	 * not SACKing (the variable headers throw things off)
-	 */
-	if (likely(!icsk->icsk_mtup.enabled ||
-		   icsk->icsk_mtup.probe_size ||
-		   inet_csk(sk)->icsk_ca_state != TCP_CA_Open ||
-		   tp->snd_cwnd < 11 ||
-		   tp->rx_opt.num_sacks || tp->rx_opt.dsack))
+	 * not SACKing (the variable headers throw things off) */
+	if (!icsk->icsk_mtup.enabled ||
+	    icsk->icsk_mtup.probe_size ||
+	    inet_csk(sk)->icsk_ca_state != TCP_CA_Open ||
+	    tp->snd_cwnd < 11 ||
+	    tp->rx_opt.num_sacks || tp->rx_opt.dsack)
 		return -1;
 
 	/* Use binary search for probe_size between tcp_mss_base,
