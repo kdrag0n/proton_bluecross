@@ -2773,6 +2773,8 @@ static int cake_init(struct Qdisc *sch, struct nlattr *opt,
 	q->cur_tin = 0;
 	q->cur_flow  = 0;
 
+	q->ack_filter = CAKE_ACK_FILTER;
+
 	qdisc_watchdog_init(&q->watchdog, sch);
 
 	if (opt) {
