@@ -28,12 +28,6 @@
  */
 
 #define arch_spin_is_locked(x)		(*(volatile int *)(&(x)->slock) <= 0)
-#define arch_spin_lock_flags(lock, flags) arch_spin_lock(lock)
-
-static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
-{
-	smp_cond_load_acquire(&lock->slock, VAL > 0);
-}
 
 /**
  * arch_spin_trylock - Try spin lock and return a result
@@ -321,12 +315,5 @@ static inline int arch_write_trylock(arch_rwlock_t *lock)
 	atomic_add(RW_LOCK_BIAS, count);
 	return 0;
 }
-
-#define arch_read_lock_flags(lock, flags) arch_read_lock(lock)
-#define arch_write_lock_flags(lock, flags) arch_write_lock(lock)
-
-#define arch_spin_relax(lock)	cpu_relax()
-#define arch_read_relax(lock)	cpu_relax()
-#define arch_write_relax(lock)	cpu_relax()
 
 #endif	/* _ASM_M32R_SPINLOCK_H */
