@@ -17,6 +17,12 @@ sha2-ce-y := sha2-ce-glue.o sha2-ce-core.o
 obj-$(CONFIG_CRYPTO_GHASH_ARM64_CE) += ghash-ce.o
 ghash-ce-y := ghash-ce-glue.o ghash-ce-core.o
 
+obj-$(CONFIG_CRYPTO_CRCT10DIF_ARM64_CE) += crct10dif-ce.o
+crct10dif-ce-y := crct10dif-ce-core.o crct10dif-ce-glue.o
+
+obj-$(CONFIG_CRYPTO_CRC32_ARM64_CE) += crc32-ce.o
+crc32-ce-y:= crc32-ce-core.o crc32-ce-glue.o
+
 obj-$(CONFIG_CRYPTO_AES_ARM64_CE) += aes-ce-cipher.o
 aes-ce-cipher-y := aes-ce-cipher-glue.o aes-ce-cipher-core.o
 CFLAGS_aes-ce-cipher-core.o += -march=armv8.2-a+crypto -Wa,-march=armv8.2-a+crypto $(DISABLE_LTO)
@@ -38,6 +44,12 @@ aes-neon-blk-y := aes-glue-neon.o aes-neon.o
 obj-$(CONFIG_CRYPTO_SPECK_NEON) += speck-neon.o
 speck-neon-y := speck-neon-core.o speck-neon-glue.o
 
+obj-$(CONFIG_CRYPTO_SHA256_ARM64) += sha256-arm64.o
+sha256-arm64-y := sha256-glue.o sha256-core.o
+
+obj-$(CONFIG_CRYPTO_SHA512_ARM64) += sha512-arm64.o
+sha512-arm64-y := sha512-glue.o sha512-core.o
+
 AFLAGS_aes-ce.o		:= -DINTERLEAVE=4
 AFLAGS_aes-neon.o	:= -DINTERLEAVE=4
 
@@ -52,3 +64,14 @@ chacha20-neon-y := chacha20-neon-core.o chacha20-neon-glue.o
 
 $(obj)/aes-glue-%.o: $(src)/aes-glue.c FORCE
 	$(call if_changed_rule,cc_o_c)
+
+quiet_cmd_perlasm = PERLASM $@
+      cmd_perlasm = $(PERL) $(<) void $(@)
+
+$(src)/sha256-core.S_shipped: $(src)/sha512-armv8.pl
+	$(call cmd,perlasm)
+
+$(src)/sha512-core.S_shipped: $(src)/sha512-armv8.pl
+	$(call cmd,perlasm)
+
+.PRECIOUS: $(obj)/sha256-core.S $(obj)/sha512-core.S
