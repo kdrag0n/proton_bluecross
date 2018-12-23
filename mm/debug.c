@@ -120,7 +120,9 @@ void dump_mm(const struct mm_struct *mm)
 #ifdef CONFIG_NUMA_BALANCING
 		"numa_next_scan %lu numa_scan_offset %lu numa_scan_seq %d\n"
 #endif
+#if defined(CONFIG_NUMA_BALANCING) || defined(CONFIG_COMPACTION)
 		"tlb_flush_pending %d\n"
+#endif
 		"def_flags: %#lx(%pGv)\n",
 
 		mm, mm->mmap, (long long) mm->vmacache_seqnum, mm->task_size,
@@ -152,7 +154,9 @@ void dump_mm(const struct mm_struct *mm)
 #ifdef CONFIG_NUMA_BALANCING
 		mm->numa_next_scan, mm->numa_scan_offset, mm->numa_scan_seq,
 #endif
-		atomic_read(&mm->tlb_flush_pending),
+#if defined(CONFIG_NUMA_BALANCING) || defined(CONFIG_COMPACTION)
+		mm->tlb_flush_pending,
+#endif
 		mm->def_flags, &mm->def_flags
 	);
 }

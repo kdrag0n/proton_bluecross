@@ -148,8 +148,7 @@ static inline void tlb_flush_mmu(struct mmu_gather *tlb)
 }
 
 static inline void
-arch_tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm,
-			unsigned long start, unsigned long end)
+tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm, unsigned long start, unsigned long end)
 {
 	tlb->mm = mm;
 	tlb->fullmm = !(start | (end+1));
@@ -167,14 +166,8 @@ arch_tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm,
 }
 
 static inline void
-arch_tlb_finish_mmu(struct mmu_gather *tlb,
-			unsigned long start, unsigned long end, bool force)
+tlb_finish_mmu(struct mmu_gather *tlb, unsigned long start, unsigned long end)
 {
-	if (force) {
-		tlb->range_start = start;
-		tlb->range_end = end;
-	}
-
 	tlb_flush_mmu(tlb);
 
 	/* keep the page table cache within bounds */
