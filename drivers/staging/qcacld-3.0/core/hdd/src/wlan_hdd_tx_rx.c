@@ -1577,15 +1577,14 @@ static inline void hdd_resolve_rx_ol_mode(hdd_context_t *hdd_ctx)
 	    hdd_ctx->config->gro_enable)) {
 		if (hdd_ctx->config->lro_enable && hdd_ctx->config->gro_enable)
 		        hdd_err("Can't enable both LRO and GRO, disabling Rx offload");
-                else {
+                else
           		hdd_debug("LRO and GRO both are disabled");
-		        hdd_ctx->ol_enable = 0;
-                }
+		hdd_ctx->ol_enable = 0;
 	} else if (hdd_ctx->config->lro_enable) {
-  		hdd_debug("Rx offload LRO is enabled");
+ 		hdd_debug("Rx offload LRO is enabled");
 		hdd_ctx->ol_enable = CFG_LRO_ENABLED;
 	} else {
-  		hdd_debug("Rx offload GRO is enabled");
+ 		hdd_debug("Rx offload GRO is enabled");
 		hdd_ctx->ol_enable = CFG_GRO_ENABLED;
 	}
 }

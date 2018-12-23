@@ -2924,7 +2924,7 @@ lim_send_deauth_mgmt_frame(tpAniSirGlobal pMac,
 							eLIM_DEAUTH_ACK_TIMER);
 			return;
 		}
-	}
+ 	} else {
 #ifdef FEATURE_WLAN_TDLS
 		if ((NULL != pStaDs)
 		    && (STA_ENTRY_TDLS_PEER == pStaDs->staType)) {
@@ -2950,6 +2950,7 @@ lim_send_deauth_mgmt_frame(tpAniSirGlobal pMac,
 				qdf_status);
 			/* Pkt will be freed up by the callback */
 		}
+	}
 } /* End lim_send_deauth_mgmt_frame. */
 
 #ifdef ANI_SUPPORT_11H

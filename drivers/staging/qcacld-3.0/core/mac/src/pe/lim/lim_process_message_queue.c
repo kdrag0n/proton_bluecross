@@ -708,6 +708,8 @@ uint32_t lim_defer_msg(tpAniSirGlobal pMac, tSirMsgQ *pMsg)
 
 	retCode = lim_write_deferred_msg_q(pMac, pMsg);
 
+	pe_err("Dropped lim message (0x%X) Message %s", pMsg->type, lim_msg_str(pMsg->type));
+
 	return retCode;
 } /*** end lim_defer_msg() ***/
 
