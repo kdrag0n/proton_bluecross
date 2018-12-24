@@ -768,7 +768,7 @@ static int qpnp_haptics_play(struct hap_chip *chip, bool enable)
 
 		if (is_sw_lra_auto_resonance_control(chip))
 			hrtimer_start(&chip->auto_res_err_poll_timer,
-				ktime_set(0, AUTO_RES_ERR_POLL_TIME_NS),
+				AUTO_RES_ERR_POLL_TIME_NS,
 				HRTIMER_MODE_REL);
 	} else {
 		rc = qpnp_haptics_play_control(chip, HAP_STOP);
@@ -850,7 +850,7 @@ static enum hrtimer_restart hap_auto_res_err_poll_timer(struct hrtimer *timer)
 
 	qpnp_haptics_update_lra_frequency(chip);
 	hrtimer_forward(&chip->auto_res_err_poll_timer, ktime_get(),
-			ktime_set(0, AUTO_RES_ERR_POLL_TIME_NS));
+			AUTO_RES_ERR_POLL_TIME_NS);
 
 	return HRTIMER_NORESTART;
 }

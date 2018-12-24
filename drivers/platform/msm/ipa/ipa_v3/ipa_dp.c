@@ -429,7 +429,7 @@ int ipa3_send(struct ipa3_sys_context *sys,
 
 	/* set the timer for sending the NOP descriptor */
 	if (send_nop) {
-		ktime_t time = ktime_set(0, IPA_TX_SEND_COMPL_NOP_DELAY_NS);
+		ktime_t time = IPA_TX_SEND_COMPL_NOP_DELAY_NS;
 
 		IPADBG_LOW("scheduling timer for ch %lu\n",
 			sys->ep->gsi_chan_hdl);

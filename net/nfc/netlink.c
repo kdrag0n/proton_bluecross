@@ -38,14 +38,7 @@ static const struct genl_multicast_group nfc_genl_mcgrps[] = {
 	{ .name = NFC_GENL_MCAST_EVENT_NAME, },
 };
 
-static struct genl_family nfc_genl_family = {
-	.id = GENL_ID_GENERATE,
-	.hdrsize = 0,
-	.name = NFC_GENL_NAME,
-	.version = NFC_GENL_VERSION,
-	.maxattr = NFC_ATTR_MAX,
-};
-
+static struct genl_family nfc_genl_family;
 static const struct nla_policy nfc_genl_policy[NFC_ATTR_MAX + 1] = {
 	[NFC_ATTR_DEVICE_INDEX] = { .type = NLA_U32 },
 	[NFC_ATTR_DEVICE_NAME] = { .type = NLA_STRING,
@@ -1757,6 +1750,18 @@ static const struct genl_ops nfc_genl_ops[] = {
 	},
 };
 
+static struct genl_family nfc_genl_family __ro_after_init = {
+	.hdrsize = 0,
+	.name = NFC_GENL_NAME,
+	.version = NFC_GENL_VERSION,
+	.maxattr = NFC_ATTR_MAX,
+	.module = THIS_MODULE,
+	.ops = nfc_genl_ops,
+	.n_ops = ARRAY_SIZE(nfc_genl_ops),
+	.mcgrps = nfc_genl_mcgrps,
+	.n_mcgrps = ARRAY_SIZE(nfc_genl_mcgrps),
+};
+
 
 struct urelease_work {
 	struct	work_struct w;
@@ -1842,9 +1847,7 @@ int __init nfc_genl_init(void)
 {
 	int rc;
 
-	rc = genl_register_family_with_ops_groups(&nfc_genl_family,
-						  nfc_genl_ops,
-						  nfc_genl_mcgrps);
+	rc = genl_register_family(&nfc_genl_family);
 	if (rc)
 		return rc;
 

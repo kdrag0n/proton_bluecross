@@ -80,7 +80,7 @@ struct nfulnl_instance {
 
 #define INSTANCE_BUCKETS	16
 
-static int nfnl_log_net_id __read_mostly;
+static unsigned int nfnl_log_net_id __read_mostly;
 
 struct nfnl_log_net {
 	spinlock_t instances_lock;
@@ -538,7 +538,7 @@ __build_packet_message(struct nfnl_log_net *log,
 			goto nla_put_failure;
 	}
 
-	if (skb->tstamp.tv64) {
+	if (skb->tstamp) {
 		struct nfulnl_msg_packet_timestamp ts;
 		struct timespec64 kts = ktime_to_timespec64(skb->tstamp);
 		ts.sec = cpu_to_be64(kts.tv_sec);

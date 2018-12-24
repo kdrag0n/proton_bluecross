@@ -302,15 +302,13 @@ int adf_vsync_wait(struct adf_interface *intf, long timeout)
 	adf_vsync_get(intf);
 	if (timeout) {
 		ret = wait_event_interruptible_timeout(intf->vsync_wait,
-				!ktime_equal(timestamp,
-						intf->vsync_timestamp),
+				timestamp != intf->vsync_timestamp,
 				msecs_to_jiffies(timeout));
-		if (ret == 0 && ktime_equal(timestamp, intf->vsync_timestamp))
+		if (ret == 0 && timestamp == intf->vsync_timestamp)
 			ret = -ETIMEDOUT;
 	} else {
 		ret = wait_event_interruptible(intf->vsync_wait,
-				!ktime_equal(timestamp,
-						intf->vsync_timestamp));
+				timestamp != intf->vsync_timestamp);
 	}
 	adf_vsync_put(intf);
 

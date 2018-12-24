@@ -15,6 +15,7 @@
 #include <linux/trace_events.h>
 #include <linux/compiler.h>
 #include <linux/trace_seq.h>
+#include <linux/glob.h>
 
 #ifdef CONFIG_FTRACE_SYSCALLS
 #include <asm/unistd.h>		/* For NR_SYSCALLS	     */
@@ -157,7 +158,7 @@ struct trace_array_cpu {
 	unsigned long		policy;
 	unsigned long		rt_priority;
 	unsigned long		skipped_entries;
-	cycle_t			preempt_timestamp;
+	u64			preempt_timestamp;
 	pid_t			pid;
 	kuid_t			uid;
 	char			comm[TASK_COMM_LEN];
@@ -175,7 +176,7 @@ struct trace_buffer {
 	struct trace_array		*tr;
 	struct ring_buffer		*buffer;
 	struct trace_array_cpu __percpu	*data;
-	cycle_t				time_start;
+	u64				time_start;
 	int				cpu;
 };
 
@@ -599,8 +600,8 @@ struct trace_entry *tracing_get_trace_entry(struct trace_array *tr,
 struct trace_entry *trace_find_next_entry(struct trace_iterator *iter,
 					  int *ent_cpu, u64 *ent_ts);
 
-void __buffer_unlock_commit(struct ring_buffer *buffer,
-			    struct ring_buffer_event *event);
+void trace_buffer_unlock_commit_nostack(struct ring_buffer *buffer,
+					struct ring_buffer_event *event);
 
 int trace_empty(struct trace_iterator *iter);
 
@@ -686,7 +687,7 @@ static inline void __trace_stack(struct trace_array *tr, unsigned long flags,
 }
 #endif /* CONFIG_STACKTRACE */
 
-extern cycle_t ftrace_now(int cpu);
+extern u64 ftrace_now(int cpu);
 
 extern void trace_find_cmdline(int pid, char comm[]);
 extern void trace_event_follow_fork(struct trace_array *tr, bool enable);
@@ -734,7 +735,7 @@ extern int trace_selftest_startup_branch(struct tracer *trace,
 #endif /* CONFIG_FTRACE_STARTUP_TEST */
 
 extern void *head_page(struct trace_array_cpu *data);
-extern unsigned long long ns2usecs(cycle_t nsec);
+extern unsigned long long ns2usecs(u64 nsec);
 extern int
 trace_vbprintk(unsigned long ip, const char *fmt, va_list args);
 extern int
@@ -1267,6 +1268,7 @@ enum regex_type {
 	MATCH_FRONT_ONLY,
 	MATCH_MIDDLE_ONLY,
 	MATCH_END_ONLY,
+	MATCH_GLOB,
 };
 
 struct regex {

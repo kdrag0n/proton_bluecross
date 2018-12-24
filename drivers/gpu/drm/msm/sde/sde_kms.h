@@ -88,7 +88,7 @@
  * Returns: -1 if A < B, 0 if A == B, 1 if A > B
  */
 #define ktime_compare_safe(A, B) \
-	ktime_compare(ktime_sub((A), (B)), ktime_set(0, 0))
+	ktime_compare(ktime_sub((A), (B)), 0)
 
 #define SDE_NAME_SIZE  12
 
