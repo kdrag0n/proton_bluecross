@@ -26,7 +26,7 @@
 #include <asm/desc.h>
 #include <asm/traps.h>
 #include <asm/vdso.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <asm/cpufeature.h>
 
 #define CREATE_TRACE_POINTS
