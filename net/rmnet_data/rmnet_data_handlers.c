@@ -728,6 +728,8 @@ void rmnet_egress_handler(struct sk_buff *skb,
 	struct net_device *orig_dev;
 	int rc;
 
+	sk_pacing_shift_update(skb->sk, 8);
+
 	orig_dev = skb->dev;
 	skb->dev = ep->egress_dev;
 
