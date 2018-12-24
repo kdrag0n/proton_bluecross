@@ -36,10 +36,6 @@
 
 #include "internal.h"
 
-static bool notests;
-module_param(notests, bool, 0644);
-MODULE_PARM_DESC(notests, "disable crypto self-tests");
-
 #ifdef CONFIG_CRYPTO_MANAGER_DISABLE_TESTS
 
 /* a perfect nop */
@@ -51,6 +47,10 @@ int alg_test(const char *driver, const char *alg, u32 type, u32 mask)
 #else
 
 #include "testmgr.h"
+
+static bool notests;
+module_param(notests, bool, 0644);
+MODULE_PARM_DESC(notests, "disable crypto self-tests");
 
 /*
  * Need slab memory for testing (size in number of pages).
