@@ -103,7 +103,7 @@ static int tcp_out_of_resources(struct sock *sk, bool do_reset)
 
 	/* If peer does not open window for long time, or did not transmit
 	 * anything for long time, penalize it. */
-	if ((s32)(tcp_time_stamp - tp->lsndtime) > 2*TCP_RTO_MAX || !do_reset)
+	if ((s32)(tcp_jiffies32 - tp->lsndtime) > 2*TCP_RTO_MAX || !do_reset)
 		shift++;
 
 	/* If some dubious ICMP arrived, penalize even more. */
@@ -113,7 +113,7 @@ static int tcp_out_of_resources(struct sock *sk, bool do_reset)
 	if (tcp_check_oom(sk, shift)) {
 		/* Catch exceptional cases, when connection requires reset.
 		 *      1. Last segment was sent recently. */
-		if ((s32)(tcp_time_stamp - tp->lsndtime) <= TCP_TIMEWAIT_LEN ||
+		if ((s32)(tcp_jiffies32 - tp->lsndtime) <= TCP_TIMEWAIT_LEN ||
 		    /*  2. Window is closed. */
 		    (!tp->snd_wnd && !tp->packets_out))
 			do_reset = true;
@@ -162,7 +162,7 @@ static void tcp_mtu_probing(struct inet_connection_sock *icsk, struct sock *sk)
 	if (net->ipv4.sysctl_tcp_mtu_probing) {
 		if (!icsk->icsk_mtup.enabled) {
 			icsk->icsk_mtup.enabled = 1;
-			icsk->icsk_mtup.probe_timestamp = tcp_time_stamp;
+			icsk->icsk_mtup.probe_timestamp = tcp_jiffies32;
 			tcp_sync_mss(sk, icsk->icsk_pmtu_cookie);
 		} else {
 			struct net *net = sock_net(sk);
@@ -499,7 +499,7 @@ void tcp_retransmit_timer(struct sock *sk)
 					    tp->snd_una, tp->snd_nxt);
 		}
 #endif
-		if (tcp_time_stamp - tp->rcv_tstamp > TCP_RTO_MAX) {
+		if (tcp_jiffies32 - tp->rcv_tstamp > TCP_RTO_MAX) {
 			tcp_write_err(sk);
 			goto out;
 		}
