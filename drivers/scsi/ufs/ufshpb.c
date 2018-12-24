@@ -1572,6 +1572,7 @@ static int ufshpb_table_mempool_init(struct ufshpb_lu *hpb,
 		int entry_count, int entry_byte)
 {
 	int i, j;
+	unsigned int b = 0;
 	struct ufshpb_map_ctx *mctx = NULL;
 
 	INIT_LIST_HEAD(&hpb->lh_map_ctx);
@@ -1596,7 +1597,8 @@ static int ufshpb_table_mempool_init(struct ufshpb_lu *hpb,
 			if (!mctx->m_page[j])
 				goto release_mem;
 		}
-		hpb_dbg(hpb->hba, "[%d] mctx->m_page %p get_order %d\n", i,
+		b += sizeof(struct ufshpb_map_ctx) + (sizeof(struct page *) * hpb->mpages_per_subregion) + (entry_count >> bits_per_byte_shift) + (hpb->mpages_per_subregion * PAGE_SIZE);
+		pr_info("hpb: [%d] mctx->m_page %p get_order %d\n", i,
 			  mctx->m_page, get_order(hpb->mpages_per_subregion));
 
 		INIT_LIST_HEAD(&mctx->list_table);
@@ -1604,9 +1606,10 @@ static int ufshpb_table_mempool_init(struct ufshpb_lu *hpb,
 
 		hpb->debug_free_table++;
 	}
+	pr_info("hpb: allocated %d bytes\n", b);
 
 	alloc_mctx = num_regions * subregions_per_region;
-	hpb_dbg(hpb->hba, "number of mctx %d %d %d. debug_free_table %d\n",
+	pr_info("hpb: number of mctx %d %d %d. debug_free_table %d\n",
 		  num_regions * subregions_per_region, num_regions,
 		  subregions_per_region, hpb->debug_free_table);
 	return 0;
