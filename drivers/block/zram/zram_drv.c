@@ -40,15 +40,7 @@ static DEFINE_IDR(zram_index_idr);
 static DEFINE_MUTEX(zram_index_mutex);
 
 static int zram_major;
-#if defined(CONFIG_CRYPTO_ZSTD)
-static const char *default_compressor = "zstd";
-#elif defined(CONFIG_CRYPTO_LZ4)
-static const char *default_compressor = "lz4";
-#elif defined(CONFIG_CRYPTO_LZ4HC)
-static const char *default_compressor = "lz4hc";
-#else
-static const char *default_compressor = "lzo";
-#endif
+static const char *default_compressor = CONFIG_ZRAM_DEFAULT_COMPRESSOR;
 
 #define BACKEND_PAR_BUF_SIZE	32
 static char backend_par_buf[BACKEND_PAR_BUF_SIZE];

@@ -1,7 +1,6 @@
 config ZRAM
 	tristate "Compressed RAM block device support"
 	depends on BLOCK && SYSFS && CRYPTO
-	depends on CRYPTO_LZO || CRYPTO_ZSTD || CRYPTO_LZ4 || CRYPTO_LZ4HC
 	select ZPOOL
 	default n
 	help
@@ -65,5 +64,40 @@ config ZRAM_DEFAULT_POOL
 	default "zbud" if ZRAM_DEFAULT_ZBUD
 	default "z3fold" if ZRAM_DEFAULT_Z3FOLD
 	default "zsmalloc" if ZRAM_DEFAULT_ZSMALLOC
+
+choice
+	prompt "Default zRAM compressor"
+	default ZRAM_DEFAULT_LZ4
+	help
+	  Select the page compressor that will be used by default for all devices.
+
+	config ZRAM_DEFAULT_LZO
+		bool "LZO"
+		select CRYPTO_LZO
+
+	config ZRAM_DEFAULT_LZ4
+		bool "LZ4"
+		select CRYPTO_LZ4
+
+	config ZRAM_DEFAULT_LZ4HC
+		bool "LZ4HC"
+		select CRYPTO_LZ4HC
+
+	config ZRAM_DEFAULT_ZSTD
+		bool "Zstd"
+		select CRYPTO_ZSTD
+
+	config ZRAM_DEFAULT_DEFLATE
+		bool "Deflate"
+		select CRYPTO_DEFLATE
+endchoice
+
+config ZRAM_DEFAULT_COMPRESSOR
+	string
+	default "lzo" if ZRAM_DEFAULT_LZO
+	default "lz4" if ZRAM_DEFAULT_LZ4
+	default "lz4hc" if ZRAM_DEFAULT_LZ4HC
+	default "zstd" if ZRAM_DEFAULT_ZSTD
+	default "deflate" if ZRAM_DEFAULT_DEFLATE
 
 endif
