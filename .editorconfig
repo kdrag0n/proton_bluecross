@@ -18,3 +18,7 @@ trim_trailing_whitespace = true
 [flasher/{anykernel.sh, ak2-core.sh, META-INF/**, powerhint.json}]
 indent_style = space
 indent_size = 2
+
+[{helpers, setup*}.sh]
+indent_style = space
+indent_size = 4
