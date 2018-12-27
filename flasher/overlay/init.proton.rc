@@ -15,8 +15,10 @@ on property:sys.boot_completed=1
 	setprop spectrum.support 1
 	setprop persist.spectrum.kernel Proton
 
-	# Override swappiness
+	# Override settings
 	write /proc/sys/vm/swappiness 65
+	write /sys/block/sda/queue/iostats 0
+	write /sys/block/sdf/queue/iostats 0
 
 	# First boot defaults
 	exec u:r:magisk:s0 root root -- /init.proton.sh
