@@ -82,7 +82,7 @@ rel() {
     kmake $@
 
     # Pack zip
-    mkdir -p builds/sm
+    mkdir -p "$kroot/builds/sm"
     mkzip "builds/ProtonKernel-pixel3-v$(cat "$kroot/out/.version").zip"
 
     # Revert version
@@ -119,7 +119,7 @@ tbuild() {
 
 # Create a flashable test release zip
 dzip() {
-    mkdir -p builds/sm
+    mkdir -p "$kroot/builds/sm"
     mkzip "builds/ProtonKernel-pixel3-test$(cat "$kroot/out/.version").zip"
 }
 
@@ -132,9 +132,7 @@ tzip() {
 ktest() {
     adb wait-for-any && \
 
-    fn="proton_kernel.zip"
-    [ "x$1" != "x" ] && fn="$1"
-
+    fn="${1:-proton_kernel.zip}"
     is_android=false
     adb shell pgrep gatekeeperd > /dev/null && is_android=true
     if $is_android; then
