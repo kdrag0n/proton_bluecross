@@ -39,7 +39,7 @@ on property:persist.proton.profile=balanced
 	setprop proton.little_max 1766400
 	setprop proton.big_boost 902400
 	setprop proton.little_boost 1056000
-	setprop proton.boost_duration 100
+	setprop proton.boost_duration 80
 	setprop proton.cpu_governor schedutil
 	setprop proton.gpu_governor msm-adreno-tz
 
@@ -48,7 +48,7 @@ on property:persist.proton.profile=performance
 	setprop proton.little_max 1766400
 	setprop proton.big_boost 1363200
 	setprop proton.little_boost 1516800
-	setprop proton.boost_duration 140
+	setprop proton.boost_duration 125
 	setprop proton.cpu_governor schedutil
 	setprop proton.gpu_governor msm-adreno-tz
 
