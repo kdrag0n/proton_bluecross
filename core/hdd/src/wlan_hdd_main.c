@@ -122,6 +122,8 @@
 #include <net/cnss_nl.h>
 #endif
 
+#include <linux/b1c1_init.h>
+
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
 #else
@@ -152,7 +154,7 @@ static unsigned int dev_num = 1;
 static struct cdev wlan_hdd_state_cdev;
 static struct class *class;
 static dev_t device;
-#ifndef MODULE
+#if !defined(MODULE) && !defined(CONFIG_BOARD_B1C1)
 static struct gwlan_loader *wlan_loader;
 static ssize_t wlan_boot_cb(struct kobject *kobj,
 			    struct kobj_attribute *attr,
@@ -12257,7 +12259,7 @@ static void __hdd_module_exit(void)
 	wlan_hdd_state_ctrl_param_destroy();
 }
 
-#ifndef MODULE
+#if !defined(MODULE) && !defined(CONFIG_BOARD_B1C1)
 /**
  * wlan_boot_cb() - Wlan boot callback
  * @kobj:      object whose directory we're creating the link in.
@@ -12385,7 +12387,7 @@ static int wlan_deinit_sysfs(void)
 
 #endif /* MODULE */
 
-#ifdef MODULE
+#if defined(MODULE) || defined(CONFIG_BOARD_B1C1)
 /**
  * __hdd_module_init - Module init helper
  *
@@ -12416,7 +12418,7 @@ static int __init hdd_module_init(void)
 #endif
 
 
-#ifdef MODULE
+#if defined(MODULE) || defined(CONFIG_BOARD_B1C1)
 /**
  * hdd_module_exit() - Exit function
  *
@@ -13215,7 +13217,7 @@ bool hdd_is_cli_iface_up(hdd_context_t *hdd_ctx)
 }
 
 /* Register the module init/exit functions */
-module_init(hdd_module_init);
+b1c1_init(hdd_module_init, B1C1_WLAN);
 module_exit(hdd_module_exit);
 
 MODULE_LICENSE("Dual BSD/GPL");
