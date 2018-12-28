@@ -1631,7 +1631,6 @@ error_free_payloads:
 	return rc;
 }
 
-
 static void dsi_panel_destroy_cmds_packets_buf(struct dsi_panel_cmd_set *set)
 {
 	u32 i = 0;
@@ -1646,9 +1645,9 @@ static void dsi_panel_destroy_cmds_packets_buf(struct dsi_panel_cmd_set *set)
 
 void dsi_panel_destroy_cmd_packets(struct dsi_panel_cmd_set *set)
 {
-
 	dsi_panel_destroy_cmds_packets_buf(set);
 	kfree(set->cmds);
+	set->count = 0;
 }
 
 static int dsi_panel_alloc_cmd_packets(struct dsi_panel_cmd_set *cmd,
@@ -3760,9 +3759,10 @@ int dsi_panel_update_pps(struct dsi_panel *panel)
 	}
 
 	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_PPS);
-	if (rc)
+	if (rc) {
 		pr_err("[%s] failed to send DSI_CMD_SET_PPS cmds, rc=%d\n",
 			panel->name, rc);
+	}
 
 	dsi_panel_destroy_cmds_packets_buf(set);
 error:
