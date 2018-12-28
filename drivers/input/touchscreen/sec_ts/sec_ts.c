@@ -21,6 +21,7 @@ bool scr_suspended(void)
 
 struct sec_ts_data *tsp_info;
 
+#include <linux/b1c1_init.h>
 #include "sec_ts.h"
 
 /* Switch GPIO values */
@@ -2814,7 +2815,7 @@ static struct i2c_driver sec_ts_driver = {
 	},
 };
 
-static int __init sec_ts_init(void)
+static int sec_ts_init(void)
 {
 #ifdef CONFIG_BATTERY_SAMSUNG
 	if (lpcharge == 1) {
@@ -2837,5 +2838,5 @@ MODULE_AUTHOR("Hyobae, Ahn<hyobae.ahn@samsung.com>");
 MODULE_DESCRIPTION("Samsung Electronics TouchScreen driver");
 MODULE_LICENSE("GPL");
 
-module_init(sec_ts_init);
+b1c1_init(sec_ts_init, B1C1_SEC_TOUCH);
 module_exit(sec_ts_exit);
