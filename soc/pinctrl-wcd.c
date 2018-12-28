@@ -21,6 +21,7 @@
 #include <linux/regmap.h>
 #include <linux/slab.h>
 #include <linux/types.h>
+#include <linux/b1c1_init.h>
 #include <asoc/wcd934x_registers.h>
 
 #include "core.h"
@@ -429,7 +430,11 @@ static struct platform_driver wcd_pinctrl_driver = {
 	.remove = wcd_pinctrl_remove,
 };
 
-module_platform_driver(wcd_pinctrl_driver);
+static int wcd_pinctrl_driver_init(void)
+{
+	return platform_driver_register(&wcd_pinctrl_driver);
+}
+b1c1_init(wcd_pinctrl_driver_init, B1C1_PINCTRL_WCD);
 
 MODULE_DESCRIPTION("Qualcomm Technologies, Inc WCD GPIO pin control driver");
 MODULE_LICENSE("GPL v2");

@@ -29,6 +29,7 @@
 #include <linux/spi/spi.h>
 #include <linux/regulator/consumer.h>
 #include <linux/mfd/wcd9xxx/wcd9xxx_registers.h>
+#include <linux/b1c1_init.h>
 #include <soc/swr-wcd.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -11115,7 +11116,11 @@ static struct platform_driver tavil_codec_driver = {
 	},
 };
 
-module_platform_driver(tavil_codec_driver);
+static int tavil_codec_driver_init(void)
+{
+	return platform_driver_register(&tavil_codec_driver);
+}
+b1c1_init(tavil_codec_driver_init, B1C1_SND_SOC_WCD934X);
 
 MODULE_DESCRIPTION("Tavil Codec driver");
 MODULE_LICENSE("GPL v2");

@@ -37,6 +37,7 @@
 #include <sound/cs35l36.h>
 #include <linux/of_irq.h>
 #include <linux/completion.h>
+#include <linux/b1c1_init.h>
 
 #include "cs35l36.h"
 
@@ -1688,7 +1689,11 @@ static struct i2c_driver cs35l36_i2c_driver = {
 	.remove = cs35l36_i2c_remove,
 };
 
-module_i2c_driver(cs35l36_i2c_driver);
+static int cs35l36_i2c_driver_init(void)
+{
+	return i2c_add_driver(&cs35l36_i2c_driver);
+}
+b1c1_init(cs35l36_i2c_driver_init, B1C1_SND_SOC_CS35L36);
 
 MODULE_DESCRIPTION("ASoC CS35L36 driver");
 MODULE_AUTHOR("Brian Austin, Cirrus Logic Inc, <brian.austin@cirrus.com>");

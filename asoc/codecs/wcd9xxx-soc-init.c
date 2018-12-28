@@ -12,10 +12,11 @@
  */
 
 #include <linux/module.h>
+#include <linux/b1c1_init.h>
 #include <sound/wcd-dsp-mgr.h>
 #include "audio-ext-clk-up.h"
 
-static int __init wcd9xxx_soc_init(void)
+static int wcd9xxx_soc_init(void)
 {
 	int ret = 0;
 
@@ -32,7 +33,7 @@ static int __init wcd9xxx_soc_init(void)
 
 	return ret;
 }
-module_init(wcd9xxx_soc_init);
+b1c1_init(wcd9xxx_soc_init, B1C1_SND_SOC_WCD9XXX);
 
 static void __exit wcd9xxx_soc_exit(void)
 {

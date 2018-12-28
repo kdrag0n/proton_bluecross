@@ -22,6 +22,7 @@
 #include <linux/input.h>
 #include <linux/of_device.h>
 #include <linux/pm_qos.h>
+#include <linux/b1c1_init.h>
 #include <sound/core.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
@@ -7283,7 +7284,12 @@ static struct platform_driver sdm845_asoc_machine_driver = {
 	.probe = msm_asoc_machine_probe,
 	.remove = msm_asoc_machine_remove,
 };
-module_platform_driver(sdm845_asoc_machine_driver);
+
+static int sdm845_asoc_machine_driver_init(void)
+{
+	return platform_driver_register(&sdm845_asoc_machine_driver);
+}
+b1c1_init(sdm845_asoc_machine_driver_init, B1C1_SND_SOC_SDM845);
 
 MODULE_DESCRIPTION("ALSA SoC msm");
 MODULE_LICENSE("GPL v2");

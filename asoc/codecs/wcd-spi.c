@@ -23,6 +23,7 @@
 #include <linux/component.h>
 #include <linux/ratelimit.h>
 #include <linux/platform_device.h>
+#include <linux/b1c1_init.h>
 #include <sound/wcd-dsp-mgr.h>
 #include <sound/wcd-spi.h>
 #include <soc/wcd-spi-ac.h>
@@ -1672,7 +1673,11 @@ static struct spi_driver wcd_spi_driver = {
 	.remove = wcd_spi_remove,
 };
 
-module_spi_driver(wcd_spi_driver);
+static int wcd_spi_driver_init(void)
+{
+	return spi_register_driver(&wcd_spi_driver);
+}
+b1c1_init(wcd_spi_driver_init, B1C1_SND_SOC_WCD_SPI);
 
 MODULE_DESCRIPTION("WCD SPI driver");
 MODULE_LICENSE("GPL v2");
