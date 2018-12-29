@@ -417,7 +417,7 @@ module_param_named(
 static int fg_restart;
 static bool fg_sram_dump;
 
-#define FG_RATE_LIM_MS (5 * MSEC_PER_SEC)
+#define FG_RATE_LIM_MS (8 * MSEC_PER_SEC)
 
 /* All getters HERE */
 
