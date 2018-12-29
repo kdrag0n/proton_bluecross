@@ -1027,6 +1027,7 @@ static int cam_ife_hw_mgr_acquire_res_ife_csid_ipp(
 {
 	int rc = -1;
 	int i;
+	int master_idx = -1;
 
 	struct cam_ife_hw_mgr               *ife_hw_mgr;
 	struct cam_ife_hw_mgr_res           *csid_res;
