@@ -1318,7 +1318,6 @@ static int cam_icp_hw_mgr_create_debugfs_entry(void)
 	return rc;
 err:
 	debugfs_remove_recursive(icp_hw_mgr.dentry);
-	icp_hw_mgr.dentry = NULL;
 	return rc;
 }
 

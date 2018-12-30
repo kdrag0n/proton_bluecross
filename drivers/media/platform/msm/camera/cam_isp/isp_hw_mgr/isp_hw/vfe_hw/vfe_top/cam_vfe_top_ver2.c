@@ -107,11 +107,14 @@ static int cam_vfe_top_set_hw_clk_rate(
 	if (max_clk_rate == top_priv->hw_clk_rate)
 		return 0;
 
-	CAM_DBG(CAM_ISP, "VFE: Clock name=%s idx=%d clk=%llu",
+	CAM_DBG(CAM_ISP, "VFE: Clock name=%s idx=%d clk=%lld",
 		soc_info->clk_name[soc_info->src_clk_idx],
 		soc_info->src_clk_idx, max_clk_rate);
 
-	rc = cam_soc_util_set_src_clk_rate(soc_info, max_clk_rate);
+	rc = cam_soc_util_set_clk_rate(
+		soc_info->clk[soc_info->src_clk_idx],
+		soc_info->clk_name[soc_info->src_clk_idx],
+		max_clk_rate);
 
 	if (!rc)
 		top_priv->hw_clk_rate = max_clk_rate;
