@@ -182,8 +182,14 @@ static void __cpu_input_boost_kick_general(struct boost_drv *b,
 void cpu_input_boost_kick_general(unsigned int duration_ms)
 {
 	struct boost_drv *b = boost_drv_g;
+	u32 state;
 
 	if (!b)
+		return;
+
+	state = get_boost_state(b);
+
+	if (!(state & SCREEN_AWAKE))
 		return;
 
 	__cpu_input_boost_kick_general(b, duration_ms);
