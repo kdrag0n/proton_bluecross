@@ -198,7 +198,7 @@ int CntRd3( UINT_32 addr, void *PcSetDat, UINT_16 UsDatNum )
 {
 	int rc = 0;
 
-	rc = camera_io_dev_read_seq(g_io_master_info, addr, PcSetDat, CAMERA_SENSOR_I2C_TYPE_WORD, UsDatNum);
+	rc = camera_io_dev_read_seq(g_io_master_info, addr, PcSetDat, CAMERA_SENSOR_I2C_TYPE_WORD, CAMERA_SENSOR_I2C_TYPE_WORD, UsDatNum);
 	if (rc < 0)
 		CAM_ERR(CAM_SENSOR, "[OISFW]:%s read i2c failed", __func__);
 	return rc;

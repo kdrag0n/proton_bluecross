@@ -423,6 +423,7 @@ static long vd6281_ioctl_handler(struct file *file, unsigned int cmd,
 					config.reg_addr[0],
 					data,
 					CAMERA_SENSOR_I2C_TYPE_BYTE,
+					CAMERA_SENSOR_I2C_TYPE_BYTE,
 					config.size);
 			if (rc) {
 				pr_err("%s i2c cont read failed: %d\n",

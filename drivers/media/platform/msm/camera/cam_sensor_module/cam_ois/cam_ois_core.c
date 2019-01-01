@@ -503,7 +503,7 @@ static void cam_ois_read_work(struct work_struct *work)
 	ois_timer_in = container_of(work, struct cam_ois_timer_t, g_work);
 	get_monotonic_boottime(&ts);
 	rc = camera_io_dev_read_seq(&ois_timer_in->o_ctrl->io_master_info,
-		0xE001, &buf[0], CAMERA_SENSOR_I2C_TYPE_WORD, 6);
+		0xE001, &buf[0], CAMERA_SENSOR_I2C_TYPE_WORD, CAMERA_SENSOR_I2C_TYPE_WORD, 6);
 
 	if (rc != 0) {
 		ois_timer.i2c_fail_count++;
@@ -705,7 +705,7 @@ static int cam_ois_read_reg(struct cam_ois_ctrl_t *o_ctrl,
 	}
 
 	rc = camera_io_dev_read_seq(&o_ctrl->io_master_info,
-		addr, buf, CAMERA_SENSOR_I2C_TYPE_WORD, num_bytes);
+		addr, buf, CAMERA_SENSOR_I2C_TYPE_WORD, CAMERA_SENSOR_I2C_TYPE_WORD, num_bytes);
 
 	if (rc) {
 		CAM_ERR(CAM_OIS, "camera_io_dev_read_seq failed!");
