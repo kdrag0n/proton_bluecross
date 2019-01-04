@@ -20,6 +20,9 @@ on property:sys.boot_completed=1
 	write /sys/block/sda/queue/iostats 0
 	write /sys/block/sdf/queue/iostats 0
 
+	# Match PowerHAL interaction boost to default CPU Input Boost duration
+	write /sys/class/drm/card0/device/idle_timeout_ms 64
+
 	# First boot defaults
 	exec u:r:magisk:s0 root root -- /init.proton.sh
 
