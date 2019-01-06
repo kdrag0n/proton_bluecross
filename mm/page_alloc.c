@@ -198,18 +198,17 @@ static void __free_pages_ok(struct page *page, unsigned int order);
  * TBD: should special case ZONE_DMA32 machines here - in those we normally
  * don't need any ZONE_NORMAL reservation
  */
-int sysctl_lowmem_reserve_ratio[MAX_NR_ZONES] = {
+int sysctl_lowmem_reserve_ratio[MAX_NR_ZONES-1] = {
 #ifdef CONFIG_ZONE_DMA
-	[ZONE_DMA] = 256,
+	 256,
 #endif
 #ifdef CONFIG_ZONE_DMA32
-	[ZONE_DMA32] = 256,
+	 256,
 #endif
-	[ZONE_NORMAL] = 32,
 #ifdef CONFIG_HIGHMEM
-	[ZONE_HIGHMEM] = INT_MAX,
+	 32,
 #endif
-	[ZONE_MOVABLE] = INT_MAX,
+	 32,
 };
 
 EXPORT_SYMBOL(totalram_pages);
