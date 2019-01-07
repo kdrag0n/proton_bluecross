@@ -58,12 +58,12 @@ static void zram_free_page(struct zram *zram, size_t index);
 
 static void zram_slot_lock(struct zram *zram, u32 index)
 {
-	bit_spin_lock(ZRAM_LOCK, &zram->table[index].value);
+	zram_lock_table(&zram->table[index]);
 }
 
 static void zram_slot_unlock(struct zram *zram, u32 index)
 {
-	bit_spin_unlock(ZRAM_LOCK, &zram->table[index].value);
+	zram_unlock_table(&zram->table[index]);
 }
 
 static inline bool init_done(struct zram *zram)
@@ -93,7 +93,7 @@ static void zram_set_handle(struct zram *zram, u32 index, unsigned long handle)
 	zram->table[index].handle = handle;
 }
 
-/* flag operations require table entry bit_spin_lock() being held */
+/* flag operations require table entry spinlock being held */
 static bool zram_test_flag(struct zram *zram, u32 index,
 			enum zram_pageflags flag)
 {
@@ -933,12 +933,14 @@ static bool zram_meta_alloc(struct zram *zram, u64 disksize)
 		return false;
 	}
 
+	zram_meta_init_table_locks(zram, disksize);
+
 	return true;
 }
 
 /*
  * To protect concurrent access to the same index entry,
- * caller should hold this table index entry's bit_spinlock to
+ * caller should hold this table index entry's spinlock to
  * indicate this index entry is accessing.
  */
 static void zram_free_page(struct zram *zram, size_t index)

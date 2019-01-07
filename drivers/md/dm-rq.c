@@ -852,7 +852,7 @@ static void dm_old_request_fn(struct request_queue *q)
 		if (map_request(tio) == DM_MAPIO_REQUEUE)
 			dm_requeue_original_request(tio, false);
 
-		BUG_ON(!irqs_disabled());
+		BUG_ON_NONRT(!irqs_disabled());
 		spin_lock(q->queue_lock);
 	}
 }

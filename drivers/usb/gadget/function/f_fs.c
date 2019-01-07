@@ -1921,7 +1921,7 @@ static void ffs_data_put(struct ffs_data *ffs)
 		}
 		ffs_data_clear(ffs);
 		BUG_ON(waitqueue_active(&ffs->ev.waitq) ||
-		       waitqueue_active(&ffs->ep0req_completion.wait));
+		       swait_active(&ffs->ep0req_completion.wait));
 		dev_name = ffs->dev_name;
 		kfree(ffs);
 		ffs_inst_clean_delay(dev_name);

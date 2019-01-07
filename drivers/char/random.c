@@ -263,6 +263,7 @@
 #include <linux/syscalls.h>
 #include <linux/completion.h>
 #include <linux/uuid.h>
+#include <linux/locallock.h>
 #include <crypto/chacha20.h>
 
 #include <asm/processor.h>
@@ -1096,8 +1097,6 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 	} sample;
 	long delta, delta2, delta3;
 
-	preempt_disable();
-
 	sample.jiffies = jiffies;
 	sample.cycles = random_get_entropy();
 	sample.num = num;
@@ -1138,7 +1137,6 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 		 */
 		credit_entropy_bits(r, min_t(int, fls(delta>>1), 11));
 	}
-	preempt_enable();
 }
 
 void add_input_randomness(unsigned int type, unsigned int code,
@@ -1195,28 +1193,27 @@ static __u32 get_reg(struct fast_pool *f, struct pt_regs *regs)
 	return *ptr;
 }
 
-void add_interrupt_randomness(int irq, int irq_flags)
+void add_interrupt_randomness(int irq, int irq_flags, __u64 ip)
 {
 	struct entropy_store	*r;
 	struct fast_pool	*fast_pool = this_cpu_ptr(&irq_randomness);
-	struct pt_regs		*regs = get_irq_regs();
 	unsigned long		now = jiffies;
 	cycles_t		cycles = random_get_entropy();
 	__u32			c_high, j_high;
-	__u64			ip;
 	unsigned long		seed;
 	int			credit = 0;
 
 	if (cycles == 0)
-		cycles = get_reg(fast_pool, regs);
+		cycles = get_reg(fast_pool, NULL);
 	c_high = (sizeof(cycles) > 4) ? cycles >> 32 : 0;
 	j_high = (sizeof(now) > 4) ? now >> 32 : 0;
 	fast_pool->pool[0] ^= cycles ^ j_high ^ irq;
 	fast_pool->pool[1] ^= now ^ c_high;
-	ip = regs ? instruction_pointer(regs) : _RET_IP_;
+	if (!ip)
+		ip = _RET_IP_;
 	fast_pool->pool[2] ^= ip;
 	fast_pool->pool[3] ^= (sizeof(ip) > 4) ? ip >> 32 :
-		get_reg(fast_pool, regs);
+		get_reg(fast_pool, NULL);
 
 	fast_mix(fast_pool);
 	add_interrupt_bench(cycles);
@@ -2133,6 +2130,7 @@ struct batched_entropy {
  * goal of being quite fast and not depleting entropy.
  */
 static DEFINE_PER_CPU(struct batched_entropy, batched_entropy_u64);
+static DEFINE_LOCAL_IRQ_LOCK(batched_entropy_u64_lock);
 u64 get_random_u64(void)
 {
 	u64 ret;
@@ -2148,6 +2146,7 @@ u64 get_random_u64(void)
 #endif
 
 	batch = &get_cpu_var(batched_entropy_u64);
+	batch = &get_locked_var(batched_entropy_u64_lock, batched_entropy_u64);
 	if (batch->position % ARRAY_SIZE(batch->entropy_u64) == 0) {
 		extract_crng((u8 *)batch->entropy_u64);
 		batch->position = 0;
@@ -2159,6 +2158,7 @@ u64 get_random_u64(void)
 EXPORT_SYMBOL(get_random_u64);
 
 static DEFINE_PER_CPU(struct batched_entropy, batched_entropy_u32);
+static DEFINE_LOCAL_IRQ_LOCK(batched_entropy_u32_lock);
 u32 get_random_u32(void)
 {
 	u32 ret;
@@ -2167,7 +2167,7 @@ u32 get_random_u32(void)
 	if (arch_get_random_int(&ret))
 		return ret;
 
-	batch = &get_cpu_var(batched_entropy_u32);
+	batch = &get_locked_var(batched_entropy_u32_lock, batched_entropy_u32);
 	if (batch->position % ARRAY_SIZE(batch->entropy_u32) == 0) {
 		extract_crng((u8 *)batch->entropy_u32);
 		batch->position = 0;
