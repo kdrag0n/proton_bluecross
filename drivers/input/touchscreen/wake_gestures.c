@@ -103,7 +103,7 @@ static unsigned long pwrtrigger_time[2] = {0, 0};
 static unsigned long long tap_time_pre = 0;
 static int touch_nr = 0, x_pre = 0, y_pre = 0;
 static bool touch_cnt = true;
-static int wake_vibrate = true;
+static int wake_vibrate = false;
 static int sleep_vibrate = false;
 
 static unsigned int sweep_y_limit = SWEEP_Y_LIMIT;
