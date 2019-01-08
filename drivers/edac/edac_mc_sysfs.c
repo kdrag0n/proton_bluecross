@@ -23,10 +23,10 @@
 #include "edac_module.h"
 
 /* MC EDAC Controls, setable by module parameter, and sysfs */
-static int edac_mc_log_ue = 1;
-static int edac_mc_log_ce = 1;
+static int edac_mc_log_ue;
+static int edac_mc_log_ce;
 static int edac_mc_panic_on_ue;
-static int edac_mc_poll_msec = 1000;
+static int edac_mc_poll_msec = 60000;
 
 /* Getter functions for above */
 int edac_mc_get_log_ue(void)
