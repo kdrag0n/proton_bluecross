@@ -281,7 +281,7 @@ enum {
 	QCOM_GLINK_DEBUG_DISABLE = 1U << 1,
 };
 
-static unsigned int glink_xprt_debug_mask = QCOM_GLINK_DEBUG_ENABLE;
+static unsigned int glink_xprt_debug_mask;
 module_param_named(debug_mask, glink_xprt_debug_mask,
 		   uint, 0664);
 

@@ -72,7 +72,7 @@ struct smp2p_out_list_item {
 static struct smp2p_out_list_item out_list[SMP2P_NUM_PROCS];
 
 static void *log_ctx;
-static int smp2p_debug_mask = MSM_SMP2P_INFO | MSM_SMP2P_DEBUG;
+static int smp2p_debug_mask;
 module_param_named(debug_mask, smp2p_debug_mask,
 		   int, 0664);
 
