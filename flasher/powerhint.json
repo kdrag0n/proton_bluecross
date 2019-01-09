@@ -330,12 +330,6 @@
     },
     {
       "PowerHint": "INTERACTION",
-      "Node": "TASchedtuneBoost",
-      "Duration": 0,
-      "Value": "20"
-    },
-    {
-      "PowerHint": "INTERACTION",
       "Node": "CPUBWHystTriggerCount",
       "Duration": 0,
       "Value": "0"
