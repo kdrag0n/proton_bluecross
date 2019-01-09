@@ -347,6 +347,18 @@ config INPUT_BOOST_FREQ_PERF
 	help
 	  Input boost frequency for the performance CPU cluster.
 
+config INPUT_BOOST_STUNE_LEVEL
+	int "Foreground app schedtune input boost level"
+	depends on DYNAMIC_STUNE_BOOST
+	default "25"
+	help
+	  Input boost level for the EAS SchedTune boosting system. This
+	  artifically increases perceived load of certain processes in order
+	  to prioritize and increase their usage of big cores as well as
+	  influence system-wide CPU frequency selection. Negative values are
+	  accepted for testing purposes. A value of 0 disables SchedTune
+	  boosting for this level.
+
 config REMOVE_INPUT_BOOST_FREQ_LP
 	int "Low-power cluster return frequency"
 	default "0"
@@ -378,6 +390,30 @@ config GENERAL_BOOST_FREQ_PERF
 	default "0"
 	help
 	  General boost frequency for the performance CPU cluster.
+
+config GENERAL_BOOST_STUNE_LEVEL
+	int "Foreground app schedtune general boost level"
+	depends on DYNAMIC_STUNE_BOOST
+	default "10"
+	help
+	  General boost level for the EAS SchedTune boosting system. This
+	  artifically increases perceived load of certain processes in order
+	  to prioritize and increase their usage of big cores as well as
+	  influence system-wide CPU frequency selection. Negative values are
+	  accepted for testing purposes. A value of 0 disables SchedTune
+	  boosting for this level.
+
+config MAX_BOOST_STUNE_LEVEL
+	int "Foreground app schedtune max boost level"
+	depends on DYNAMIC_STUNE_BOOST
+	default "50"
+	help
+	  Maximum boost level for the EAS SchedTune boosting system. This
+	  artifically increases perceived load of certain processes in order
+	  to prioritize and increase their usage of big cores as well as
+	  influence system-wide CPU frequency selection. Negative values are
+	  accepted for testing purposes. A value of 0 disables SchedTune
+	  boosting for this level.
 
 endif
 
