@@ -1264,6 +1264,8 @@ struct f2fs_sb_info {
 
 	/* Precomputed FS UUID checksum for seeding other checksums */
 	__u32 s_chksum_seed;
+
+	struct list_head list;
 };
 
 #ifdef CONFIG_F2FS_FAULT_INJECTION
@@ -2960,6 +2962,10 @@ bool f2fs_overwrite_io(struct inode *inode, loff_t pos, size_t len);
  */
 int start_gc_thread(struct f2fs_sb_info *sbi);
 void stop_gc_thread(struct f2fs_sb_info *sbi);
+void f2fs_start_all_gc_threads(void);
+void f2fs_stop_all_gc_threads(void);
+void f2fs_sbi_list_add(struct f2fs_sb_info *sbi);
+void f2fs_sbi_list_del(struct f2fs_sb_info *sbi);
 block_t start_bidx_of_node(unsigned int node_ofs, struct inode *inode);
 int f2fs_gc(struct f2fs_sb_info *sbi, bool sync, bool background,
 			unsigned int segno);
