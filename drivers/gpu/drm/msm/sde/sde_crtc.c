@@ -3626,7 +3626,7 @@ void sde_crtc_commit_kickoff(struct drm_crtc *crtc,
 
 #ifdef CONFIG_CPU_INPUT_BOOST
 	if (time_before(jiffies, last_input_jiffies + msecs_to_jiffies(5000)))
-		cpu_input_boost_kick_general(100);
+		cpu_input_boost_kick_general(80);
 #endif
 
 	is_error = _sde_crtc_prepare_for_kickoff_rot(dev, crtc);
