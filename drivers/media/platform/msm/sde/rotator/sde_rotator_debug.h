@@ -55,7 +55,6 @@ void sde_rot_evtlog_tout_handler(bool queue, const char *name, ...)
 {
 }
 #endif
-void sde_rot_dump_panic(void);
 
 struct sde_rotator_device;
 

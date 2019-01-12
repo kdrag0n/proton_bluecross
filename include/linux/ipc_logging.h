@@ -15,7 +15,6 @@
 
 #include <linux/errno.h>
 #include <linux/types.h>
-#include <uapi/asm-generic/errno-base.h>
 
 #define MAX_MSG_SIZE 255
 

@@ -139,11 +139,9 @@ struct qcota_stat {
 	u64 f9_op_fail;
 };
 static struct qcota_stat _qcota_stat;
-#ifdef CONFIG_DEBUG_FS
 static struct dentry *_debug_dent;
 static char _debug_read_buf[DEBUG_MAX_RW_BUF];
 static int _debug_qcota;
-#endif
 
 static struct ota_dev_control *qcota_control(void)
 {
@@ -792,7 +790,6 @@ static struct platform_driver qcota_plat_driver = {
 	},
 };
 
-#ifdef CONFIG_DEBUG_FS
 static int _disp_stats(void)
 {
 	struct qcota_stat *pstat;
@@ -944,15 +941,15 @@ err:
 	debugfs_remove_recursive(_debug_dent);
 	return rc;
 }
-#endif
 
 static int __init qcota_init(void)
 {
+	int rc;
 	struct ota_dev_control *podev;
 
-#ifdef CONFIG_DEBUG_FS
-	_qcota_debug_init();
-#endif
+	rc = _qcota_debug_init();
+	if (rc)
+		return rc;
 
 	podev = &qcota_dev;
 	INIT_LIST_HEAD(&podev->ready_commands);
@@ -966,9 +963,7 @@ static int __init qcota_init(void)
 }
 static void __exit qcota_exit(void)
 {
-#ifdef CONFIG_DEBUG_FS
 	debugfs_remove_recursive(_debug_dent);
-#endif
 	platform_driver_unregister(&qcota_plat_driver);
 }
 
