@@ -26,8 +26,8 @@ static __read_mostly unsigned short input_boost_duration = CONFIG_INPUT_BOOST_DU
 
 module_param(input_boost_freq_lp, uint, 0644);
 module_param(input_boost_freq_hp, uint, 0644);
-module_param(input_boost_return_freq_lp, uint, 0644);
-module_param(input_boost_return_freq_hp, uint, 0644);
+module_param_named(remove_input_boost_freq_lp, input_boost_return_freq_lp, uint, 0644);
+module_param_named(remove_input_boost_freq_perf, input_boost_return_freq_hp, uint, 0644);
 module_param(input_boost_awake_return_freq_lp, uint, 0644);
 module_param(input_boost_awake_return_freq_hp, uint, 0644);
 module_param(general_boost_freq_lp, uint, 0644);
