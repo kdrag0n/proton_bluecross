@@ -39,6 +39,9 @@ module_param(max_stune_boost, int, 0644);
 
 static __read_mostly int general_stune_boost = CONFIG_GENERAL_BOOST_STUNE_LEVEL;
 module_param(general_stune_boost, int, 0644);
+
+static __read_mostly int display_stune_boost = CONFIG_DISPLAY_BOOST_STUNE_LEVEL;
+module_param(display_stune_boost, int, 0644);
 #endif
 
 /* Available bits for boost_drv state */
@@ -49,6 +52,7 @@ module_param(general_stune_boost, int, 0644);
 #define INPUT_STUNE_BOOST	BIT(4)
 #define MAX_STUNE_BOOST		BIT(5)
 #define GENERAL_STUNE_BOOST	BIT(6)
+#define DISPLAY_STUNE_BOOST	BIT(7)
 
 struct boost_drv {
 	struct workqueue_struct *wq;
@@ -68,6 +72,7 @@ struct boost_drv {
 	int input_stune_slot;
 	int max_stune_slot;
 	int general_stune_slot;
+	int display_stune_slot;
 };
 
 static struct boost_drv *boost_drv_g __read_mostly;
@@ -354,6 +359,7 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 	struct boost_drv *b = container_of(nb, typeof(*b), msm_drm_notif);
 	struct msm_drm_notifier *evdata = data;
 	int *blank = evdata->data;
+	u32 state = get_boost_state(b);
 
 	/* Parse framebuffer blank events as soon as they occur */
 	if (action != MSM_DRM_EARLY_EVENT_BLANK)
@@ -362,8 +368,12 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 	/* Boost when the screen turns on and unboost when it turns off */
 	if (*blank == MSM_DRM_BLANK_UNBLANK) {
 		set_boost_bit(b, SCREEN_AWAKE);
+		set_stune_boost(b, state, DISPLAY_STUNE_BOOST, display_stune_boost,
+			        &b->display_stune_slot);
 	} else {
 		clear_boost_bit(b, SCREEN_AWAKE);
+		clear_stune_boost(b, state, DISPLAY_STUNE_BOOST,
+				  b->display_stune_slot);
 		unboost_all_cpus(b);
 #ifdef CONFIG_CPU_INPUT_BOOST_DEBUG
 		pr_info("cleared all boosts due to blank event\n");
