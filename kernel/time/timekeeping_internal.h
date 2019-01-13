@@ -6,11 +6,7 @@
 #include <linux/clocksource.h>
 #include <linux/time.h>
 
-#ifdef CONFIG_DEBUG_FS
 extern void tk_debug_account_sleep_time(struct timespec64 *t);
-#else
-#define tk_debug_account_sleep_time(x)
-#endif
 
 #ifdef CONFIG_CLOCKSOURCE_VALIDATE_LAST_CYCLE
 static inline u64 clocksource_delta(u64 now, u64 last, u64 mask)
