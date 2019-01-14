@@ -76,7 +76,6 @@ echo $(cat /sys/module/cpu_input_boost/parameters/input_boost_duration) > /sys/c
 # Thanks to xFirefly93 @ XDA for the original tuned values in his BlackenedMod script
 echo "0-3" > /dev/cpuset/background/cpus
 echo "0-3" > /dev/cpuset/foreground/cpus
-echo "4-5" > /dev/cpuset/kernel/cpus
 
 # Enable suspending of printk while the system is suspended for a negligible increase in power consumption when idle
 # This is disabled by init.sdm845.power.rc for better debugging of panics around suspend/resume events
