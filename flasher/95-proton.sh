@@ -82,5 +82,10 @@ echo "0-3" > /dev/cpuset/foreground/cpus
 echo 1 > /sys/module/printk/parameters/console_suspend
 
 # Enable deep in-memory sleep when suspending for less idle battery drain when the system decides to enter suspend
+# This is closer to the deep ACPI sleep states used on conventional x86 laptops as "Suspend" instead of s2idle
 # This is disabled by init.sdm845.power.rc to reduce suspend/resume latency but I haven't noticed a significant difference
 echo deep > /sys/power/mem_sleep
+
+# Increase perceived stability when something goes wrong in the kernel
+# This does have the risk of hiding critical issues, but it may be worth it
+echo 0 > /proc/sys/kernel/panic_on_oops
