@@ -20,9 +20,6 @@
 #include <linux/kthread.h>
 #include <linux/freezer.h>
 #include <linux/page_owner.h>
-#ifdef CONFIG_STATE_NOTIFIER
-#include <linux/state_notifier.h>
-#endif
 #include "internal.h"
 
 #ifdef CONFIG_COMPACTION
@@ -1783,28 +1780,6 @@ enum compact_result try_to_compact_pages(gfp_t gfp_mask, unsigned int order,
 	return rc;
 }
 
-#ifdef CONFIG_STATE_NOTIFIER
-static void compact_nodes(void);
-
-static int state_notifier_callback(struct notifier_block *this,
-				unsigned long event, void *data)
-{
-	switch (event) {
-		case STATE_NOTIFIER_SUSPEND:
-			compact_nodes();
-			break;
-		default:
-			break;
-	}
-
-	return NOTIFY_OK;
-}
-
-static struct notifier_block compact_notifier_block = {
-	.notifier_call = state_notifier_callback,
-	.priority = -1,
-};
-#endif
 
 /* Compact all zones within a node */
 static void compact_node(int nid)
@@ -2123,12 +2098,4 @@ static int __init kcompactd_init(void)
 }
 subsys_initcall(kcompactd_init)
 
-#ifdef CONFIG_STATE_NOTIFIER
-static int  __init mem_compaction_init(void)
-{
-	state_register_client(&compact_notifier_block);
-	return 0;
-}
-late_initcall(mem_compaction_init);
-#endif
 #endif /* CONFIG_COMPACTION */
