@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 4.9.149 Kernel Configuration
+# Linux/arm64 4.9.150 Kernel Configuration
 #
 CONFIG_ARM64=y
 CONFIG_64BIT=y
@@ -3611,7 +3611,7 @@ CONFIG_QPNP_USB_PDPHY=y
 # CONFIG_USB_EZUSB_FX2 is not set
 # CONFIG_USB_HSIC_USB3503 is not set
 # CONFIG_USB_HSIC_USB4604 is not set
-CONFIG_USB_LINK_LAYER_TEST=y
+# CONFIG_USB_LINK_LAYER_TEST is not set
 # CONFIG_USB_CHAOSKEY is not set
 
 #
