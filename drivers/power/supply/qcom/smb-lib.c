@@ -867,9 +867,7 @@ static int set_sdp_current(struct smb_charger *chg, int icl_ua)
 
 #ifdef CONFIG_FORCE_FAST_CHARGE
 	if (force_fast_charge > 0 && icl_ua == USBIN_500MA)
-	{
 		icl_ua = USBIN_900MA;
-	}
 #endif
 
 	/* power source is SDP */
