@@ -27,6 +27,7 @@
 #include <linux/delay.h>
 #include <linux/power_supply.h>
 #include <linux/pmic-voter.h>
+#include <linux/fastchg.h>
 #include "p9221_charger.h"
 
 #define P9221_TX_TIMEOUT_MS		(20 * 1000)
@@ -1212,6 +1213,19 @@ static void p9221_set_online(struct p9221_charger_data *charger)
 
 	/* NOTE: depends on _is_epp() which is not valid until DC_IN */
 	p9221_write_fod(charger);
+
+#ifdef CONFIG_FORCE_FAST_CHARGE
+	/* Override maximum voltage if fast charge is enabled */
+	if (force_fast_charge) {
+		union power_supply_propval val =
+			{ .intval = CONFIG_P9221_FAST_MAX_VOLTAGE_UV };
+		ret = p9221_set_property_reg(charger, POWER_SUPPLY_PROP_VOLTAGE_MAX,
+					&val);
+		if (ret)
+			dev_err(&charger->client->dev,
+				"Could not set max voltage: %d\n", ret);
+	}
+#endif
 }
 
 /* 2 * P9221_NOTIFIER_DELAY_MS from VRECTON */

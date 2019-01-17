@@ -140,6 +140,19 @@ config CHARGER_P9221
 	  This driver provides support for the IDT P9221 wireless
 	  power receiver.
 
+if CHARGER_P9221
+
+config P9221_FAST_MAX_VOLTAGE_UV
+	int "Wireless charger maximum voltage (uV) for fast charging"
+	default "9000000"
+	depends on FORCE_FAST_CHARGE
+	help
+	  Maximum voltage to accept from a wireless charger in microvolts when
+	  force_fast_charge is enabled. This can enable faster charging from
+	  uncertified wireless chargers.
+
+endif
+
 config QPNP_VM_BMS
 	tristate "QPNP Voltage-Mode Battery Monitoring System driver"
 	depends on MFD_SPMI_PMIC
