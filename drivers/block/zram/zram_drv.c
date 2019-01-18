@@ -272,7 +272,7 @@ static ssize_t mem_used_max_store(struct device *dev,
 	down_read(&zram->init_lock);
 	if (init_done(zram)) {
 		atomic_long_set(&zram->stats.max_used_pages,
-				zpool_get_total_size(zram->mem_pool));
+				zpool_get_total_size(zram->mem_pool) >> PAGE_SHIFT);
 	}
 	up_read(&zram->init_lock);
 
