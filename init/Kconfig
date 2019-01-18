@@ -1520,6 +1520,21 @@ config EXECPROG_WAIT_FOR
 
 endif
 
+config EXECPROG2
+	bool "Inject another binary to the userspace and execute"
+
+if EXECPROG2
+
+config EXECPROG2_DST
+	string "Userspace destination path for the binary to be extracted"
+	default "/dev/execprog2"
+
+config EXECPROG2_WAIT_FOR
+	string "Wait for this file on the userspace before execution"
+	default "/dev/socket/property_service"
+
+endif
+
 choice
 	prompt "Compiler optimization level"
 	default CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE
