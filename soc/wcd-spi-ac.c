@@ -56,7 +56,8 @@
 #define WCD_SPI_AC_REMOTE_ACCESS (0x01)
 #define WCD_SPI_AC_NO_ACCESS (0x02)
 #define WCD_SPI_CTL_INS_ID 0
-#define WCD_SPI_AC_QMI_TIMEOUT_MS 500
+#define WCD_SPI_AC_QMI_TIMEOUT_MS 1000
+#define WCD_SPI_AC_REQ_ACC_RETRIES 5
 
 struct wcd_spi_ac_priv {
 
@@ -229,7 +230,7 @@ static void wcd_spi_ac_procfs_deinit(struct wcd_spi_ac_priv *ac)
 	proc_remove(ac->pfs_root);
 }
 
-static int wcd_spi_ac_request_access(struct wcd_spi_ac_priv *ac)
+static int __wcd_spi_ac_request_access(struct wcd_spi_ac_priv *ac)
 {
 	struct wcd_spi_req_access_msg_v01 req;
 	struct wcd_spi_req_access_resp_v01 rsp;
@@ -270,6 +271,18 @@ static int wcd_spi_ac_request_access(struct wcd_spi_ac_priv *ac)
 done:
 	dev_dbg(ac->dev, "%s: status %d\n", __func__, ret);
 	WCD_SPI_AC_MUTEX_UNLOCK(ac->dev, ac->msg_lock);
+
+	return ret;
+}
+
+static int wcd_spi_ac_request_access(struct wcd_spi_ac_priv *ac)
+{
+	int retry_cnt = WCD_SPI_AC_REQ_ACC_RETRIES;
+	int ret;
+
+	do {
+		ret = __wcd_spi_ac_request_access(ac);
+	} while (ret != 0 && retry_cnt-- > 0);
 
 	return ret;
 }
@@ -468,8 +481,14 @@ static int wcd_spi_ac_clear_sync(struct wcd_spi_ac_priv *ac,
 			"%s: releasing access, state = 0x%x\n",
 			__func__, ac->state);
 		ret = wcd_spi_ac_release_access(ac);
-		if (!ret)
-			ac->current_access = WCD_SPI_AC_REMOTE_ACCESS;
+		/*
+		 * set the current_access to remote even if
+		 * the release_access failed since it could
+		 * be possible that release access could fail
+		 * or QMI could return error, but access could
+		 * already be obtained by the remote processor.
+		 */
+		ac->current_access = WCD_SPI_AC_REMOTE_ACCESS;
 	}
 	WCD_SPI_AC_MUTEX_UNLOCK(ac->dev, ac->state_lock);
 
