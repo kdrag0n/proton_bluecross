@@ -231,6 +231,7 @@ void f2fs_start_all_gc_threads(void)
 		if (invalid_blocks >
 		    ((long)((sbi->user_block_count - written_block_count(sbi)) *
 			RAPID_GC_LIMIT_INVALID_BLOCK) / 100)) {
+			f2fs_msg(sbi->sb, KERN_INFO, "Starting rapid GC");
 			start_gc_thread(sbi);
 			sbi->gc_thread->gc_wake = 1;
 			wake_up_interruptible_all(&sbi->gc_thread->gc_wait_queue_head);
