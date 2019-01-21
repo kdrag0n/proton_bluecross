@@ -72,11 +72,6 @@ echo 0 > /sys/block/sdf/queue/iostats
 # This does not have any effect on the actual display stack as one might assume
 echo $(cat /sys/module/cpu_input_boost/parameters/input_boost_duration) > /sys/class/drm/card0/device/idle_timeout_ms
 
-# Tune the CPU affinities assigned to certain processes in the system, including apps
-# Thanks to xFirefly93 @ XDA for the original tuned values in his BlackenedMod script
-echo "0-3" > /dev/cpuset/background/cpus
-echo "0-3" > /dev/cpuset/foreground/cpus
-
 # Enable suspending of printk while the system is suspended for a negligible increase in power consumption when idle
 # This is disabled by init.sdm845.power.rc for better debugging of panics around suspend/resume events
 echo 1 > /sys/module/printk/parameters/console_suspend
