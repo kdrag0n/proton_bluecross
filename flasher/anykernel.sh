@@ -46,7 +46,7 @@ fi
 mountpoint -q /data && {
   # Install custom PowerHAL config
   mkdir -p /data/adb/magisk_simple/vendor/etc
-  cp $TMPDIR/powerhint.json /data/adb/magisk_simple/vendor/etc
+  rm -f /data/adb/magisk_simple/vendor/etc/powerhint.json
 
   # Install second-stage late init script
   mkdir -p /data/adb/service.d
