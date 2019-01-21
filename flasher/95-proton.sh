@@ -67,10 +67,10 @@ echo 85 > /proc/sys/vm/swappiness
 echo 0 > /sys/block/sda/queue/iostats
 echo 0 > /sys/block/sdf/queue/iostats
 
-# Make the PowerHAL INTERACTION boost duration match the in-kernel CPU Input Boost driver
+# Reduce PowerHAL INTERACTION boost timeout
 # libperfmgr polls idle_state for its INTERACTION hint, which is controlled by idle_timeout_ms
 # This does not have any effect on the actual display stack as one might assume
-echo $(cat /sys/module/cpu_input_boost/parameters/input_boost_duration) > /sys/class/drm/card0/device/idle_timeout_ms
+echo 80 > /sys/class/drm/card0/device/idle_timeout_ms
 
 # Enable suspending of printk while the system is suspended for a negligible increase in power consumption when idle
 # This is disabled by init.sdm845.power.rc for better debugging of panics around suspend/resume events
