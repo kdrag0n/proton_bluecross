@@ -59,6 +59,52 @@ mountpoint -q /data && {
     ui_print "  • Backing up existing DTBO"
     dd if=/dev/block/by-name/dtbo${slot} of=/data/adb/dtbo${slot}.orig.img
   fi
+
+  # Optimize F2FS extension list (@arter97)
+  find /sys/fs/f2fs -name extension_list | while read list; do
+    HASH=$(md5sum $list | awk '{print $1}')
+
+    if [[ $HASH == "b7b2a4563c80a66c5ec021fc7afcd8c8" ]]; then
+      echo "Extensions list up-to-date: $list"
+      continue
+    fi
+
+    echo "Updating extension list: $list"
+
+    echo "Clearing extension list"
+
+    HOT=$(cat $list | grep -n 'hot file extension' | cut -d : -f 1)
+    COLD=$(($(cat $list | wc -l) - $HOT))
+
+    COLDLIST=$(head -n$(($HOT - 1)) $list | grep -v ':')
+    HOTLIST=$(tail -n$COLD $list)
+
+    echo $COLDLIST | tr ' ' '\n' | while read cold; do
+      if [ ! -z $cold ]; then
+        echo "[c]!$cold" > $list
+      fi
+    done
+
+    echo $HOTLIST | tr ' ' '\n' | while read hot; do
+      if [ ! -z $hot ]; then
+        echo "[h]!$hot" > $list
+      fi
+    done
+
+    echo "Writing new extension list"
+
+    cat $TMPDIR/f2fs-cold.list | grep -v '#' | while read cold; do
+      if [ ! -z $cold ]; then
+        echo "[c]$cold" > $list
+      fi
+    done
+
+    cat $TMPDIR/f2fs-hot.list | while read hot; do
+      if [ ! -z $hot ]; then
+        echo "[h]$hot" > $list
+      fi
+    done
+  done
 }
 
 # end ramdisk changes
