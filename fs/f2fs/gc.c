@@ -238,7 +238,7 @@ void f2fs_start_all_gc_threads(void)
 			wake_up_discard_thread(sbi, true);
 		} else {
 			f2fs_msg(sbi->sb, KERN_INFO,
-					"Invalid blocks lower than %d%%,"
+					"Invalid blocks lower than %d%%, "
 					"skipping rapid GC (%u / (%u - %u))",
 					RAPID_GC_LIMIT_INVALID_BLOCK,
 					invalid_blocks,
