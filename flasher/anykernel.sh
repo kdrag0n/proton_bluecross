@@ -105,7 +105,7 @@ mountpoint -q /data && {
       fi
     done
   done
-}
+} || ui_print '  ! Data is not mounted; some tweaks will be missing'
 
 # end ramdisk changes
 
