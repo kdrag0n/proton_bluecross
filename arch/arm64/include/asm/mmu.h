@@ -87,6 +87,9 @@ extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
 			       unsigned long virt, phys_addr_t size,
 			       pgprot_t prot, bool page_mappings_only);
 extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
+#ifdef CONFIG_BUILD_ARM64_EMBEDDED_DTB
+extern void select_embedded_dt(void *dt_virt) __init;
+#endif
 
 #endif	/* !__ASSEMBLY__ */
 #endif
