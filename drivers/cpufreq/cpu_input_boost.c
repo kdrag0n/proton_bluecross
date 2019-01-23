@@ -536,7 +536,7 @@ static int __init cpu_input_boost_init(void)
 	if (!b)
 		return -ENOMEM;
 
-	b->wq = alloc_workqueue("cpu_input_boost_wq", WQ_HIGHPRI | WQ_UNBOUND, 0);
+	b->wq = alloc_workqueue("cpu_input_boost_wq", WQ_HIGHPRI, 0);
 	if (!b->wq) {
 		ret = -ENOMEM;
 		goto free_b;
