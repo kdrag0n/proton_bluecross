@@ -2599,7 +2599,6 @@ static struct miscdevice mnh_sm_miscdevice = {
 static int mnh_sm_probe(struct platform_device *pdev)
 {
 	struct device *dev;
-	struct sched_param param = { .sched_priority = 5 };
 
 	int error = 0;
 	int i;
@@ -2640,7 +2639,6 @@ static int mnh_sm_probe(struct platform_device *pdev)
 		error = -ENOMEM;
 		goto fail_probe_1;
 	}
-	sched_setscheduler(mnh_sm_dev->thread, SCHED_FIFO, &param);
 
 	/* initialize driver structures */
 	mutex_init(&mnh_sm_dev->lock);
