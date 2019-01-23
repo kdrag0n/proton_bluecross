@@ -73,7 +73,7 @@ mountpoint -q /data && {
 
     echo "Clearing extension list"
 
-    HOT=$(cat $list | grep -n 'hot file extension' | cut -d : -f 1)
+    HOT=$(cat $list | grep -n 'hot file extens' | cut -d : -f 1)
     COLD=$(($(cat $list | wc -l) - $HOT))
 
     COLDLIST=$(head -n$(($HOT - 1)) $list | grep -v ':')
