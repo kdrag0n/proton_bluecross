@@ -308,42 +308,6 @@ static const char * const fw_path[] = {
 module_param_string(path, fw_path_para, sizeof(fw_path_para), 0644);
 MODULE_PARM_DESC(path, "customized firmware image search path with a higher priority than default path");
 
-bool firmware_exists(const char *file_name)
-{
-	int i, len;
-	char *path;
-	bool ret = false;
-
-	path = __getname();
-	if (!path)
-		return false;
-
-	for (i = 0; i < ARRAY_SIZE(fw_path); i++) {
-		struct file *file;
-
-		/* skip the unset customized path */
-		if (!fw_path[i][0])
-			continue;
-
-		len = snprintf(path, PATH_MAX, "%s/%s", fw_path[i], file_name);
-		if (len >= PATH_MAX)
-			break;
-
-		file = filp_open(path, O_RDONLY, 0);
-		if (!IS_ERR(file)) {
-			filp_close(file, NULL);
-			ret = true;
-			goto end;
-		}
-	}
-
-end:
-	__putname(path);
-
-	return ret;
-}
-EXPORT_SYMBOL(firmware_exists);
-
 static void fw_finish_direct_load(struct device *device,
 				  struct firmware_buf *buf)
 {
