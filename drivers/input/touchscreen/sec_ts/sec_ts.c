@@ -2132,7 +2132,7 @@ static void sec_ts_read_info_work(struct work_struct *work)
 	input_log_fix();
 }
 
-static void __maybe_unused sec_ts_fw_update_work(struct work_struct *work)
+static void sec_ts_fw_update_work(struct work_struct *work)
 {
 	struct sec_ts_data *ts = container_of(work, struct sec_ts_data,
 					      work_fw_update);
