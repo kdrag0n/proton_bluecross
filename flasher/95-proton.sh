@@ -11,28 +11,13 @@
 # Self-destruct and fully uninstall Proton Kernel if necessary
 #
 
-# Remove the opposite slot's DTBO if it exists
-slot="$(getprop ro.boot.slot_suffix)"
-if [ "$slot" = "_a" ]; then
-	rm -f /data/adb/dtbo_b.orig.img
-else
-	rm -f /data/adb/dtbo_a.orig.img
-fi
+# Remove old backup DTBOs
+rm -f /data/adb/dtbo_a.orig.img /data/adb/dtbo_b.orig.img
 
 # Check if Proton is no longer installed
 if ! grep -q Proton /proc/version; then
 	# Remove the custom PowerHAL config
 	rm -f /data/adb/magisk_simple/vendor/etc/powerhint.json
-
-	# Restore the current slot's DTBO backup if available
-	if [ -f "/data/adb/dtbo${slot}.orig.img" ]; then
-		dtbb="/dev/block/by-name/dtbo$slot"
-		dd if=/dev/zero of=$dtbb
-    	dd if=/data/adb/dtbo${slot}.orig.img of=$dtbb
-	fi
-
-	# Remove backup DTBOs
-	rm -f /data/adb/dtbo_a.orig.img /data/adb/dtbo_b.orig.img
 
 	# Remove this init script
 	rm -f /data/adb/service.d/95-proton.sh

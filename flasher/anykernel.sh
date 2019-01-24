@@ -43,6 +43,13 @@ else
   ui_print '  ! Magisk is not installed; some tweaks will be missing'
 fi
 
+# Restore stock DTBO if modified; check for edited model name
+slot="$(getprop ro.boot.slot_suffix)"
+if grep -q "Google Pixel 3 XL" /dev/block/by-name/dtbo$slot; then
+  ui_print "  • Restoring stock DTBO"
+  mv $TMPDIR/stock_dtbo.img $TMPDIR/dtbo.img
+fi
+
 mountpoint -q /data && {
   # Install custom PowerHAL config
   mkdir -p /data/adb/magisk_simple/vendor/etc
@@ -53,12 +60,8 @@ mountpoint -q /data && {
   cp $TMPDIR/95-proton.sh /data/adb/service.d
   chmod +x /data/adb/service.d/95-proton.sh
 
-  # Back up DTBO if necessary
-  slot="$(getprop ro.boot.slot_suffix)"
-  if [ ! -f "/data/adb/dtbo${slot}.orig.img" ]; then
-    ui_print "  • Backing up existing DTBO"
-    dd if=/dev/block/by-name/dtbo${slot} of=/data/adb/dtbo${slot}.orig.img
-  fi
+  # Remove old backup DTBOs
+	rm -f /data/adb/dtbo_a.orig.img /data/adb/dtbo_b.orig.img
 
   # Optimize F2FS extension list (@arter97)
   find /sys/fs/f2fs -name extension_list | while read list; do
