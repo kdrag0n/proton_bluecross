@@ -230,11 +230,6 @@ void cpu_input_boost_kick_max(unsigned int duration_ms)
 	__cpu_input_boost_kick_max(b, duration_ms);
 }
 
-void cpu_input_boost_kick_wake(void)
-{
-	cpu_input_boost_kick_max(CONFIG_WAKE_BOOST_DURATION_MS);
-}
-
 static void __cpu_input_boost_kick_general(struct boost_drv *b,
 	unsigned int duration_ms)
 {
