@@ -188,11 +188,6 @@ ifeq ($(CONFIG_BUILD_ARM64_APPLY_DTBO),y)
 	KBUILD_APPLY_DTBO := apply_dtbo
 endif
 
-BUILD_DTC_PATH = $(subst $\",,$(CONFIG_BUILD_ARM64_DTC))
-ifneq ($(BUILD_DTC_PATH),)
-	DTC = $(BUILD_DTC_PATH)
-endif
-
 BUILD_DTC_FLAGS = $(subst $\",,$(CONFIG_BUILD_ARM64_DTC_FLAGS))
 ifneq ($(BUILD_DTC_FLAGS),)
 	DTC_FLAGS += $(BUILD_DTC_FLAGS)
@@ -218,6 +213,12 @@ PHONY += dtbs dtbs_install
 
 dtbs: prepare scripts
 	$(Q)$(MAKE) $(build)=$(boot)/dts
+
+ifeq ($(CONFIG_BUILD_ARM64_EMBEDDED_DTB),y)
+$(obj)/kernel/embedded-dtb.c: dtbs dtbo.img
+	$(Q)$(MAKE) $(build)=$(boot) $(obj)/arch/arm64/boot/../kernel/embedded-dtb.c
+arch/arm64/kernel: $(obj)/kernel/embedded-dtb.c
+endif
 
 dtbs_install:
 	$(Q)$(MAKE) $(dtbinst)=$(boot)/dts

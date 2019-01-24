@@ -31,6 +31,8 @@
 #include <drm/drm_mode.h>
 #include <drm/drm_plane_helper.h>
 #include <linux/sync_file.h>
+#include <linux/cpu_input_boost.h>
+#include <linux/devfreq_boost.h>
 
 #include "drm_crtc_internal.h"
 
@@ -1904,6 +1906,16 @@ int drm_mode_atomic_ioctl(struct drm_device *dev,
 			(arg->flags & DRM_MODE_PAGE_FLIP_EVENT))
 		return -EINVAL;
 
+#ifdef CONFIG_CPU_INPUT_BOOST
+	if (!(arg->flags & DRM_MODE_ATOMIC_TEST_ONLY) && time_before(jiffies,
+			last_input_jiffies + msecs_to_jiffies(2500))) {
+		cpu_input_boost_kick();
+#ifdef CONFIG_DEVFREQ_BOOST
+		devfreq_boost_kick(DEVFREQ_MSM_CPUBW);
+#endif
+	}
+#endif
+
 	drm_modeset_acquire_init(&ctx, 0);
 
 	state = drm_atomic_state_alloc(dev);
@@ -2004,10 +2016,24 @@ retry:
 		 * Below we call drm_atomic_state_free for it.
 		 */
 		ret = drm_atomic_check_only(state);
-	} else if (arg->flags & DRM_MODE_ATOMIC_NONBLOCK) {
-		ret = drm_atomic_nonblocking_commit(state);
 	} else {
-		ret = drm_atomic_commit(state);
+		if (!dev->bridges_enabled) {
+#ifdef CONFIG_CPU_INPUT_BOOST
+			cpu_input_boost_kick_max(CONFIG_WAKE_BOOST_DURATION_MS);
+#endif
+#ifdef CONFIG_DEVFREQ_BOOST
+			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW,
+				CONFIG_DEVFREQ_WAKE_BOOST_DURATION_MS);
+#endif
+			kthread_queue_work(&dev->bridge_enable_worker,
+					   &dev->bridge_enable_work);
+			dev->bridges_enabled = true;
+		}
+
+		if (arg->flags & DRM_MODE_ATOMIC_NONBLOCK)
+			ret = drm_atomic_nonblocking_commit(state);
+		else
+			ret = drm_atomic_commit(state);
 	}
 
 out:

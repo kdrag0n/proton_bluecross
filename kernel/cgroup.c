@@ -63,9 +63,6 @@
 #include <linux/nsproxy.h>
 #include <linux/file.h>
 #include <net/sock.h>
-#include <linux/cpu_input_boost.h>
-#include <linux/devfreq_boost.h>
-#include <linux/state_notifier.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/cgroup.h>
@@ -2960,19 +2957,6 @@ static ssize_t __cgroup_procs_write(struct kernfs_open_file *of, char *buf,
 	ret = cgroup_procs_write_permission(tsk, cgrp, of);
 	if (!ret)
 		ret = cgroup_attach_task(cgrp, tsk, threadgroup);
-
-	/* Boost CPU to the max for 500 ms when launcher becomes a top app */
-	if (!memcmp(cgrp->kn->name, "top-app", sizeof("top-app")) &&
-		(!memcmp(tsk->comm, "s.nexuslauncher", sizeof("s.nexuslauncher")) ||
-		!memcmp(tsk->comm, "pe.lawnchair.ci", sizeof("pe.lawnchair.ci"))) &&
-		!ret && !state_suspended) {
-		cpu_input_boost_kick_max(500);
-		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 500);
-#if defined(CONFIG_CPU_INPUT_BOOST_DEBUG) || defined(CONFIG_DEVFREQ_BOOST_DEBUG)
-		pr_info("cgroup: kicked max cpu and cpubw boost for 500 ms for top-app %s\n",
-			tsk->comm);
-#endif
-	}
 
 	put_task_struct(tsk);
 	goto out_unlock_threadgroup;

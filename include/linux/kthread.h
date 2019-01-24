@@ -51,7 +51,7 @@ struct task_struct *kthread_create_on_cpu(int (*threadfn)(void *data),
 /**
  * kthread_run_perf_critical - create and wake a performance-critical thread.
  *
- * Same as kthread_create().
+ * Same as kthread_run(), but with the kthread bound to performance CPUs.
  */
 #define kthread_run_perf_critical(threadfn, data, namefmt, ...)		   \
 ({									   \
