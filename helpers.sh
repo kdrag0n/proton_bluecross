@@ -52,7 +52,6 @@ mkzip() {
     [ $_RELEASE -eq 1 ] && vprefix=v
 
     cp "$kroot/out/arch/arm64/boot/Image.lz4-dtb" "$kroot/flasher/"
-    cp "$kroot/out/arch/arm64/boot/dtbo.img" "$kroot/flasher/"
     cp "$kroot/out/System.map" "$kroot/builds/sm/$vprefix$(cat "$kroot/out/.version").map"
 
     [ $_RELEASE -eq 0 ] && echo "  • Installing test build $(cat "$kroot/out/.version")" >| "$kroot/flasher/version"
