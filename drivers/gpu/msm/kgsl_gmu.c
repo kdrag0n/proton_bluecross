@@ -1485,8 +1485,7 @@ int gmu_start(struct kgsl_device *device)
 				goto error_gmu;
 
 			/* Send DCVS level prior to reset*/
-			gmu_change_gpu_pwrlevel(device,
-				pwr->num_pwrlevels - 1);
+			gmu_change_gpu_pwrlevel(device, pwr->num_pwrlevels - 1);
 		} else {
 			/* GMU fast boot */
 			hfi_stop(gmu);
