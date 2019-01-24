@@ -62,9 +62,7 @@ mountpoint -q /data && {
 
   # Optimize F2FS extension list (@arter97)
   find /sys/fs/f2fs -name extension_list | while read list; do
-    HASH=$(md5sum $list | awk '{print $1}')
-
-    if [[ $HASH == "b7b2a4563c80a66c5ec021fc7afcd8c8" ]]; then
+    if grep -q odex "$list"; then
       echo "Extensions list up-to-date: $list"
       continue
     fi
