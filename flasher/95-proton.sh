@@ -1,14 +1,15 @@
 #!/system/bin/sh
 
 #
-# Second-stage Proton Kernel init script by @kdrag0n
-#
-# Self-destructs when Proton is uninstalled, no need to manually delete
-# DTBO and PowerHAL config are restored as well
+# Wait for /data to be mounted
 #
 
+while ! mountpoint -q /data; do
+	sleep 1
+done
+
 #
-# Self-destruct and fully uninstall Proton Kernel if necessary
+# Cleanup
 #
 
 # Remove old backup DTBOs
@@ -27,10 +28,9 @@ if ! grep -q Proton /proc/version; then
 fi
 
 #
-# Wait for Android to finish boot
+# Wait for Android to finish booting
 #
 
-# Wait for Android to complete boot (to override boot_completed=1 settings)
 while [ "$(getprop sys.boot_completed)" != 1 ]; do
 	sleep 2
 done
@@ -39,33 +39,13 @@ done
 sleep 2
 
 #
-# Apply overrides and tweaks:
+# Apply overrides and tweaks
 #
 
-# Reduce swappiness: 100 -> 85 (since December update)
-# This reduces kswapd0 CPU usage, leading to better performance and battery due to less CPU time used
 echo 85 > /proc/sys/vm/swappiness
-
-# Disable I/O statistics accounting on important block devices (others disabled in kernel)
-# According to Jens Axboe, this adds 0.5-1% of system CPU time to block IO operations - not desirable
-# This could break apps that rely on stats via storaged (which reads them); however, I have not seen any cases of this
 echo 0 > /sys/block/sda/queue/iostats
 echo 0 > /sys/block/sdf/queue/iostats
-
-# Reduce PowerHAL INTERACTION boost timeout
-# libperfmgr polls idle_state for its INTERACTION hint, which is controlled by idle_timeout_ms
-# This does not have any effect on the actual display stack as one might assume
 echo 80 > /sys/class/drm/card0/device/idle_timeout_ms
-
-# Enable suspending of printk while the system is suspended for a negligible increase in power consumption when idle
-# This is disabled by init.sdm845.power.rc for better debugging of panics around suspend/resume events
 echo 1 > /sys/module/printk/parameters/console_suspend
-
-# Enable deep in-memory sleep when suspending for less idle battery drain when the system decides to enter suspend
-# This is closer to the deep ACPI sleep states used on conventional x86 laptops as "Suspend" instead of s2idle
-# This is disabled by init.sdm845.power.rc to reduce suspend/resume latency but I haven't noticed a significant difference
 echo deep > /sys/power/mem_sleep
-
-# Increase perceived stability when something goes wrong in the kernel
-# This does have the risk of hiding critical issues, but it may be worth it
 echo 0 > /proc/sys/kernel/panic_on_oops
