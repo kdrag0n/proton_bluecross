@@ -6926,6 +6926,9 @@ static int start_cpu(bool boosted)
 
 	start_cpu = boosted ? rd->max_cap_orig_cpu : rd->min_cap_orig_cpu;
 
+	if (!sched_feat(STUNE_BOOST_BIAS_BIG))
+		start_cpu = rd->min_cap_orig_cpu;
+
 	return walt_start_cpu(start_cpu);
 }
 
