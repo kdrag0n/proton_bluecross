@@ -27,7 +27,7 @@
 
 int main(int argc, char** argv)
 {
-	FILE *in, *out;
+	FILE *in;
 	int sub, i;
 	unsigned char buf[4096];
 	ssize_t nread;
@@ -40,24 +40,18 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	out = fopen("execprog.h", "w");
-	if (!out) {
-		perror("Failed to create execprog.h");
-		return 1;
-	}
-
-	fprintf(out, "// Created from %s\n\n", argv[1]);
+	printf("// Created from %s\n\n", argv[1]);
 
 	for (sub = 0; sub < 4096; sub++) {
 		nread = fread(buf, 1, sizeof(buf), in);
 		if (!nread)
 			break;
 
-		fprintf(out, "static const unsigned char sub%d[] __initconst = {\n    ", sub);
+		printf("static const unsigned char sub%d[] __initconst = {\n    ", sub);
 		for (i = 0; i < nread; i++) {
-			fprintf(out, "%d, ", buf[i]);
+			printf("%d, ", buf[i]);
 		}
-		fprintf(out, "\n};\n\n");
+		printf("\n};\n\n");
 
 		if (nread != 4096)
 			last_item = (int)nread;
@@ -65,16 +59,14 @@ int main(int argc, char** argv)
 
 	fclose(in);
 
-	fprintf(out, "static const unsigned char* const primary[] __initconst = {\n    ");
+	printf("static const unsigned char* const primary[] __initconst = {\n    ");
 	for (i = 0; i < sub; i++) {
-		fprintf(out, "sub%d, ", i);
+		printf("sub%d, ", i);
 	}
-	fprintf(out, "\n};\n\n");
+	printf("\n};\n\n");
 
-	fprintf(out, "static const int last_index __initconst = %d;\n", sub);
-	fprintf(out, "static const int last_items __initconst = %d;\n", last_item);
-
-	fclose(out);
+	printf("static const int last_index __initconst = %d;\n", sub);
+	printf("static const int last_items __initconst = %d;\n", last_item);
 
 	return 0;
 }
