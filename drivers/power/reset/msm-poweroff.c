@@ -320,6 +320,16 @@ static void msm_restart_prepare(const char *cmd)
 	/* configure reset reason back to 0 before reset */
 	qpnp_pon_set_restart_reason(PON_RESTART_REASON_UNKNOWN);
 
+#ifdef CONFIG_QCOM_DLOAD_MODE
+	/* Write download mode flags if we're panic'ing
+	 * Write download mode flags if restart_mode says so
+	 * Kill download mode if master-kill switch is set
+	 */
+
+	set_dload_mode(download_mode &&
+			(in_panic || restart_mode == RESTART_DLOAD));
+#endif
+
 	if (qpnp_pon_check_hard_reset_stored()) {
 		/* Set warm reset as true when device is in dload mode */
 		if (get_dload_mode() ||
@@ -331,7 +341,7 @@ static void msm_restart_prepare(const char *cmd)
 	}
 
 	/* Hard reset the PMIC unless memory contents must be maintained. */
-	if (need_warm_reset || in_panic)
+	if (need_warm_reset)
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
 	else
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
@@ -398,9 +408,6 @@ static void msm_restart_prepare(const char *cmd)
 			__raw_writel(0x77665501, restart_reason);
 		}
 	}
-
-	if (in_panic)
-		__raw_writel(0x77665501, restart_reason);
 
 	flush_cache_all();
 
