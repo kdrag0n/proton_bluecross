@@ -1907,8 +1907,8 @@ int drm_mode_atomic_ioctl(struct drm_device *dev,
 		return -EINVAL;
 
 #ifdef CONFIG_CPU_INPUT_BOOST
-	if (!(arg->flags & DRM_MODE_ATOMIC_TEST_ONLY) && time_before(jiffies,
-			last_input_jiffies + msecs_to_jiffies(2500))) {
+	if (!(arg->flags & DRM_MODE_ATOMIC_TEST_ONLY) &&
+			should_kick_frame_boost()) {
 		cpu_input_boost_kick();
 #ifdef CONFIG_DEVFREQ_BOOST
 		devfreq_boost_kick(DEVFREQ_MSM_CPUBW);
