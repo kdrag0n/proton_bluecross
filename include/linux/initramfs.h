@@ -26,6 +26,7 @@
 #if IS_BUILTIN(CONFIG_BLK_DEV_INITRD)
 
 int __init default_rootfs(void);
+extern bool in_recovery;
 
 #endif
 
