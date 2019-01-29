@@ -80,6 +80,7 @@
 				qcom,mdss-dsi-h-right-border = <0>;
 				qcom,mdss-dsi-v-top-border = <0>;
 				qcom,mdss-dsi-v-bottom-border = <0>;
+				qcom,mdss-dsi-panel-jitter = <0x8 0xa>;
 				qcom,mdss-dsi-on-command = [
 					07 01 00 00 00 00 01 01    /* Compression Enable */
 					05 01 00 00 0A 00 01 11    /* sleep out, Wait 10 ms */
