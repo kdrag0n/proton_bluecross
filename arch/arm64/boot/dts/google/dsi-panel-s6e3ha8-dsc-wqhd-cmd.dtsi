@@ -150,7 +150,7 @@
 				qcom,default-topology-index = <0>;
 
 				qcom,partial-update-enabled = "single_roi";
-				qcom,panel-roi-alignment = <2 2 2 2 0 0>;
+				qcom,panel-roi-alignment = <720 40 720 40 720 40>;
 			};
 		};
 
