@@ -62,6 +62,7 @@
 		qcom,panel-allow-phy-poweroff;
 		qcom,mdss-dsi-bllp-eof-power-mode;
 		qcom,mdss-dsi-bllp-power-mode;
+		qcom,mdss-mdp-transfer-time-us = <6000>;
 
 		qcom,mdss-dsi-display-timings {
 			timing@0 {
