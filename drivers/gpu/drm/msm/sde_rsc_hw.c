@@ -728,10 +728,10 @@ int sde_rsc_debug_show(struct seq_file *s, struct sde_rsc_priv *rsc)
 	seq_printf(s, "power ctrl:0x%x\n",
 		 dss_reg_r(&rsc->wrapper_io, SDE_RSCC_PWR_CTRL,
 				rsc->debug_mode));
-	seq_printf(s, "vsycn timestamp0:0x%x\n",
+	seq_printf(s, "vsync timestamp0:0x%x\n",
 		 dss_reg_r(&rsc->wrapper_io, SDE_RSCC_WRAPPER_VSYNC_TIMESTAMP0,
 				rsc->debug_mode));
-	seq_printf(s, "vsycn timestamp1:0x%x\n",
+	seq_printf(s, "vsync timestamp1:0x%x\n",
 		 dss_reg_r(&rsc->wrapper_io, SDE_RSCC_WRAPPER_VSYNC_TIMESTAMP1,
 				rsc->debug_mode));
 
