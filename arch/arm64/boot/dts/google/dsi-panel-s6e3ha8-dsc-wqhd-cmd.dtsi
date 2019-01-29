@@ -152,6 +152,9 @@
 				/* 2xLM, 2xDSC Enc, 1xDSI Intf */
 				qcom,display-topology = <2 2 1>;
 				qcom,default-topology-index = <0>;
+
+				qcom,partial-update-enabled = "single_roi";
+				qcom,panel-roi-alignment = <2 2 2 2 0 0>;
 			};
 		};
 

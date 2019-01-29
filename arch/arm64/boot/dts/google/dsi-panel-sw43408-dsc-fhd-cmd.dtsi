@@ -26,8 +26,6 @@
 		qcom,mdss-dsi-border-color = <0>;
 		qcom,mdss-dsi-traffic-mode = "burst_mode";
 		qcom,mdss-dsi-lane-map = "lane_map_0123";
-		/* qcom,partial-update-enabled = "single-roi"; */
-		/* qcom,panel-roi-alignment = <1440 16 1440 16 1440 16>; */
 		qcom,mdss-dsi-lane-0-state;
 		qcom,mdss-dsi-lane-1-state;
 		qcom,mdss-dsi-lane-2-state;
@@ -199,6 +197,9 @@
 				/* 2xLM, 2xDSC Enc, 1xDSI Intf */
 				qcom,display-topology = <2 2 1>;
 				qcom,default-topology-index = <0>;
+
+				qcom,partial-update-enabled = "single_roi";
+				qcom,panel-roi-alignment = <1440 16 1440 16 1440 16>;
 			};
 		};
 
