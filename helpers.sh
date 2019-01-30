@@ -51,6 +51,7 @@ mkzip() {
     [ $_RELEASE -eq 0 ] && vprefix=test
     [ $_RELEASE -eq 1 ] && vprefix=v
 
+    mkdir -p "$kroot/builds/sm"
     cp "$kroot/out/arch/arm64/boot/Image.lz4-dtb" "$kroot/flasher/"
     cp "$kroot/out/System.map" "$kroot/builds/sm/$vprefix$(cat "$kroot/out/.version").map"
 
@@ -81,7 +82,6 @@ rel() {
     kmake $@
 
     # Pack zip
-    mkdir -p "$kroot/builds/sm"
     mkzip "builds/ProtonKernel-pixel3-v$(cat "$kroot/out/.version").zip"
 
     # Revert version
@@ -118,7 +118,6 @@ tbuild() {
 
 # Create a flashable test release zip
 dzip() {
-    mkdir -p "$kroot/builds/sm"
     mkzip "builds/ProtonKernel-pixel3-test$(cat "$kroot/out/.version").zip"
 }
 
