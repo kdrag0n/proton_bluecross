@@ -1806,7 +1806,7 @@ static void prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags
 			verify_zero_highpage(page + i);
 	}
 
-	if ((!IS_ENABLED(CONFIG_PAGE_SANITIZE) && (!free_pages_prezeroed() && (gfp_flags & __GFP_ZERO))))
+	if ((!IS_ENABLED(CONFIG_PAGE_SANITIZE) && (!free_pages_prezeroed() && (gfp_flags & __GFP_ZERO)))
 		for (i = 0; i < (1 << order); i++)
 			clear_highpage(page + i);
 
