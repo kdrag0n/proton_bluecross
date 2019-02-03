@@ -47,5 +47,4 @@ echo 0 > /sys/block/sda/queue/iostats
 echo 0 > /sys/block/sdf/queue/iostats
 echo 80 > /sys/class/drm/card0/device/idle_timeout_ms
 echo 1 > /sys/module/printk/parameters/console_suspend
-echo deep > /sys/power/mem_sleep
 echo 0 > /proc/sys/kernel/panic_on_oops
