@@ -58,7 +58,6 @@
 #include <linux/vmalloc.h>
 #include <linux/workqueue.h>
 #include <linux/fence.h>
-#include <linux/kthread.h>
 
 #include <asm/mman.h>
 #include <asm/pgalloc.h>
@@ -893,12 +892,6 @@ struct drm_device {
 	struct drm_vma_offset_manager *vma_offset_manager;
 	/*@} */
 	int switch_power_state;
-
-	struct drm_bridge *bridge;
-	struct task_struct *bridge_enable_task;
-	struct kthread_worker bridge_enable_worker;
-	struct kthread_work bridge_enable_work;
-	bool bridges_enabled;
 };
 
 #include <drm/drm_irq.h>

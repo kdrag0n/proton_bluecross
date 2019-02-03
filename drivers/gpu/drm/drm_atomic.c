@@ -2016,24 +2016,10 @@ retry:
 		 * Below we call drm_atomic_state_free for it.
 		 */
 		ret = drm_atomic_check_only(state);
+	} else if (arg->flags & DRM_MODE_ATOMIC_NONBLOCK) {
+		ret = drm_atomic_nonblocking_commit(state);
 	} else {
-		if (!dev->bridges_enabled) {
-#ifdef CONFIG_CPU_INPUT_BOOST
-			cpu_input_boost_kick_max(CONFIG_WAKE_BOOST_DURATION_MS);
-#endif
-#ifdef CONFIG_DEVFREQ_BOOST
-			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW,
-				CONFIG_DEVFREQ_WAKE_BOOST_DURATION_MS);
-#endif
-			kthread_queue_work(&dev->bridge_enable_worker,
-					   &dev->bridge_enable_work);
-			dev->bridges_enabled = true;
-		}
-
-		if (arg->flags & DRM_MODE_ATOMIC_NONBLOCK)
-			ret = drm_atomic_nonblocking_commit(state);
-		else
-			ret = drm_atomic_commit(state);
+		ret = drm_atomic_commit(state);
 	}
 
 out:
