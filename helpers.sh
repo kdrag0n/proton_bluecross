@@ -27,7 +27,7 @@ get_clang_version() {
 
 # Get the version of GCC in a user-friendly form
 get_gcc_version() {
-    "$1" --version|head -n1|cut -d'(' -f2|tr -d ')'|awk '{$5=""; print $0}'|sed -e 's/[[:space:]]*$//'
+    "$1" --version|head -n1|cut -d'(' -f2|tr -d ')'|sed -e 's/[[:space:]]*$//'
 }
 
 # Define the flags given to make to compile the kernel

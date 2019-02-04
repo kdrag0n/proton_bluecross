@@ -1,18 +1,18 @@
 # Toolchain paths
 
 # Path to the root of the 64-bit GCC toolchain
-tc=/usr
+tc=$HOME/toolchains/arm-gcc-8.x
 
 # Path to the root of the 32-bit GCC toolchain
-tc32=$HOME/toolchains/gcc32-8.x
+tc32=$HOME/toolchains/arm-gcc32-8.x
 
 # Optional: target prefix of the 64-bit GCC toolchain
 # Leave blank for autodetection
-prefix=aarch64-linux-gnu-
+prefix=aarch64-elf-
 
 # Optional: target prefix of the 32-bit GCC toolchain
 # Leave blank for autodetection
-prefix32=
+prefix32=arm-eabi-
 
 # Number of parallel jobs to run
 # Do not remove, set to 1 for no parallelism.
