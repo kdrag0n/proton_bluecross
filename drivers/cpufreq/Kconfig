@@ -433,42 +433,6 @@ config DISPLAY_BOOST_STUNE_LEVEL
 	  accepted for testing purposes. A value of 0 disables SchedTune
 	  boosting for this level.
 
-config BG_DISPLAY_BOOST_STUNE_LEVEL
-	int "Background app schedtune screen-on boost level"
-	depends on DYNAMIC_STUNE_BOOST
-	default "-15"
-	help
-	  Screen-on boost level for the EAS SchedTune boosting system. This
-	  artifically increases perceived load of certain processes in order
-	  to prioritize and increase their usage of big cores as well as
-	  influence system-wide CPU frequency selection. Negative values are
-	  accepted for testing purposes. A value of 0 disables SchedTune
-	  boosting for this level.
-
-config SUSPEND_BOOST_STUNE_LEVEL
-	int "Suspended schedtune boost level for all apps"
-	depends on DYNAMIC_STUNE_BOOST
-	default "-25"
-	help
-	  Suspended boost level for the EAS SchedTune boosting system. This
-	  artifically decreases perceived load of certain processes in order
-	  to de-prioritize and decrease their usage of big cores as well as
-	  influence system-wide CPU frequency selection. Negative values are
-	  encouraged for battery. A value of 0 disables SchedTune boosting
-	  for this level.
-
-config ROOT_SUSPEND_BOOST_STUNE_LEVEL
-	int "Suspended schedtune boost level for all processes"
-	depends on DYNAMIC_STUNE_BOOST
-	default "-15"
-	help
-	  Suspended boost level for the EAS SchedTune boosting system. This
-	  artifically decreases perceived load of all processes in order
-	  to de-prioritize and decrease their usage of big cores as well as
-	  influence system-wide CPU frequency selection. Negative values are
-	  encouraged for battery. A value of 0 disables SchedTune boosting
-	  for this level.
-
 endif
 
 comment "CPU frequency scaling drivers"
