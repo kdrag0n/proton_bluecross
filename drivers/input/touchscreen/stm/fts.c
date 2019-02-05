@@ -3560,7 +3560,7 @@ static int fts_screen_state_chg_callback(struct notifier_block *nb,
 	struct msm_drm_notifier *evdata = data;
 	unsigned int blank;
 
-	if (val != MSM_DRM_EVENT_BLANK)
+	if (val != MSM_DRM_EVENT_BLANK && val != MSM_DRM_EARLY_EVENT_BLANK)
 		return NOTIFY_DONE;
 
 	if (!info || !evdata || !evdata->data) {
@@ -3577,17 +3577,19 @@ static int fts_screen_state_chg_callback(struct notifier_block *nb,
 	switch (blank) {
 	case MSM_DRM_BLANK_POWERDOWN:
 	case MSM_DRM_BLANK_LP:
-		pr_info("%s: BLANK\n", __func__);
 #ifdef CONFIG_WAKE_GESTURES
 		if (wg_switch) {
 			is_suspended = true;
 			break;
 		}
 #endif
-		fts_set_bus_ref(info, FTS_BUS_REF_SCREEN_ON, false);
+
+		if (val == MSM_DRM_EARLY_EVENT_BLANK) {
+			pr_info("%s: BLANK\n", __func__);
+			fts_set_bus_ref(info, FTS_BUS_REF_SCREEN_ON, false);
+		}
 		break;
 	case MSM_DRM_BLANK_UNBLANK:
-		pr_info("%s: UNBLANK\n", __func__);
 #ifdef CONFIG_WAKE_GESTURES
 		if (wg_switch) {
 			is_suspended = false;
@@ -3598,7 +3600,11 @@ static int fts_screen_state_chg_callback(struct notifier_block *nb,
 			wg_changed = false;
 		}
 #endif
-		fts_set_bus_ref(info, FTS_BUS_REF_SCREEN_ON, true);
+
+		if (val == MSM_DRM_EVENT_BLANK) {
+			pr_info("%s: UNBLANK\n", __func__);
+			fts_set_bus_ref(info, FTS_BUS_REF_SCREEN_ON, true);
+		}
 		break;
 	}
 	return NOTIFY_OK;
