@@ -196,7 +196,6 @@ osize() {
 
 # Update the subtrees in the kernel repo
 utree() {
-    git subtree pull --prefix flasher ak2 master # AnyKernel2 fork
     git subtree pull --prefix techpack/audio msm-extra $1 # Techpack ASoC audio drivers
     git subtree pull --prefix drivers/staging/qcacld-3.0 qcacld-3.0 $1 # QCA CLD 3.0 Wi-Fi drivers
     git subtree pull --prefix drivers/staging/qca-wifi-host-cmn qca-wfi-host-cmn $1 # QCA Wi-Fi common files
