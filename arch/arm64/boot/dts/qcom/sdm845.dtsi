@@ -1870,7 +1870,6 @@
 			qcom,secure-context-bank;
 			iommus = <&apps_smmu 0x140A 0x30>;
 			dma-coherent;
-			status = "disabled";
 		};
 		qcom,msm_fastrpc_compute_cb11 {
 			compatible = "qcom,msm-fastrpc-compute-cb";
