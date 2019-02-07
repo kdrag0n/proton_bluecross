@@ -59,7 +59,13 @@ struct netlbl_domhsh_walk_arg {
 };
 
 /* NetLabel Generic NETLINK CIPSOv4 family */
-static struct genl_family netlbl_cipsov4_gnl_family;
+static struct genl_family netlbl_cipsov4_gnl_family = {
+	.hdrsize = 0,
+	.name = NETLBL_NLTYPE_CIPSOV4_NAME,
+	.version = NETLBL_PROTO_VERSION,
+	.maxattr = NLBL_CIPSOV4_A_MAX,
+};
+
 /* NetLabel Netlink attribute policy */
 static const struct nla_policy netlbl_cipsov4_genl_policy[NLBL_CIPSOV4_A_MAX + 1] = {
 	[NLBL_CIPSOV4_A_DOI] = { .type = NLA_U32 },
@@ -760,16 +766,6 @@ static const struct genl_ops netlbl_cipsov4_ops[] = {
 	},
 };
 
-static struct genl_family netlbl_cipsov4_gnl_family = {
-	.hdrsize = 0,
-	.name = NETLBL_NLTYPE_CIPSOV4_NAME,
-	.version = NETLBL_PROTO_VERSION,
-	.maxattr = NLBL_CIPSOV4_A_MAX,
-	.module = THIS_MODULE,
-	.ops = netlbl_cipsov4_ops,
-	.n_ops = ARRAY_SIZE(netlbl_cipsov4_ops),
-};
-
 /*
  * NetLabel Generic NETLINK Protocol Functions
  */
@@ -784,5 +780,6 @@ static struct genl_family netlbl_cipsov4_gnl_family = {
  */
 int __init netlbl_cipsov4_genl_init(void)
 {
-	return genl_register_family(&netlbl_cipsov4_gnl_family);
+	return genl_register_family_with_ops(&netlbl_cipsov4_gnl_family,
+					     netlbl_cipsov4_ops);
 }

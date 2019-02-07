@@ -24,7 +24,12 @@
 
 
 
-static struct genl_family irda_nl_family;
+static struct genl_family irda_nl_family = {
+	.name = IRDA_NL_NAME,
+	.hdrsize = 0,
+	.version = IRDA_NL_VERSION,
+	.maxattr = IRDA_NL_CMD_MAX,
+};
 
 static struct net_device * ifname_to_netdev(struct net *net, struct genl_info *info)
 {
@@ -141,19 +146,9 @@ static const struct genl_ops irda_nl_ops[] = {
 
 };
 
-static struct genl_family irda_nl_family = {
-	.name = IRDA_NL_NAME,
-	.hdrsize = 0,
-	.version = IRDA_NL_VERSION,
-	.maxattr = IRDA_NL_CMD_MAX,
-	.module = THIS_MODULE,
-	.ops = irda_nl_ops,
-	.n_ops = ARRAY_SIZE(irda_nl_ops),
-};
-
 int irda_nl_register(void)
 {
-	return genl_register_family(&irda_nl_family);
+	return genl_register_family_with_ops(&irda_nl_family, irda_nl_ops);
 }
 
 void irda_nl_unregister(void)

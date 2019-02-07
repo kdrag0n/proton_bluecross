@@ -16,7 +16,10 @@
 static uint32_t dlm_nl_seqnum;
 static uint32_t listener_nlportid;
 
-static struct genl_family family;
+static struct genl_family family = {
+	.name		= DLM_GENL_NAME,
+	.version	= DLM_GENL_VERSION,
+};
 
 static int prepare_data(u8 cmd, struct sk_buff **skbp, size_t size)
 {
@@ -72,17 +75,9 @@ static struct genl_ops dlm_nl_ops[] = {
 	},
 };
 
-static struct genl_family family = {
-	.name		= DLM_GENL_NAME,
-	.version	= DLM_GENL_VERSION,
-	.ops		= dlm_nl_ops,
-	.n_ops		= ARRAY_SIZE(dlm_nl_ops),
-	.module		= THIS_MODULE,
-};
-
 int __init dlm_netlink_init(void)
 {
-	return genl_register_family(&family);
+	return genl_register_family_with_ops(&family, dlm_nl_ops);
 }
 
 void dlm_netlink_exit(void)

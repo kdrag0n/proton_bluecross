@@ -119,7 +119,14 @@ static const struct rhashtable_params rht_params = {
 	.obj_cmpfn = ila_cmpfn,
 };
 
-static struct genl_family ila_nl_family;
+static struct genl_family ila_nl_family = {
+	.hdrsize	= 0,
+	.name		= ILA_GENL_NAME,
+	.version	= ILA_GENL_VERSION,
+	.maxattr	= ILA_ATTR_MAX,
+	.netnsok	= true,
+	.parallel_ops	= true,
+};
 
 static const struct nla_policy ila_nl_policy[ILA_ATTR_MAX + 1] = {
 	[ILA_ATTR_LOCATOR] = { .type = NLA_U64, },
@@ -554,18 +561,6 @@ static const struct genl_ops ila_nl_ops[] = {
 	},
 };
 
-static struct genl_family ila_nl_family = {
-	.hdrsize	= 0,
-	.name		= ILA_GENL_NAME,
-	.version	= ILA_GENL_VERSION,
-	.maxattr	= ILA_ATTR_MAX,
-	.netnsok	= true,
-	.parallel_ops	= true,
-	.module		= THIS_MODULE,
-	.ops		= ila_nl_ops,
-	.n_ops		= ARRAY_SIZE(ila_nl_ops),
-};
-
 #define ILA_HASH_TABLE_SIZE 1024
 
 static __net_init int ila_init_net(struct net *net)
@@ -636,7 +631,8 @@ int ila_xlat_init(void)
 	if (ret)
 		goto exit;
 
-	ret = genl_register_family(&ila_nl_family);
+	ret = genl_register_family_with_ops(&ila_nl_family,
+					    ila_nl_ops);
 	if (ret < 0)
 		goto unregister;
 

@@ -1457,7 +1457,13 @@ static void clear_tx_sa(struct macsec_tx_sa *tx_sa)
 	macsec_txsa_put(tx_sa);
 }
 
-static struct genl_family macsec_fam;
+static struct genl_family macsec_fam = {
+	.name		= MACSEC_GENL_NAME,
+	.hdrsize	= 0,
+	.version	= MACSEC_GENL_VERSION,
+	.maxattr	= MACSEC_ATTR_MAX,
+	.netnsok	= true,
+};
 
 static struct net_device *get_dev_from_nl(struct net *net,
 					  struct nlattr **attrs)
@@ -2684,17 +2690,6 @@ static const struct genl_ops macsec_genl_ops[] = {
 	},
 };
 
-static struct genl_family macsec_fam = {
-	.name		= MACSEC_GENL_NAME,
-	.hdrsize	= 0,
-	.version	= MACSEC_GENL_VERSION,
-	.maxattr	= MACSEC_ATTR_MAX,
-	.netnsok	= true,
-	.module		= THIS_MODULE,
-	.ops		= macsec_genl_ops,
-	.n_ops		= ARRAY_SIZE(macsec_genl_ops),
-};
-
 static netdev_tx_t macsec_start_xmit(struct sk_buff *skb,
 				     struct net_device *dev)
 {
@@ -3500,7 +3495,7 @@ static int __init macsec_init(void)
 	if (err)
 		goto notifier;
 
-	err = genl_register_family(&macsec_fam);
+	err = genl_register_family_with_ops(&macsec_fam, macsec_genl_ops);
 	if (err)
 		goto rtnl;
 
