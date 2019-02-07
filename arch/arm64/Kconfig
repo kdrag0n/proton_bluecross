@@ -615,13 +615,6 @@ config CPU_BIG_ENDIAN
        help
          Say Y if you plan on running a kernel in big-endian mode.
 
-config DEBUG_MONITORS
-	bool "Hardware debugging support"
-	help
-	  This option enables support for hardware-level CPU debugging
-	  including JTAG instruction stepping support and context switch
-	  debugging.
-
 config SCHED_MC
 	bool "Multi-core scheduler support"
 	help

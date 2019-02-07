@@ -303,18 +303,8 @@ static inline void user_disable_single_step(struct task_struct *task)
 {
 }
 #else
-#if defined(CONFIG_ARM64) && !defined(CONFIG_DEBUG_MONITORS)
-static inline void user_enable_single_step(struct task_struct *task)
-{
-}
-
-static inline void user_disable_single_step(struct task_struct *task)
-{
-}
-#else
 extern void user_enable_single_step(struct task_struct *);
 extern void user_disable_single_step(struct task_struct *);
-#endif
 #endif	/* arch_has_single_step */
 
 #ifndef arch_has_block_step
