@@ -7,11 +7,7 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
-#if !(defined(__APPLE__) || defined(__CYGWIN__))
 #include <elf.h>
-#else
-#include "elf.h"
-#endif
 
 #include "elfconfig.h"
 
