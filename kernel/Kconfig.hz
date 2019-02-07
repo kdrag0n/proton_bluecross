@@ -39,6 +39,13 @@ choice
 	 on SMP and NUMA systems and exactly dividing by both PAL and
 	 NTSC frame rates for video and multimedia work.
 
+	config HZ_400
+		bool "400 HZ"
+	help
+	 400 Hz is a balanced timer frequency that can provide exact jiffy
+	 lengths while not sacrificing battery life or causing increased
+	 thermal output on mobile devices.
+
 	config HZ_500
 		bool "500 HZ"
 	help
@@ -59,6 +66,7 @@ config HZ
 	default 100 if HZ_100
 	default 250 if HZ_250
 	default 300 if HZ_300
+	default 400 if HZ_400
 	default 500 if HZ_500
 	default 1000 if HZ_1000
 
