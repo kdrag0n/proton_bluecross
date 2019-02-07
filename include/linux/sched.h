@@ -1145,7 +1145,7 @@ struct sched_capacity_reqs {
  * already in a wake queue, the wakeup will happen soon and the second
  * waker can just skip it.
  *
- * The DEFINE_WAKE_Q macro declares and initializes the list head.
+ * The WAKE_Q macro declares and initializes the list head.
  * wake_up_q() does NOT reinitialize the list; it's expected to be
  * called near the end of a function, where the fact that the queue is
  * not used again will be easy to see by inspection.
@@ -1165,7 +1165,7 @@ struct wake_q_head {
 
 #define WAKE_Q_TAIL ((struct wake_q_node *) 0x01)
 
-#define DEFINE_WAKE_Q(name)				\
+#define WAKE_Q(name)					\
 	struct wake_q_head name = { WAKE_Q_TAIL, &name.first }
 
 extern void wake_q_add(struct wake_q_head *head,
