@@ -267,15 +267,8 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 		for (i = 0; i < DEVFREQ_MAX; i++)
 			__devfreq_boost_kick_max(d->devices + i,
 				CONFIG_DEVFREQ_WAKE_BOOST_DURATION_MS);
-
-#ifdef CONFIG_DEVFREQ_BOOST_DEBUG
-		pr_info("kicked max wake boost due to unblank event\n");
-#endif
 	} else {
 		devfreq_unboost_all(d);
-#ifdef CONFIG_DEVFREQ_BOOST_DEBUG
-		pr_info("cleared all boosts due to blank event\n");
-#endif
 	}
 
 	return NOTIFY_OK;
