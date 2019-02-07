@@ -1794,12 +1794,10 @@ static int __init setup_vmstat(void)
 	cpu_notifier_register_done();
 #endif
 #ifdef CONFIG_PROC_FS
-	if (!IS_ENABLED(CONFIG_PROC_STRIPPED)) {
-		proc_create("buddyinfo", S_IRUGO, NULL, &fragmentation_file_operations);
-		proc_create("pagetypeinfo", S_IRUGO, NULL, &pagetypeinfo_file_ops);
-		proc_create("zoneinfo", S_IRUGO, NULL, &proc_zoneinfo_file_operations);
-	}
+	proc_create("buddyinfo", S_IRUGO, NULL, &fragmentation_file_operations);
+	proc_create("pagetypeinfo", S_IRUGO, NULL, &pagetypeinfo_file_ops);
 	proc_create("vmstat", S_IRUGO, NULL, &proc_vmstat_file_operations);
+	proc_create("zoneinfo", S_IRUGO, NULL, &proc_zoneinfo_file_operations);
 #endif
 	return 0;
 }
