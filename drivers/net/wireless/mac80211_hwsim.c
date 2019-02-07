@@ -585,8 +585,15 @@ struct hwsim_radiotap_ack_hdr {
 	__le16 rt_chbitmask;
 } __packed;
 
-/* MAC80211_HWSIM netlink family */
-static struct genl_family hwsim_genl_family;
+/* MAC80211_HWSIM netlinf family */
+static struct genl_family hwsim_genl_family = {
+	.id = GENL_ID_GENERATE,
+	.hdrsize = 0,
+	.name = "MAC80211_HWSIM",
+	.version = 1,
+	.maxattr = HWSIM_ATTR_MAX,
+	.netnsok = true,
+};
 
 enum hwsim_multicast_groups {
 	HWSIM_MCGRP_CONFIG,
@@ -3244,18 +3251,6 @@ static const struct genl_ops hwsim_ops[] = {
 	},
 };
 
-static struct genl_family hwsim_genl_family __ro_after_init = {
-	.name = "MAC80211_HWSIM",
-	.version = 1,
-	.maxattr = HWSIM_ATTR_MAX,
-	.netnsok = true,
-	.module = THIS_MODULE,
-	.ops = hwsim_ops,
-	.n_ops = ARRAY_SIZE(hwsim_ops),
-	.mcgrps = hwsim_mcgrps,
-	.n_mcgrps = ARRAY_SIZE(hwsim_mcgrps),
-};
-
 static void destroy_radio(struct work_struct *work)
 {
 	struct mac80211_hwsim_data *data =
@@ -3303,13 +3298,15 @@ static struct notifier_block hwsim_netlink_notifier = {
 	.notifier_call = mac80211_hwsim_netlink_notify,
 };
 
-static int __init hwsim_init_netlink(void)
+static int hwsim_init_netlink(void)
 {
 	int rc;
 
 	printk(KERN_INFO "mac80211_hwsim: initializing netlink\n");
 
-	rc = genl_register_family(&hwsim_genl_family);
+	rc = genl_register_family_with_ops_groups(&hwsim_genl_family,
+						  hwsim_ops,
+						  hwsim_mcgrps);
 	if (rc)
 		goto failure;
 

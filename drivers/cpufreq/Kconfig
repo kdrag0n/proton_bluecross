@@ -139,16 +139,6 @@ config CPU_FREQ_DEFAULT_GOV_BLU_SCHEDUTIL
 	  have a look at the help section of that governor. The fallback
 	  governor will be 'performance'.
 
-config CPU_FREQ_DEFAULT_GOV_SMURFUTIL
-	bool "smurfutil"
-	depends on SMP
-	select CPU_FREQ_GOV_SMURFUTIL
-	select CPU_FREQ_GOV_PERFORMANCE
-	help
-	  Use the 'smurfutil' CPUFreq governor by default. If unsure,
-	  have a look at the help section of that governor. The fallback
-	  governor will be 'performance'.
-
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -295,22 +285,6 @@ config CPU_FREQ_GOV_BLU_SCHEDUTIL
 
 	  If in doubt, say N.
 
-config CPU_FREQ_GOV_SMURFUTIL
-	bool "'smurfutil' cpufreq policy governor"
-	depends on CPU_FREQ && SMP
-	select CPU_FREQ_GOV_ATTR_SET
-	select IRQ_WORK
-	help
-	  This governor makes decisions based on the utilization data provided
-	  by the scheduler.  It sets the CPU frequency to be proportional to
-	  the utilization/capacity ratio coming from the scheduler.  If the
-	  utilization is frequency-invariant, the new frequency is also
-	  proportional to the maximum available frequency.  If that is not the
-	  case, it is proportional to the current frequency of the CPU.  The
-	  frequency tipping point is at utilization/capacity equal to 80% in
-	  both cases.
-	  If in doubt, say N.
-
 config CPU_INPUT_BOOST
 	bool "CPU Input Boost"
 	help
@@ -322,12 +296,6 @@ config CPU_INPUT_BOOST
 	  consumption is minimized at said frequency combination.
 
 if CPU_INPUT_BOOST
-
-config CPU_INPUT_BOOST_DEBUG
-	bool "Input boost debugging"
-	help
-	  Log all boosting events to the kernel log buffer for debugging
-	  purposes.
 
 config INPUT_BOOST_DURATION_MS
 	int "Input boost duration"

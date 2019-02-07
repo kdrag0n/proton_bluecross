@@ -33,9 +33,3 @@ obj-$(CONFIG_CPU_FREQ) += cpufreq.o
 obj-$(CONFIG_CPU_FREQ_GOV_SCHEDUTIL) += cpufreq_schedutil.o
 obj-$(CONFIG_SCHED_CORE_CTL) += core_ctl.o
 obj-$(CONFIG_CPU_FREQ_GOV_BLU_SCHEDUTIL) += cpufreq_blu_schedutil.o
-
-# Hack 
-ifdef CONFIG_CPU_FREQ_GOV_SMURFUTIL
-obj-y += cpufreq_smurfutil.o
-endif
-

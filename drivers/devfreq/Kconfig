@@ -273,12 +273,6 @@ config DEVFREQ_BOOST
 
 if DEVFREQ_BOOST
 
-config DEVFREQ_BOOST_DEBUG
-	bool "Devfreq boost debugging"
-	help
-	  Log all boosting events to the kernel log buffer for debugging
-	  purposes.
-
 config DEVFREQ_INPUT_BOOST_DURATION_MS
 	int "Input boost duration"
 	default "100"

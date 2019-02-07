@@ -90,9 +90,6 @@ source "net/netlabel/Kconfig"
 
 endif # if INET
 
-config SOCK_DIAG
-	bool
-
 config ANDROID_PARANOID_NETWORK
 	bool "Only allow certain groups to create sockets"
 	default y
@@ -439,14 +436,6 @@ config MAY_USE_DEVLINK
 	  devlink is a loadable module and the driver using it is built-in.
 
 source "net/ipc_router/Kconfig"
-
-config SYSCTL_NET_BUSY_READ
-	int "Default busy_read value"
-	default 0
-
-config SYSCTL_NET_BUSY_POLL
-	int "Default busy_poll value"
-	default 0
 
 endif   # if NET
 

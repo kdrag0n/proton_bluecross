@@ -1094,7 +1094,14 @@ static int gtp_genl_del_pdp(struct sk_buff *skb, struct genl_info *info)
 	return 0;
 }
 
-static struct genl_family gtp_genl_family;
+static struct genl_family gtp_genl_family = {
+	.id		= GENL_ID_GENERATE,
+	.name		= "gtp",
+	.version	= 0,
+	.hdrsize	= 0,
+	.maxattr	= GTPA_MAX,
+	.netnsok	= true,
+};
 
 static int gtp_genl_fill_info(struct sk_buff *skb, u32 snd_portid, u32 snd_seq,
 			      u32 type, struct pdp_ctx *pctx)
@@ -1290,17 +1297,6 @@ static const struct genl_ops gtp_genl_ops[] = {
 	},
 };
 
-static struct genl_family gtp_genl_family __ro_after_init = {
-	.name		= "gtp",
-	.version	= 0,
-	.hdrsize	= 0,
-	.maxattr	= GTPA_MAX,
-	.netnsok	= true,
-	.module		= THIS_MODULE,
-	.ops		= gtp_genl_ops,
-	.n_ops		= ARRAY_SIZE(gtp_genl_ops),
-};
-
 static int __net_init gtp_net_init(struct net *net)
 {
 	struct gtp_net *gn = net_generic(net, gtp_net_id);
@@ -1340,7 +1336,7 @@ static int __init gtp_init(void)
 	if (err < 0)
 		goto error_out;
 
-	err = genl_register_family(&gtp_genl_family);
+	err = genl_register_family_with_ops(&gtp_genl_family, gtp_genl_ops);
 	if (err < 0)
 		goto unreg_rtnl_link;
 

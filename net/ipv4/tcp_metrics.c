@@ -574,7 +574,7 @@ reset:
 		tp->snd_cwnd = 1;
 	else
 		tp->snd_cwnd = tcp_init_cwnd(tp, dst);
-	tp->snd_cwnd_stamp = tcp_jiffies32;
+	tp->snd_cwnd_stamp = tcp_time_stamp;
 }
 
 bool tcp_peer_is_proven(struct request_sock *req, struct dst_entry *dst,
@@ -742,7 +742,14 @@ void tcp_fastopen_cache_set(struct sock *sk, u16 mss,
 	rcu_read_unlock();
 }
 
-static struct genl_family tcp_metrics_nl_family;
+static struct genl_family tcp_metrics_nl_family = {
+	.id		= GENL_ID_GENERATE,
+	.hdrsize	= 0,
+	.name		= TCP_METRICS_GENL_NAME,
+	.version	= TCP_METRICS_GENL_VERSION,
+	.maxattr	= TCP_METRICS_ATTR_MAX,
+	.netnsok	= true,
+};
 
 static const struct nla_policy tcp_metrics_nl_policy[TCP_METRICS_ATTR_MAX + 1] = {
 	[TCP_METRICS_ATTR_ADDR_IPV4]	= { .type = NLA_U32, },
@@ -1109,17 +1116,6 @@ static const struct genl_ops tcp_metrics_nl_ops[] = {
 	},
 };
 
-static struct genl_family tcp_metrics_nl_family __ro_after_init = {
-	.hdrsize	= 0,
-	.name		= TCP_METRICS_GENL_NAME,
-	.version	= TCP_METRICS_GENL_VERSION,
-	.maxattr	= TCP_METRICS_ATTR_MAX,
-	.netnsok	= true,
-	.module		= THIS_MODULE,
-	.ops		= tcp_metrics_nl_ops,
-	.n_ops		= ARRAY_SIZE(tcp_metrics_nl_ops),
-};
-
 static unsigned int tcpmhash_entries;
 static int __init set_tcpmhash_entries(char *str)
 {
@@ -1183,7 +1179,8 @@ void __init tcp_metrics_init(void)
 	if (ret < 0)
 		panic("Could not allocate the tcp_metrics hash table\n");
 
-	ret = genl_register_family(&tcp_metrics_nl_family);
+	ret = genl_register_family_with_ops(&tcp_metrics_nl_family,
+					    tcp_metrics_nl_ops);
 	if (ret < 0)
 		panic("Could not register tcp_metrics generic netlink\n");
 }

@@ -58,7 +58,6 @@
 
 		qcom,ulps-enabled;
 		qcom,suspend-ulps-enabled;
-		qcom,panel-allow-phy-poweroff;
 		qcom,mdss-mdp-transfer-time-us = <6000>;
 
 		qcom,mdss-dsi-display-timings {
