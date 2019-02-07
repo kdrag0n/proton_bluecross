@@ -342,6 +342,7 @@ static void devlink_nl_post_doit(const struct genl_ops *ops,
 }
 
 static struct genl_family devlink_nl_family = {
+	.id		= GENL_ID_GENERATE,
 	.name		= DEVLINK_GENL_NAME,
 	.version	= DEVLINK_GENL_VERSION,
 	.maxattr	= DEVLINK_ATTR_MAX,

@@ -25,6 +25,7 @@
 
 
 static struct genl_family irda_nl_family = {
+	.id = GENL_ID_GENERATE,
 	.name = IRDA_NL_NAME,
 	.hdrsize = 0,
 	.version = IRDA_NL_VERSION,

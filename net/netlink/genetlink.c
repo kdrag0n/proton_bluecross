@@ -349,6 +349,8 @@ static int genl_validate_ops(const struct genl_family *family)
  *
  * Registers the specified family after validating it first. Only one
  * family may be registered with the same family name or identifier.
+ * The family id may equal GENL_ID_GENERATE causing an unique id to
+ * be automatically generated and assigned.
  *
  * The family's ops array must already be assigned, you can use the
  * genl_register_family_with_ops() helper function.
@@ -357,7 +359,13 @@ static int genl_validate_ops(const struct genl_family *family)
  */
 int __genl_register_family(struct genl_family *family)
 {
-	int err, i;
+	int err = -EINVAL, i;
+
+	if (family->id && family->id < GENL_MIN_ID)
+		goto errout;
+
+	if (family->id > GENL_MAX_ID)
+		goto errout;
 
 	err = genl_validate_ops(family);
 	if (err)
@@ -370,27 +378,8 @@ int __genl_register_family(struct genl_family *family)
 		goto errout_locked;
 	}
 
-	if (family == &genl_ctrl) {
-		family->id = GENL_ID_CTRL;
-	} else {
-		u16 newid;
-
-		/* this should be left zero in the struct */
-		WARN_ON(family->id);
-
-		/*
-		 * Sadly, a few cases need to be special-cased
-		 * due to them having previously abused the API
-		 * and having used their family ID also as their
-		 * multicast group ID, so we use reserved IDs
-		 * for both to be sure we can do that mapping.
-		 */
-		if (strcmp(family->name, "pmcraid") == 0)
-			newid = GENL_ID_PMCRAID;
-		else if (strcmp(family->name, "VFS_DQUOT") == 0)
-			newid = GENL_ID_VFS_DQUOT;
-		else
-			newid = genl_generate_id();
+	if (family->id == GENL_ID_GENERATE) {
+		u16 newid = genl_generate_id();
 
 		if (!newid) {
 			err = -ENOMEM;
@@ -398,6 +387,9 @@ int __genl_register_family(struct genl_family *family)
 		}
 
 		family->id = newid;
+	} else if (genl_family_find_byid(family->id)) {
+		err = -EEXIST;
+		goto errout_locked;
 	}
 
 	if (family->maxattr && !family->parallel_ops) {
@@ -430,6 +422,7 @@ errout_free:
 	kfree(family->attrbuf);
 errout_locked:
 	genl_unlock_all();
+errout:
 	return err;
 }
 EXPORT_SYMBOL(__genl_register_family);

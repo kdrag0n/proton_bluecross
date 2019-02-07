@@ -49,6 +49,7 @@
 #include "translation-table.h"
 
 struct genl_family batadv_netlink_family = {
+	.id = GENL_ID_GENERATE,
 	.hdrsize = 0,
 	.name = BATADV_NL_NAME,
 	.version = 1,

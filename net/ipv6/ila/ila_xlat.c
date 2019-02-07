@@ -120,6 +120,7 @@ static const struct rhashtable_params rht_params = {
 };
 
 static struct genl_family ila_nl_family = {
+	.id		= GENL_ID_GENERATE,
 	.hdrsize	= 0,
 	.name		= ILA_GENL_NAME,
 	.version	= ILA_GENL_VERSION,

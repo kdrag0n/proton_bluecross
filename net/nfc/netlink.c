@@ -39,6 +39,7 @@ static const struct genl_multicast_group nfc_genl_mcgrps[] = {
 };
 
 static struct genl_family nfc_genl_family = {
+	.id = GENL_ID_GENERATE,
 	.hdrsize = 0,
 	.name = NFC_GENL_NAME,
 	.version = NFC_GENL_VERSION,
