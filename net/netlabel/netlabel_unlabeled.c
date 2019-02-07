@@ -1373,7 +1373,7 @@ static const struct genl_ops netlbl_unlabel_genl_ops[] = {
 	},
 };
 
-static struct genl_family netlbl_unlabel_gnl_family __ro_after_init = {
+static struct genl_family netlbl_unlabel_gnl_family = {
 	.hdrsize = 0,
 	.name = NETLBL_NLTYPE_UNLABELED_NAME,
 	.version = NETLBL_PROTO_VERSION,

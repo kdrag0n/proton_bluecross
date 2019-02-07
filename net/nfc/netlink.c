@@ -1750,7 +1750,7 @@ static const struct genl_ops nfc_genl_ops[] = {
 	},
 };
 
-static struct genl_family nfc_genl_family __ro_after_init = {
+static struct genl_family nfc_genl_family = {
 	.hdrsize = 0,
 	.name = NFC_GENL_NAME,
 	.version = NFC_GENL_VERSION,

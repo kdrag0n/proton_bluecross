@@ -1368,7 +1368,7 @@ static struct genl_multicast_group pmcraid_mcgrps[] = {
 	{ .name = "events", /* not really used - see ID discussion below */ },
 };
 
-static struct genl_family pmcraid_event_family __ro_after_init = {
+static struct genl_family pmcraid_event_family = {
 	.module = THIS_MODULE,
 	.name = "pmcraid",
 	.version = 1,
@@ -1384,7 +1384,7 @@ static struct genl_family pmcraid_event_family __ro_after_init = {
  *	0 if the pmcraid_event_family is successfully registered
  *	with netlink generic, non-zero otherwise
  */
-static int __init pmcraid_netlink_init(void)
+static int pmcraid_netlink_init(void)
 {
 	int result;
 

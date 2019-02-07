@@ -650,7 +650,7 @@ static const struct genl_ops taskstats_ops[] = {
 	},
 };
 
-static struct genl_family family __ro_after_init = {
+static struct genl_family family = {
 	.name		= TASKSTATS_GENL_NAME,
 	.version	= TASKSTATS_GENL_VERSION,
 	.maxattr	= TASKSTATS_CMD_ATTR_MAX,

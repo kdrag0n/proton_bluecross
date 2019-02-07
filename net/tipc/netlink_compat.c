@@ -1273,7 +1273,7 @@ static struct genl_ops tipc_genl_compat_ops[] = {
 	},
 };
 
-static struct genl_family tipc_genl_compat_family __ro_after_init = {
+static struct genl_family tipc_genl_compat_family = {
 	.name		= TIPC_GENL_NAME,
 	.version	= TIPC_GENL_VERSION,
 	.hdrsize	= TIPC_GENL_HDRLEN,
@@ -1284,7 +1284,7 @@ static struct genl_family tipc_genl_compat_family __ro_after_init = {
 	.n_ops		= ARRAY_SIZE(tipc_genl_compat_ops),
 };
 
-int __init tipc_netlink_compat_start(void)
+int tipc_netlink_compat_start(void)
 {
 	int res;
 

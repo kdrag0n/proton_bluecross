@@ -3882,7 +3882,7 @@ static const struct genl_ops ip_vs_genl_ops[] = {
 	},
 };
 
-static struct genl_family ip_vs_genl_family __ro_after_init = {
+static struct genl_family ip_vs_genl_family = {
 	.hdrsize	= 0,
 	.name		= IPVS_GENL_NAME,
 	.version	= IPVS_GENL_VERSION,
