@@ -109,7 +109,7 @@ static void release_rq_locks_irqrestore(const cpumask_t *cpus,
 	local_irq_restore(*flags);
 }
 
-#ifdef CONFIG_HZ_300
+#if CONFIG_HZ == 300
 /*
  * Tick interval becomes to 3333333 due to
  * rounding error when HZ=300.
