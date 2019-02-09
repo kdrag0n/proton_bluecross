@@ -47,3 +47,5 @@ echo 0 > /sys/block/sda/queue/iostats
 echo 0 > /sys/block/sdf/queue/iostats
 echo $(cat /sys/module/cpu_input_boost/parameters/input_boost_duration) > /sys/class/drm/card0/device/idle_timeout_ms
 echo 1 > /sys/module/printk/parameters/console_suspend
+echo 0 > /dev/stune/foreground/schedtune.prefer_idle
+echo 0 > /dev/stune/top-app/schedtune.prefer_idle
