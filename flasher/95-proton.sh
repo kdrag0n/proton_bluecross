@@ -47,5 +47,3 @@ echo 0 > /sys/block/sda/queue/iostats # Disable IO stat accounting for less IO s
 echo 0 > /sys/block/sdf/queue/iostats # Same as above
 echo $(cat /sys/module/cpu_input_boost/parameters/input_boost_duration) > /sys/class/drm/card0/device/idle_timeout_ms # Reduce default PowerHAL interaction boost timeout
 echo 1 > /sys/module/printk/parameters/console_suspend # Marginally reduce suspend latency
-echo 0 > /dev/stune/foreground/schedtune.prefer_idle # Improve battery at the cost of some UX
-echo 0 > /dev/stune/top-app/schedtune.prefer_idle # Same as above
