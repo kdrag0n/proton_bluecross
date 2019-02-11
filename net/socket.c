@@ -93,7 +93,7 @@
 #include <linux/seemp_api.h>
 #include <linux/seemp_instrumentation.h>
 
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 #include <asm/unistd.h>
 
 #include <net/compat.h>

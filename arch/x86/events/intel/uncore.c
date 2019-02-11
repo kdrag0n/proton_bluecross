@@ -1365,22 +1365,22 @@ static int __init intel_uncore_init(void)
 	 */
 	if (!cret) {
 	       ret = cpuhp_setup_state(CPUHP_PERF_X86_UNCORE_PREP,
-				       "perf/x86/intel/uncore:prepare",
-				       uncore_cpu_prepare, NULL);
+					"PERF_X86_UNCORE_PREP",
+					uncore_cpu_prepare, NULL);
 		if (ret)
 			goto err;
 	} else {
 		cpuhp_setup_state_nocalls(CPUHP_PERF_X86_UNCORE_PREP,
-					  "perf/x86/intel/uncore:prepare",
+					  "PERF_X86_UNCORE_PREP",
 					  uncore_cpu_prepare, NULL);
 	}
 
 	cpuhp_setup_state(CPUHP_AP_PERF_X86_UNCORE_STARTING,
-			  "perf/x86/uncore:starting",
+			  "AP_PERF_X86_UNCORE_STARTING",
 			  uncore_cpu_starting, uncore_cpu_dying);
 
 	cpuhp_setup_state(CPUHP_AP_PERF_X86_UNCORE_ONLINE,
-			  "perf/x86/uncore:online",
+			  "AP_PERF_X86_UNCORE_ONLINE",
 			  uncore_event_cpu_online, uncore_event_cpu_offline);
 	return 0;
 

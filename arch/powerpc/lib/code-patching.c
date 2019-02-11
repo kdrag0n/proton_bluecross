@@ -13,7 +13,7 @@
 #include <linux/mm.h>
 #include <asm/page.h>
 #include <asm/code-patching.h>
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 
 
 int patch_instruction(unsigned int *addr, unsigned int instr)

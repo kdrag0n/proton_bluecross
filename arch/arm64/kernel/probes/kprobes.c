@@ -29,7 +29,7 @@
 #include <asm/debug-monitors.h>
 #include <asm/system_misc.h>
 #include <asm/insn.h>
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 #include <asm/irq.h>
 #include <asm/sections.h>
 
@@ -44,31 +44,31 @@ post_kprobe_handler(struct kprobe_ctlblk *, struct pt_regs *);
 static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
 {
 	/* prepare insn slot */
-	p->ainsn.api.insn[0] = cpu_to_le32(p->opcode);
+	p->ainsn.insn[0] = cpu_to_le32(p->opcode);
 
-	flush_icache_range((uintptr_t) (p->ainsn.api.insn),
-			   (uintptr_t) (p->ainsn.api.insn) +
+	flush_icache_range((uintptr_t) (p->ainsn.insn),
+			   (uintptr_t) (p->ainsn.insn) +
 			   MAX_INSN_SIZE * sizeof(kprobe_opcode_t));
 
 	/*
 	 * Needs restoring of return address after stepping xol.
 	 */
-	p->ainsn.api.restore = (unsigned long) p->addr +
+	p->ainsn.restore = (unsigned long) p->addr +
 	  sizeof(kprobe_opcode_t);
 }
 
 static void __kprobes arch_prepare_simulate(struct kprobe *p)
 {
 	/* This instructions is not executed xol. No need to adjust the PC */
-	p->ainsn.api.restore = 0;
+	p->ainsn.restore = 0;
 }
 
 static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
 {
 	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
 
-	if (p->ainsn.api.handler)
-		p->ainsn.api.handler((u32)p->opcode, (long)p->addr, regs);
+	if (p->ainsn.handler)
+		p->ainsn.handler((u32)p->opcode, (long)p->addr, regs);
 
 	/* single step simulated, now go for post processing */
 	post_kprobe_handler(kcb, regs);
@@ -98,18 +98,18 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
 		return -EINVAL;
 
 	case INSN_GOOD_NO_SLOT:	/* insn need simulation */
-		p->ainsn.api.insn = NULL;
+		p->ainsn.insn = NULL;
 		break;
 
 	case INSN_GOOD:	/* instruction uses slot */
-		p->ainsn.api.insn = get_insn_slot();
-		if (!p->ainsn.api.insn)
+		p->ainsn.insn = get_insn_slot();
+		if (!p->ainsn.insn)
 			return -ENOMEM;
 		break;
 	};
 
 	/* prepare the instruction */
-	if (p->ainsn.api.insn)
+	if (p->ainsn.insn)
 		arch_prepare_ss_slot(p);
 	else
 		arch_prepare_simulate(p);
@@ -142,9 +142,9 @@ void __kprobes arch_disarm_kprobe(struct kprobe *p)
 
 void __kprobes arch_remove_kprobe(struct kprobe *p)
 {
-	if (p->ainsn.api.insn) {
-		free_insn_slot(p->ainsn.api.insn, 0);
-		p->ainsn.api.insn = NULL;
+	if (p->ainsn.insn) {
+		free_insn_slot(p->ainsn.insn, 0);
+		p->ainsn.insn = NULL;
 	}
 }
 
@@ -244,9 +244,9 @@ static void __kprobes setup_singlestep(struct kprobe *p,
 	}
 
 
-	if (p->ainsn.api.insn) {
+	if (p->ainsn.insn) {
 		/* prepare for single stepping */
-		slot = (unsigned long)p->ainsn.api.insn;
+		slot = (unsigned long)p->ainsn.insn;
 
 		set_ss_context(kcb, slot);	/* mark pending ss */
 
@@ -295,8 +295,8 @@ post_kprobe_handler(struct kprobe_ctlblk *kcb, struct pt_regs *regs)
 		return;
 
 	/* return addr restore if non-branching insn */
-	if (cur->ainsn.api.restore != 0)
-		instruction_pointer_set(regs, cur->ainsn.api.restore);
+	if (cur->ainsn.restore != 0)
+		instruction_pointer_set(regs, cur->ainsn.restore);
 
 	/* restore back original saved kprobe variables and continue */
 	if (kcb->kprobe_status == KPROBE_REENTER) {

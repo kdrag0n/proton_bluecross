@@ -2114,13 +2114,13 @@ static __init int virtio_net_driver_init(void)
 {
 	int ret;
 
-	ret = cpuhp_setup_state_multi(CPUHP_AP_ONLINE_DYN, "virtio/net:online",
+	ret = cpuhp_setup_state_multi(CPUHP_AP_ONLINE_DYN, "AP_VIRT_NET_ONLINE",
 				      virtnet_cpu_online,
 				      virtnet_cpu_down_prep);
 	if (ret < 0)
 		goto out;
 	virtionet_online = ret;
-	ret = cpuhp_setup_state_multi(CPUHP_VIRT_NET_DEAD, "virtio/net:dead",
+	ret = cpuhp_setup_state_multi(CPUHP_VIRT_NET_DEAD, "VIRT_NET_DEAD",
 				      NULL, virtnet_cpu_dead);
 	if (ret)
 		goto err_dead;

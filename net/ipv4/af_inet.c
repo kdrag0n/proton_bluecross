@@ -91,7 +91,7 @@
 #include <linux/slab.h>
 #include <linux/netfilter/xt_qtaguid.h>
 
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 
 #include <linux/inet.h>
 #include <linux/igmp.h>

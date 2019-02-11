@@ -316,7 +316,7 @@ static int __init global_timer_of_register(struct device_node *np)
 		goto out_irq;
 	
 	err = cpuhp_setup_state(CPUHP_AP_ARM_GLOBAL_TIMER_STARTING,
-				"clockevents/arm/global_timer:starting",
+				"AP_ARM_GLOBAL_TIMER_STARTING",
 				gt_starting_cpu, gt_dying_cpu);
 	if (err)
 		goto out_irq;

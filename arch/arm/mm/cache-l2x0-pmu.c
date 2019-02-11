@@ -563,7 +563,7 @@ static __init int l2x0_pmu_init(void)
 
 	cpumask_set_cpu(0, &pmu_cpu);
 	ret = cpuhp_setup_state_nocalls(CPUHP_AP_PERF_ARM_L2X0_ONLINE,
-					"perf/arm/l2x0:online", NULL,
+					"AP_PERF_ARM_L2X0_ONLINE", NULL,
 					l2x0_pmu_offline_cpu);
 	if (ret)
 		goto out_pmu;

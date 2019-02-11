@@ -132,13 +132,14 @@ static int __init acpi_fadt_sanity_check(void)
 	struct acpi_table_header *table;
 	struct acpi_table_fadt *fadt;
 	acpi_status status;
+	acpi_size tbl_size;
 	int ret = 0;
 
 	/*
 	 * FADT is required on arm64; retrieve it to check its presence
 	 * and carry out revision and ACPI HW reduced compliancy tests
 	 */
-	status = acpi_get_table(ACPI_SIG_FADT, 0, &table);
+	status = acpi_get_table_with_size(ACPI_SIG_FADT, 0, &table, &tbl_size);
 	if (ACPI_FAILURE(status)) {
 		const char *msg = acpi_format_exception(status);
 
@@ -169,10 +170,10 @@ static int __init acpi_fadt_sanity_check(void)
 
 out:
 	/*
-	 * acpi_get_table() creates FADT table mapping that
+	 * acpi_get_table_with_size() creates FADT table mapping that
 	 * should be released after parsing and before resuming boot
 	 */
-	acpi_put_table(table);
+	early_acpi_os_unmap_memory(table, tbl_size);
 	return ret;
 }
 

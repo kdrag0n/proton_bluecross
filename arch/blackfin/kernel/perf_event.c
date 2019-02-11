@@ -475,7 +475,7 @@ static int __init bfin_pmu_init(void)
 
 	ret = perf_pmu_register(&pmu, "cpu", PERF_TYPE_RAW);
 	if (!ret)
-		cpuhp_setup_state(CPUHP_PERF_BFIN,"perf/bfin:starting",
+		cpuhp_setup_state(CPUHP_PERF_BFIN, "PERF_BFIN",
 				  bfin_pmu_prepare_cpu, NULL);
 	return ret;
 }

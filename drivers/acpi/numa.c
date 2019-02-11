@@ -70,7 +70,7 @@ int acpi_map_pxm_to_node(int pxm)
 {
 	int node;
 
-	if (pxm < 0 || pxm >= MAX_PXM_DOMAINS || numa_off)
+	if (pxm < 0 || pxm >= MAX_PXM_DOMAINS)
 		return NUMA_NO_NODE;
 
 	node = pxm_to_node_map[pxm];

@@ -34,7 +34,7 @@
 #include <linux/fs.h>
 
 #include <asm/io.h>
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 
 #include "applicom.h"
 

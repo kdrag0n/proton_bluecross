@@ -761,7 +761,7 @@ static int __init arch_timer_register(void)
 
 	/* Register and immediately configure the timer on the boot CPU */
 	err = cpuhp_setup_state(CPUHP_AP_ARM_ARCH_TIMER_STARTING,
-				"clockevents/arm/arch_timer:starting",
+				"AP_ARM_ARCH_TIMER_STARTING",
 				arch_timer_starting_cpu, arch_timer_dying_cpu);
 	if (err)
 		goto out_unreg_cpupm;

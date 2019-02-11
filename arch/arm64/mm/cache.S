@@ -23,7 +23,7 @@
 #include <asm/assembler.h>
 #include <asm/cpufeature.h>
 #include <asm/alternative.h>
-#include <asm/asm-uaccess.h>
+#include <asm/uaccess.h>
 
 /*
  *	__flush_dcache_all()

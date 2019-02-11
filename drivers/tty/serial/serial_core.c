@@ -36,7 +36,7 @@
 #include <linux/mutex.h>
 
 #include <asm/irq.h>
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 
 /*
  * This is used to lock changes in serial line configuration.

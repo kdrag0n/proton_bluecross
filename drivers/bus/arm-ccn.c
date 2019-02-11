@@ -1571,7 +1571,7 @@ static int __init arm_ccn_init(void)
 	int i, ret;
 
 	ret = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_CCN_ONLINE,
-				      "perf/arm/ccn:online", NULL,
+				      "AP_PERF_ARM_CCN_ONLINE", NULL,
 				      arm_ccn_pmu_offline_cpu);
 	if (ret)
 		return ret;

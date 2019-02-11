@@ -62,7 +62,7 @@
 #endif
 #include <net/calipso.h>
 
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 #include <linux/mroute6.h>
 
 #ifdef CONFIG_ANDROID_PARANOID_NETWORK

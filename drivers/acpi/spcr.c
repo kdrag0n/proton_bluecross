@@ -33,6 +33,7 @@ int __init parse_spcr(bool earlycon)
 {
 	static char opts[64];
 	struct acpi_table_spcr *table;
+	acpi_size table_size;
 	acpi_status status;
 	char *uart;
 	char *iotype;
@@ -42,8 +43,9 @@ int __init parse_spcr(bool earlycon)
 	if (acpi_disabled)
 		return -ENODEV;
 
-	status = acpi_get_table(ACPI_SIG_SPCR, 0,
-				(struct acpi_table_header **)&table);
+	status = acpi_get_table_with_size(ACPI_SIG_SPCR, 0,
+					  (struct acpi_table_header **)&table,
+					  &table_size);
 
 	if (ACPI_FAILURE(status))
 		return -ENOENT;
@@ -104,6 +106,6 @@ int __init parse_spcr(bool earlycon)
 	err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
 
 done:
-	acpi_put_table((struct acpi_table_header *)table);
+	early_acpi_os_unmap_memory((void __iomem *)table, table_size);
 	return err;
 }

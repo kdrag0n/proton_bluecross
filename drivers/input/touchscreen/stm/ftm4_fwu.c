@@ -27,7 +27,7 @@
 #include <linux/input.h>
 #include <linux/firmware.h>
 #include <linux/slab.h>
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 #include <linux/hrtimer.h>
 #include <linux/interrupt.h>
 #include <linux/gpio.h>

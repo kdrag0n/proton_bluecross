@@ -1766,9 +1766,9 @@ static int __init intel_cqm_init(void)
 	 * is enabled to avoid notifier leak.
 	 */
 	cpuhp_setup_state(CPUHP_AP_PERF_X86_CQM_STARTING,
-			  "perf/x86/cqm:starting",
+			  "AP_PERF_X86_CQM_STARTING",
 			  intel_cqm_cpu_starting, NULL);
-	cpuhp_setup_state(CPUHP_AP_PERF_X86_CQM_ONLINE, "perf/x86/cqm:online",
+	cpuhp_setup_state(CPUHP_AP_PERF_X86_CQM_ONLINE, "AP_PERF_X86_CQM_ONLINE",
 			  NULL, intel_cqm_cpu_exit);
 
 out:

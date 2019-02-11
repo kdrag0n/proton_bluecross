@@ -1799,7 +1799,7 @@ static int __init cci_platform_init(void)
 	int ret;
 
 	ret = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_CCI_ONLINE,
-				      "perf/arm/cci:online", NULL,
+				      "AP_PERF_ARM_CCI_ONLINE", NULL,
 				      cci_pmu_offline_cpu);
 	if (ret)
 		return ret;

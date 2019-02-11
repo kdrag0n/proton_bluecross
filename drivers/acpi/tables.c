@@ -333,6 +333,7 @@ acpi_table_parse_entries_array(char *id,
 			 unsigned int max_entries)
 {
 	struct acpi_table_header *table_header = NULL;
+	acpi_size tbl_size;
 	int count;
 	u32 instance = 0;
 
@@ -345,7 +346,7 @@ acpi_table_parse_entries_array(char *id,
 	if (!strncmp(id, ACPI_SIG_MADT, 4))
 		instance = acpi_apic_instance;
 
-	acpi_get_table(id, instance, &table_header);
+	acpi_get_table_with_size(id, instance, &table_header, &tbl_size);
 	if (!table_header) {
 		pr_warn("%4.4s not present\n", id);
 		return -ENODEV;
@@ -354,7 +355,7 @@ acpi_table_parse_entries_array(char *id,
 	count = acpi_parse_entries_array(id, table_size, table_header,
 			proc, proc_num, max_entries);
 
-	acpi_put_table(table_header);
+	early_acpi_os_unmap_memory((char *)table_header, tbl_size);
 	return count;
 }
 
@@ -396,6 +397,7 @@ acpi_table_parse_madt(enum acpi_madt_type id,
 int __init acpi_table_parse(char *id, acpi_tbl_table_handler handler)
 {
 	struct acpi_table_header *table = NULL;
+	acpi_size tbl_size;
 
 	if (acpi_disabled)
 		return -ENODEV;
@@ -404,13 +406,13 @@ int __init acpi_table_parse(char *id, acpi_tbl_table_handler handler)
 		return -EINVAL;
 
 	if (strncmp(id, ACPI_SIG_MADT, 4) == 0)
-		acpi_get_table(id, acpi_apic_instance, &table);
+		acpi_get_table_with_size(id, acpi_apic_instance, &table, &tbl_size);
 	else
-		acpi_get_table(id, 0, &table);
+		acpi_get_table_with_size(id, 0, &table, &tbl_size);
 
 	if (table) {
 		handler(table);
-		acpi_put_table(table);
+		early_acpi_os_unmap_memory(table, tbl_size);
 		return 0;
 	} else
 		return -ENODEV;
@@ -424,15 +426,16 @@ int __init acpi_table_parse(char *id, acpi_tbl_table_handler handler)
 static void __init check_multiple_madt(void)
 {
 	struct acpi_table_header *table = NULL;
+	acpi_size tbl_size;
 
-	acpi_get_table(ACPI_SIG_MADT, 2, &table);
+	acpi_get_table_with_size(ACPI_SIG_MADT, 2, &table, &tbl_size);
 	if (table) {
 		pr_warn("BIOS bug: multiple APIC/MADT found, using %d\n",
 			acpi_apic_instance);
 		pr_warn("If \"acpi_apic_instance=%d\" works better, "
 			"notify linux-acpi@vger.kernel.org\n",
 			acpi_apic_instance ? 0 : 2);
-		acpi_put_table(table);
+		early_acpi_os_unmap_memory(table, tbl_size);
 
 	} else
 		acpi_apic_instance = 0;

@@ -34,7 +34,7 @@
 
 #include <net/sock.h>
 
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 
 static const struct pppox_proto *pppox_protos[PX_MAX_PROTO + 1];
 

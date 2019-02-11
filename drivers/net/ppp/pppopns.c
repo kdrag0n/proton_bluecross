@@ -34,7 +34,7 @@
 #include <linux/if_ppp.h>
 #include <linux/if_pppox.h>
 #include <linux/ppp_channel.h>
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 
 #define GRE_HEADER_SIZE		8
 

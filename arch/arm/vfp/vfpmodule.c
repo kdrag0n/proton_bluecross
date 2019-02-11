@@ -796,7 +796,7 @@ static int __init vfp_init(void)
 	}
 
 	cpuhp_setup_state_nocalls(CPUHP_AP_ARM_VFP_STARTING,
-				  "arm/vfp:starting", vfp_starting_cpu,
+				  "AP_ARM_VFP_STARTING", vfp_starting_cpu,
 				  vfp_dying_cpu);
 
 	vfp_vector = vfp_support_entry;

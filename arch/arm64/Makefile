@@ -80,12 +80,6 @@ ifeq ($(CONFIG_COMPAT_VDSO), y)
   endif
 endif
 
-brokengasinst := $(call as-instr,1:\n.inst 0\n.rept . - 1b\n\nnop\n.endr\n,,-DCONFIG_BROKEN_GAS_INST=1)
-
-ifneq ($(brokengasinst),)
-$(warning Detected assembler with broken .inst; disassembly will be unreliable)
-endif
-
 ifeq ($(cc-name),clang)
 # This is a workaround for https://bugs.llvm.org/show_bug.cgi?id=30792.
 # TODO: revert when this is fixed in LLVM.
@@ -93,13 +87,13 @@ KBUILD_CFLAGS  += -mno-implicit-float
 else
 KBUILD_CFLAGS  += -mgeneral-regs-only
 endif
-KBUILD_CFLAGS	+= $(lseinstr) $(brokengasinst) $(vdso32)
+KBUILD_CFLAGS	+= $(lseinstr) $(vdso32)
 KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
 ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
 KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
 endif
 KBUILD_CFLAGS	+= -fno-pic
-KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst) $(vdso32)
+KBUILD_AFLAGS	+= $(lseinstr) $(vdso32)
 
 ifeq ($(cc-name),clang)
 KBUILD_CFLAGS	+= -DCONFIG_ARCH_SUPPORTS_INT128

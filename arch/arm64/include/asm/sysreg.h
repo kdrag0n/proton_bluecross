@@ -22,6 +22,8 @@
 
 #include <linux/stringify.h>
 
+#include <asm/opcodes.h>
+
 /*
  * ARMv8 ARM reserves the following encoding for system registers:
  * (Ref: ARMv8 ARM, Section: "System instruction class encoding overview",
@@ -34,33 +36,6 @@
  */
 #define sys_reg(op0, op1, crn, crm, op2) \
 	((((op0)&3)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
-
-#ifndef CONFIG_BROKEN_GAS_INST
-
-#ifdef __ASSEMBLY__
-#define __emit_inst(x)			.inst (x)
-#else
-#define __emit_inst(x)			".inst " __stringify((x)) "\n\t"
-#endif
-
-#else  /* CONFIG_BROKEN_GAS_INST */
-
-#ifndef CONFIG_CPU_BIG_ENDIAN
-#define __INSTR_BSWAP(x)		(x)
-#else  /* CONFIG_CPU_BIG_ENDIAN */
-#define __INSTR_BSWAP(x)		((((x) << 24) & 0xff000000)	| \
-					 (((x) <<  8) & 0x00ff0000)	| \
-					 (((x) >>  8) & 0x0000ff00)	| \
-					 (((x) >> 24) & 0x000000ff))
-#endif	/* CONFIG_CPU_BIG_ENDIAN */
-
-#ifdef __ASSEMBLY__
-#define __emit_inst(x)			.long __INSTR_BSWAP(x)
-#else  /* __ASSEMBLY__ */
-#define __emit_inst(x)			".long " __stringify(__INSTR_BSWAP(x)) "\n\t"
-#endif	/* __ASSEMBLY__ */
-
-#endif	/* CONFIG_BROKEN_GAS_INST */
 
 #define SYS_MIDR_EL1			sys_reg(3, 0, 0, 0, 0)
 #define SYS_MPIDR_EL1			sys_reg(3, 0, 0, 0, 5)
@@ -106,10 +81,10 @@
 #define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
 #define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
 
-#define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
-				      (!!x)<<8 | 0x1f)
-#define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
-				      (!!x)<<8 | 0x1f)
+#define SET_PSTATE_PAN(x) __inst_arm(0xd5000000 | REG_PSTATE_PAN_IMM |\
+				     (!!x)<<8 | 0x1f)
+#define SET_PSTATE_UAO(x) __inst_arm(0xd5000000 | REG_PSTATE_UAO_IMM |\
+				     (!!x)<<8 | 0x1f)
 
 /* Common SCTLR_ELx flags. */
 #define SCTLR_ELx_EE    (1 << 25)
@@ -264,11 +239,11 @@
 	.equ	.L__reg_num_xzr, 31
 
 	.macro	mrs_s, rt, sreg
-	 __emit_inst(0xd5200000|(\sreg)|(.L__reg_num_\rt))
+	.inst	0xd5200000|(\sreg)|(.L__reg_num_\rt)
 	.endm
 
 	.macro	msr_s, sreg, rt
-	__emit_inst(0xd5000000|(\sreg)|(.L__reg_num_\rt))
+	.inst	0xd5000000|(\sreg)|(.L__reg_num_\rt)
 	.endm
 
 #else
@@ -284,13 +259,13 @@
 #define DEFINE_MRS_S						\
 	__DEFINE_MRS_MSR_S_REGNUM				\
 "	.macro	mrs_s, rt, sreg\n"				\
-	__emit_inst(0xd5200000|(\\sreg)|(.L__reg_num_\\rt))	\
+"	.inst 0xd5200000|(\\sreg)|(.L__reg_num_\\rt)\n"	\
 "	.endm\n"
 
 #define DEFINE_MSR_S						\
 	__DEFINE_MRS_MSR_S_REGNUM				\
 "	.macro	msr_s, sreg, rt\n"				\
-	__emit_inst(0xd5000000|(\\sreg)|(.L__reg_num_\\rt))	\
+"	.inst 0xd5000000|(\\sreg)|(.L__reg_num_\\rt)\n"		\
 "	.endm\n"
 
 #define UNDEFINE_MRS_S						\
