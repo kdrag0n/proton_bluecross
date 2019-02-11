@@ -14,7 +14,9 @@
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
 #include <linux/msi.h>
-#include <linux/slab.h>
+
+/* Temparory solution for building, will be removed later */
+#include <linux/pci.h>
 
 /**
  * alloc_msi_entry - Allocate an initialize msi_entry
