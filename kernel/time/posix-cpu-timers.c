@@ -132,9 +132,9 @@ static inline unsigned long long prof_ticks(struct task_struct *p)
 }
 static inline unsigned long long virt_ticks(struct task_struct *p)
 {
-	cputime_t utime, stime;
+	cputime_t utime;
 
-	task_cputime(p, &utime, &stime);
+	task_cputime(p, &utime, NULL);
 
 	return cputime_to_expires(utime);
 }
