@@ -274,21 +274,21 @@ static inline void set_freepointer(struct kmem_cache *s, void *object, void *fp)
 		__p += (__s)->size, __idx++)
 
 /* Determine object index from a given position */
-static inline unsigned int slab_index(void *p, struct kmem_cache *s, void *addr)
+static inline int slab_index(void *p, struct kmem_cache *s, void *addr)
 {
 	return (p - addr) / s->size;
 }
 
-static inline int order_objects(int order, unsigned long size)
+static inline int order_objects(int order, unsigned long size, int reserved)
 {
-	return (PAGE_SIZE << order) / size;
+	return ((PAGE_SIZE << order) - reserved) / size;
 }
 
 static inline struct kmem_cache_order_objects oo_make(int order,
-		unsigned long size)
+		unsigned long size, int reserved)
 {
 	struct kmem_cache_order_objects x = {
-		(order << OO_SHIFT) + order_objects(order, size)
+		(order << OO_SHIFT) + order_objects(order, size, reserved)
 	};
 
 	return x;
@@ -429,7 +429,7 @@ static void get_map(struct kmem_cache *s, struct page *page, unsigned long *map)
 		set_bit(slab_index(p, s, addr), map);
 }
 
-static inline unsigned int size_from_object(struct kmem_cache *s)
+static inline int size_from_object(struct kmem_cache *s)
 {
 	if (s->flags & SLAB_RED_ZONE)
 		return s->size - s->red_left_pad;
@@ -820,7 +820,7 @@ static int slab_pad_check(struct kmem_cache *s, struct page *page)
 		return 1;
 
 	start = page_address(page);
-	length = PAGE_SIZE << compound_order(page);
+	length = (PAGE_SIZE << compound_order(page)) - s->reserved;
 	end = start + length;
 	remainder = length % s->size;
 	if (!remainder)
@@ -908,7 +908,7 @@ static int check_slab(struct kmem_cache *s, struct page *page)
 		return 0;
 	}
 
-	maxobj = order_objects(compound_order(page), s->size);
+	maxobj = order_objects(compound_order(page), s->size, s->reserved);
 	if (page->objects > maxobj) {
 		slab_err(s, page, "objects %u > max %u",
 			page->objects, maxobj);
@@ -958,7 +958,7 @@ static int on_freelist(struct kmem_cache *s, struct page *page, void *search)
 		nr++;
 	}
 
-	max_objects = order_objects(compound_order(page), s->size);
+	max_objects = order_objects(compound_order(page), s->size, s->reserved);
 	if (max_objects > MAX_OBJS_PER_PAGE)
 		max_objects = MAX_OBJS_PER_PAGE;
 
@@ -1680,9 +1680,17 @@ static void __free_slab(struct kmem_cache *s, struct page *page)
 	__free_pages(page, order);
 }
 
+#define need_reserve_slab_rcu						\
+	(sizeof(((struct page *)NULL)->lru) < sizeof(struct rcu_head))
+
 static void rcu_free_slab(struct rcu_head *h)
 {
-	struct page *page = container_of(h, struct page, rcu_head);
+	struct page *page;
+
+	if (need_reserve_slab_rcu)
+		page = virt_to_head_page(h);
+	else
+		page = container_of((struct list_head *)h, struct page, lru);
 
 	__free_slab(page->slab_cache, page);
 }
@@ -1690,7 +1698,19 @@ static void rcu_free_slab(struct rcu_head *h)
 static void free_slab(struct kmem_cache *s, struct page *page)
 {
 	if (unlikely(s->flags & SLAB_DESTROY_BY_RCU)) {
-		call_rcu(&page->rcu_head, rcu_free_slab);
+		struct rcu_head *head;
+
+		if (need_reserve_slab_rcu) {
+			int order = compound_order(page);
+			int offset = (PAGE_SIZE << order) - s->reserved;
+
+			VM_BUG_ON(s->reserved != sizeof(*head));
+			head = page_address(page) + offset;
+		} else {
+			head = &page->rcu_head;
+		}
+
+		call_rcu(head, rcu_free_slab);
 	} else
 		__free_slab(s, page);
 }
@@ -3194,21 +3214,21 @@ static int slub_min_objects;
  * the smallest order which will fit the object.
  */
 static inline int slab_order(int size, int min_objects,
-				int max_order, int fract_leftover)
+				int max_order, int fract_leftover, int reserved)
 {
 	int order;
 	int rem;
 	int min_order = slub_min_order;
 
-	if (order_objects(min_order, size) > MAX_OBJS_PER_PAGE)
+	if (order_objects(min_order, size, reserved) > MAX_OBJS_PER_PAGE)
 		return get_order(size * MAX_OBJS_PER_PAGE) - 1;
 
-	for (order = max(min_order, get_order(min_objects * size));
+	for (order = max(min_order, get_order(min_objects * size + reserved));
 			order <= max_order; order++) {
 
 		unsigned long slab_size = PAGE_SIZE << order;
 
-		rem = slab_size % size;
+		rem = (slab_size - reserved) % size;
 
 		if (rem <= slab_size / fract_leftover)
 			break;
@@ -3217,7 +3237,7 @@ static inline int slab_order(int size, int min_objects,
 	return order;
 }
 
-static inline int calculate_order(int size)
+static inline int calculate_order(int size, int reserved)
 {
 	int order;
 	int min_objects;
@@ -3235,14 +3255,14 @@ static inline int calculate_order(int size)
 	min_objects = slub_min_objects;
 	if (!min_objects)
 		min_objects = 4 * (fls(nr_cpu_ids) + 1);
-	max_objects = order_objects(slub_max_order, size);
+	max_objects = order_objects(slub_max_order, size, reserved);
 	min_objects = min(min_objects, max_objects);
 
 	while (min_objects > 1) {
 		fraction = 16;
 		while (fraction >= 4) {
 			order = slab_order(size, min_objects,
-					slub_max_order, fraction);
+					slub_max_order, fraction, reserved);
 			if (order <= slub_max_order)
 				return order;
 			fraction /= 2;
@@ -3254,14 +3274,14 @@ static inline int calculate_order(int size)
 	 * We were unable to place multiple objects in a slab. Now
 	 * lets see if we can place a single object there.
 	 */
-	order = slab_order(size, 1, slub_max_order, 1);
+	order = slab_order(size, 1, slub_max_order, 1, reserved);
 	if (order <= slub_max_order)
 		return order;
 
 	/*
 	 * Doh this slab cannot be placed using slub_max_order.
 	 */
-	order = slab_order(size, 1, MAX_ORDER, 1);
+	order = slab_order(size, 1, MAX_ORDER, 1, reserved);
 	if (order < MAX_ORDER)
 		return order;
 	return -ENOSYS;
@@ -3496,7 +3516,7 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 	if (forced_order >= 0)
 		order = forced_order;
 	else
-		order = calculate_order(size);
+		order = calculate_order(size, s->reserved);
 
 	if (order < 0)
 		return 0;
@@ -3514,8 +3534,8 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 	/*
 	 * Determine the number of objects per slab
 	 */
-	s->oo = oo_make(order, size);
-	s->min = oo_make(get_order(size), size);
+	s->oo = oo_make(order, size, s->reserved);
+	s->min = oo_make(get_order(size), size, s->reserved);
 	if (oo_objects(s->oo) > oo_objects(s->max))
 		s->max = s->oo;
 
@@ -3525,6 +3545,10 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 static int kmem_cache_open(struct kmem_cache *s, unsigned long flags)
 {
 	s->flags = kmem_cache_flags(s->size, flags, s->name, s->ctor);
+	s->reserved = 0;
+
+	if (need_reserve_slab_rcu && (s->flags & SLAB_DESTROY_BY_RCU))
+		s->reserved = sizeof(struct rcu_head);
 
 	if (!calculate_sizes(s, -1))
 		goto error;
@@ -4127,6 +4151,12 @@ void __init kmem_cache_init(void)
 		       SLAB_HWCACHE_ALIGN);
 
 	kmem_cache = bootstrap(&boot_kmem_cache);
+
+	/*
+	 * Allocate kmem_cache_node properly from the kmem_cache slab.
+	 * kmem_cache_node is separately allocated so no need to
+	 * update any list pointers.
+	 */
 	kmem_cache_node = bootstrap(&boot_kmem_cache_node);
 
 	/* Now we can use the kmem_cache to allocate kmalloc slabs */
@@ -4790,7 +4820,7 @@ SLAB_ATTR_RO(slab_size);
 
 static ssize_t align_show(struct kmem_cache *s, char *buf)
 {
-	return sprintf(buf, "%u\n", s->align);
+	return sprintf(buf, "%d\n", s->align);
 }
 SLAB_ATTR_RO(align);
 
@@ -4975,6 +5005,12 @@ static ssize_t destroy_by_rcu_show(struct kmem_cache *s, char *buf)
 	return sprintf(buf, "%d\n", !!(s->flags & SLAB_DESTROY_BY_RCU));
 }
 SLAB_ATTR_RO(destroy_by_rcu);
+
+static ssize_t reserved_show(struct kmem_cache *s, char *buf)
+{
+	return sprintf(buf, "%d\n", s->reserved);
+}
+SLAB_ATTR_RO(reserved);
 
 #ifdef CONFIG_SLUB_DEBUG
 static ssize_t slabs_show(struct kmem_cache *s, char *buf)
@@ -5167,22 +5203,21 @@ SLAB_ATTR(shrink);
 #ifdef CONFIG_NUMA
 static ssize_t remote_node_defrag_ratio_show(struct kmem_cache *s, char *buf)
 {
-	return sprintf(buf, "%u\n", s->remote_node_defrag_ratio / 10);
+	return sprintf(buf, "%d\n", s->remote_node_defrag_ratio / 10);
 }
 
 static ssize_t remote_node_defrag_ratio_store(struct kmem_cache *s,
 				const char *buf, size_t length)
 {
-	unsigned int ratio;
+	unsigned long ratio;
 	int err;
 
-	err = kstrtouint(buf, 10, &ratio);
+	err = kstrtoul(buf, 10, &ratio);
 	if (err)
 		return err;
-	if (ratio > 100)
-		return -ERANGE;
 
-	s->remote_node_defrag_ratio = ratio * 10;
+	if (ratio <= 100)
+		s->remote_node_defrag_ratio = ratio * 10;
 
 	return length;
 }
@@ -5288,6 +5323,7 @@ static struct attribute *slab_attrs[] = {
 	&reclaim_account_attr.attr,
 	&destroy_by_rcu_attr.attr,
 	&shrink_attr.attr,
+	&reserved_attr.attr,
 	&slabs_cpu_partial_attr.attr,
 #ifdef CONFIG_SLUB_DEBUG
 	&total_objects_attr.attr,
