@@ -50,6 +50,7 @@
 #define ECRYPTFS_MAX_NUM_USERS 32768
 #define ECRYPTFS_XATTR_NAME "user.ecryptfs"
 
+void ecryptfs_dump_auth_tok(struct ecryptfs_auth_tok *auth_tok);
 extern void ecryptfs_to_hex(char *dst, char *src, size_t src_size);
 extern void ecryptfs_from_hex(char *dst, char *src, int dst_size);
 
@@ -630,19 +631,10 @@ int ecryptfs_encrypt_and_encode_filename(
 	struct ecryptfs_mount_crypt_stat *mount_crypt_stat,
 	const char *name, size_t name_size);
 struct dentry *ecryptfs_lower_dentry(struct dentry *this_dentry);
-#ifdef CONFIG_DEBUG_KERNEL
-void ecryptfs_dump_auth_tok(struct ecryptfs_auth_tok *auth_tok);
 void ecryptfs_dump_hex(char *data, int bytes);
 void ecryptfs_dump_salt_hex(char *data, int key_size,
 		const struct ecryptfs_crypt_stat *crypt_stat);
 extern void ecryptfs_dump_cipher(struct ecryptfs_crypt_stat *stat);
-#else
-static inline void ecryptfs_dump_auth_tok(struct ecryptfs_auth_tok *auth_tok) {}
-static inline void ecryptfs_dump_hex(char *data, int bytes) {}
-static inline void ecryptfs_dump_salt_hex(char *data, int key_size,
-		const struct ecryptfs_crypt_stat *crypt_stat) {}
-static inline void ecryptfs_dump_cipher(struct ecryptfs_crypt_stat *stat) {}
-#endif
 
 int virt_to_scatterlist(const void *addr, int size, struct scatterlist *sg,
 			int sg_size);
