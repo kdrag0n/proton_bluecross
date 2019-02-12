@@ -34,7 +34,6 @@
 #include <linux/platform_device.h>
 #include <linux/platform_data/cs40l2x.h>
 #include <linux/wake_gestures.h>
-#include <linux/kthread.h>
 
 #include "cs40l2x.h"
 
@@ -45,12 +44,10 @@ struct cs40l2x_private {
 	unsigned int num_supplies;
 	unsigned int devid;
 	unsigned int revid;
-	struct kthread_work vibe_start_work;
-	struct kthread_work vibe_pbq_work;
+	struct work_struct vibe_start_work;
+	struct work_struct vibe_pbq_work;
 	struct work_struct vibe_stop_work;
 	struct workqueue_struct *vibe_workqueue;
-	struct kthread_worker vibe_kworker;
-	struct task_struct *vibe_worker_thread;
 	struct mutex lock;
 	unsigned int cp_trigger_index;
 	unsigned int cp_trailer_index;
@@ -1285,7 +1282,7 @@ static int cs40l2x_pbq_pair_launch(struct cs40l2x_private *cs40l2x)
 	return 0;
 }
 
-static void cs40l2x_vibe_pbq_worker(struct kthread_work *work)
+static void cs40l2x_vibe_pbq_worker(struct work_struct *work)
 {
 	struct cs40l2x_private *cs40l2x =
 		container_of(work, struct cs40l2x_private, vibe_pbq_work);
@@ -1341,7 +1338,7 @@ static enum hrtimer_restart cs40l2x_pbq_timer(struct hrtimer *timer)
 	struct cs40l2x_private *cs40l2x =
 		container_of(timer, struct cs40l2x_private, pbq_timer);
 
-	kthread_queue_work(&cs40l2x->vibe_kworker, &cs40l2x->vibe_pbq_work);
+	queue_work(cs40l2x->vibe_workqueue, &cs40l2x->vibe_pbq_work);
 
 	return HRTIMER_NORESTART;
 }
@@ -1373,7 +1370,7 @@ static int cs40l2x_diag_capture(struct cs40l2x_private *cs40l2x)
 	return 0;
 }
 
-static void cs40l2x_vibe_start_worker(struct kthread_work *work)
+static void cs40l2x_vibe_start_worker(struct work_struct *work)
 {
 	struct cs40l2x_private *cs40l2x =
 		container_of(work, struct cs40l2x_private, vibe_start_work);
@@ -1568,8 +1565,7 @@ static void cs40l2x_vibe_brightness_set(struct led_classdev *led_cdev,
 	if (brightness == LED_OFF)
 		queue_work(cs40l2x->vibe_workqueue, &cs40l2x->vibe_stop_work);
 	else
-		kthread_queue_work(&cs40l2x->vibe_kworker,
-				   &cs40l2x->vibe_start_work);
+		queue_work(cs40l2x->vibe_workqueue, &cs40l2x->vibe_start_work);
 }
 
 void set_vibrate()
@@ -1607,7 +1603,6 @@ static void cs40l2x_create_led(struct cs40l2x_private *cs40l2x)
 
 static void cs40l2x_vibe_init(struct cs40l2x_private *cs40l2x)
 {
-	struct sched_param param = { .sched_priority = 6 };
 	struct hrtimer *pbq_timer = &cs40l2x->pbq_timer;
 	int ret;
 
@@ -1618,23 +1613,8 @@ static void cs40l2x_vibe_init(struct cs40l2x_private *cs40l2x)
 		return;
 	}
 
-	kthread_init_worker(&cs40l2x->vibe_kworker);
-	cs40l2x->vibe_worker_thread = kthread_run(kthread_worker_fn,
-						  &cs40l2x->vibe_kworker,
-						  "vibe_thread");
-	if (IS_ERR(cs40l2x->vibe_worker_thread)) {
-		ret = PTR_ERR(cs40l2x->vibe_worker_thread);
-		dev_err(cs40l2x->dev, "Failed to start kworker, err: %d\n", ret);
-		return;
-	}
-
-	ret = sched_setscheduler(cs40l2x->vibe_worker_thread, SCHED_FIFO, &param);
-	if (ret)
-		dev_err(cs40l2x->dev, "Failed to set SCHED_FIFO on kworker, err: %d\n",
-			ret);
-
-	kthread_init_work(&cs40l2x->vibe_start_work, cs40l2x_vibe_start_worker);
-	kthread_init_work(&cs40l2x->vibe_pbq_work, cs40l2x_vibe_pbq_worker);
+	INIT_WORK(&cs40l2x->vibe_start_work, cs40l2x_vibe_start_worker);
+	INIT_WORK(&cs40l2x->vibe_pbq_work, cs40l2x_vibe_pbq_worker);
 	INIT_WORK(&cs40l2x->vibe_stop_work, cs40l2x_vibe_stop_worker);
 
 	hrtimer_init(pbq_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
@@ -3040,8 +3020,8 @@ static int cs40l2x_i2c_remove(struct i2c_client *i2c_client)
 
 		hrtimer_cancel(&cs40l2x->pbq_timer);
 
-		kthread_cancel_work_sync(&cs40l2x->vibe_start_work);
-		kthread_cancel_work_sync(&cs40l2x->vibe_pbq_work);
+		cancel_work_sync(&cs40l2x->vibe_start_work);
+		cancel_work_sync(&cs40l2x->vibe_pbq_work);
 		cancel_work_sync(&cs40l2x->vibe_stop_work);
 
 		destroy_workqueue(cs40l2x->vibe_workqueue);
