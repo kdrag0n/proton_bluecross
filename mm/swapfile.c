@@ -2293,8 +2293,8 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
 	free_percpu(p->percpu_cluster);
 	p->percpu_cluster = NULL;
 	vfree(swap_map);
-	kvfree(cluster_info);
-	kvfree(frontswap_map);
+	vfree(cluster_info);
+	vfree(frontswap_map);
 	/* Destroy swap account information */
 	swap_cgroup_swapoff(p->type);
 	exit_swap_address_space(p->type);
@@ -2835,8 +2835,7 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 		p->cluster_next = 1 + (prandom_u32() % p->highest_bit);
 		nr_cluster = DIV_ROUND_UP(maxpages, SWAPFILE_CLUSTER);
 
-		cluster_info = kvzalloc(array_size(sizeof(*cluster_info), nr_cluster),
-					GFP_KERNEL);
+		cluster_info = vzalloc(array_size(sizeof(*cluster_info), nr_cluster));
 		if (!cluster_info) {
 			error = -ENOMEM;
 			goto bad_swap;
@@ -2869,8 +2868,7 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 	}
 	/* frontswap enabled? set up bit-per-page map for frontswap */
 	if (IS_ENABLED(CONFIG_FRONTSWAP))
-		frontswap_map = kvzalloc(array_size(sizeof(long), BITS_TO_LONGS(maxpages)),
-					 GFP_KERNEL);
+		frontswap_map = vzalloc(array_size(sizeof(long), BITS_TO_LONGS(maxpages)));
 
 	if (p->bdev &&(swap_flags & SWAP_FLAG_DISCARD) && swap_discardable(p)) {
 		/*
