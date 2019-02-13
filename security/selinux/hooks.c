@@ -2529,8 +2529,7 @@ static void selinux_bprm_committing_creds(struct linux_binprm *bprm)
 			rlim->rlim_cur = min(rlim->rlim_max, initrlim->rlim_cur);
 		}
 		task_unlock(current);
-		if (IS_ENABLED(CONFIG_POSIX_TIMERS))
-			update_rlimit_cpu(current, rlimit(RLIMIT_CPU));
+		update_rlimit_cpu(current, rlimit(RLIMIT_CPU));
 	}
 }
 
@@ -2560,11 +2559,9 @@ static void selinux_bprm_committed_creds(struct linux_binprm *bprm)
 	 */
 	rc = avc_has_perm(osid, sid, SECCLASS_PROCESS, PROCESS__SIGINH, NULL);
 	if (rc) {
-		if (IS_ENABLED(CONFIG_POSIX_TIMERS)) {
-			memset(&itimer, 0, sizeof itimer);
-			for (i = 0; i < 3; i++)
-				do_setitimer(i, &itimer, NULL);
-		}
+		memset(&itimer, 0, sizeof itimer);
+		for (i = 0; i < 3; i++)
+			do_setitimer(i, &itimer, NULL);
 		spin_lock_irq(&current->sighand->siglock);
 		if (!fatal_signal_pending(current)) {
 			flush_sigqueue(&current->pending);

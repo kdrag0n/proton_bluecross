@@ -37,7 +37,9 @@ static void nvmet_inline_bio_init(struct nvmet_req *req)
 {
 	struct bio *bio = &req->inline_bio;
 
-	bio_init(bio, req->inline_bvec, NVMET_MAX_INLINE_BIOVEC);
+	bio_init(bio);
+	bio->bi_max_vecs = NVMET_MAX_INLINE_BIOVEC;
+	bio->bi_io_vec = req->inline_bvec;
 }
 
 static void nvmet_execute_rw(struct nvmet_req *req)
@@ -94,7 +96,7 @@ static void nvmet_execute_rw(struct nvmet_req *req)
 
 	cookie = submit_bio(bio);
 
-	blk_mq_poll(bdev_get_queue(req->ns->bdev), cookie);
+	blk_poll(bdev_get_queue(req->ns->bdev), cookie);
 }
 
 static void nvmet_execute_flush(struct nvmet_req *req)
