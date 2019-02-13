@@ -36,9 +36,6 @@ clang_bin=$tc_clang/bin
 export LD_LIBRARY_PATH=$tc_clang/lib64:$LD_LIBRARY_PATH
 export PATH=$clang_bin:$PATH
 
-export CROSS_COMPILE=$gcc_bin/$prefix_gcc
-export CROSS_COMPILE_ARM32=$gcc32_bin/$prefix_gcc32
-export CLANG_TRIPLE=aarch64-linux-gnu-
 MAKEFLAGS+=(
     CC=clang
     O=out
