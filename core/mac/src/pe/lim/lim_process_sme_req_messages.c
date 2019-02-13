@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2931,6 +2931,9 @@ __lim_process_sme_set_context_req(tpAniSirGlobal mac_ctx, uint32_t *msg_buf)
 	}
 	qdf_mem_copy(set_context_req, msg_buf,
 			sizeof(struct sSirSmeSetContextReq));
+
+	qdf_mem_zero(msg_buf, sizeof(tSirSmeSetContextReq));
+
 	sme_session_id = set_context_req->sessionId;
 	sme_transaction_id = set_context_req->transactionId;
 
@@ -3038,6 +3041,7 @@ __lim_process_sme_set_context_req(tpAniSirGlobal mac_ctx, uint32_t *msg_buf)
 				sme_transaction_id);
 	}
 end:
+	qdf_mem_zero(set_context_req, sizeof(tSirSmeSetContextReq));
 	qdf_mem_free(set_context_req);
 	return;
 }
