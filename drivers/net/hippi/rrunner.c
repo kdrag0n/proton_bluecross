@@ -1585,7 +1585,7 @@ static int rr_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			return -EPERM;
 		}
 
-		image = kmalloc_array(EEPROM_WORDS, sizeof(u32), GFP_KERNEL);
+		image = kmalloc(EEPROM_WORDS * sizeof(u32), GFP_KERNEL);
 		if (!image)
 			return -ENOMEM;
 
@@ -1616,9 +1616,8 @@ static int rr_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			return -EPERM;
 		}
 
-		image = kmalloc_array(EEPROM_WORDS, sizeof(u32), GFP_KERNEL);
-		oldimage = kmalloc_array(EEPROM_WORDS, sizeof(u32),
-					 GFP_KERNEL);
+		image = kmalloc(EEPROM_WORDS * sizeof(u32), GFP_KERNEL);
+		oldimage = kmalloc(EEPROM_WORDS * sizeof(u32), GFP_KERNEL);
 		if (!image || !oldimage) {
 			error = -ENOMEM;
 			goto wf_out;

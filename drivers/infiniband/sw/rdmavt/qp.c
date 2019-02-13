@@ -681,8 +681,9 @@ struct ib_qp *rvt_create_qp(struct ib_pd *ibpd,
 				sqsize * sz,
 				gfp | __GFP_ZERO, PAGE_KERNEL);
 		else
-			swq = vzalloc_node(array_size(sz, sqsize),
-					   rdi->dparms.node);
+			swq = vzalloc_node(
+				sqsize * sz,
+				rdi->dparms.node);
 		if (!swq)
 			return ERR_PTR(-ENOMEM);
 
@@ -704,10 +705,11 @@ struct ib_qp *rvt_create_qp(struct ib_pd *ibpd,
 		RCU_INIT_POINTER(qp->next, NULL);
 		if (init_attr->qp_type == IB_QPT_RC) {
 			qp->s_ack_queue =
-				kcalloc_node(rvt_max_atomic(rdi),
-					     sizeof(*qp->s_ack_queue),
-					     gfp,
-					     rdi->dparms.node);
+				kzalloc_node(
+					sizeof(*qp->s_ack_queue) *
+					 rvt_max_atomic(rdi),
+					gfp,
+					rdi->dparms.node);
 			if (!qp->s_ack_queue)
 				goto bail_qp;
 		}

@@ -19,7 +19,6 @@
  */
 
 #include <linux/ctype.h>
-#include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/export.h>
 #include <media/v4l2-ioctl.h>
@@ -1754,9 +1753,8 @@ int v4l2_ctrl_handler_init_class(struct v4l2_ctrl_handler *hdl,
 	INIT_LIST_HEAD(&hdl->ctrls);
 	INIT_LIST_HEAD(&hdl->ctrl_refs);
 	hdl->nr_of_buckets = 1 + nr_of_controls_hint / 8;
-	hdl->buckets = kvmalloc_array(hdl->nr_of_buckets,
-				      sizeof(hdl->buckets[0]),
-				      GFP_KERNEL | __GFP_ZERO);
+	hdl->buckets = kcalloc(hdl->nr_of_buckets, sizeof(hdl->buckets[0]),
+			       GFP_KERNEL);
 	hdl->error = hdl->buckets ? 0 : -ENOMEM;
 	return hdl->error;
 }
@@ -1783,9 +1781,9 @@ void v4l2_ctrl_handler_free(struct v4l2_ctrl_handler *hdl)
 		list_del(&ctrl->node);
 		list_for_each_entry_safe(sev, next_sev, &ctrl->ev_subs, node)
 			list_del(&sev->node);
-		kvfree(ctrl);
+		kfree(ctrl);
 	}
-	kvfree(hdl->buckets);
+	kfree(hdl->buckets);
 	hdl->buckets = NULL;
 	hdl->cached = NULL;
 	hdl->error = 0;
@@ -2032,7 +2030,7 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct v4l2_ctrl_handler *hdl,
 		 is_array)
 		sz_extra += 2 * tot_ctrl_size;
 
-	ctrl = kvzalloc(sizeof(*ctrl) + sz_extra, GFP_KERNEL);
+	ctrl = kzalloc(sizeof(*ctrl) + sz_extra, GFP_KERNEL);
 	if (ctrl == NULL) {
 		handler_set_err(hdl, -ENOMEM);
 		return NULL;
@@ -2081,7 +2079,7 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct v4l2_ctrl_handler *hdl,
 	}
 
 	if (handler_new_ref(hdl, ctrl)) {
-		kvfree(ctrl);
+		kfree(ctrl);
 		return NULL;
 	}
 	mutex_lock(hdl->lock);
@@ -2832,8 +2830,8 @@ int v4l2_g_ext_ctrls(struct v4l2_ctrl_handler *hdl, struct v4l2_ext_controls *cs
 		return class_check(hdl, cs->which);
 
 	if (cs->count > ARRAY_SIZE(helper)) {
-		helpers = kvmalloc_array(cs->count, sizeof(helper[0]),
-					 GFP_KERNEL);
+		helpers = kmalloc_array(cs->count, sizeof(helper[0]),
+					GFP_KERNEL);
 		if (helpers == NULL)
 			return -ENOMEM;
 	}
@@ -2885,7 +2883,7 @@ int v4l2_g_ext_ctrls(struct v4l2_ctrl_handler *hdl, struct v4l2_ext_controls *cs
 	}
 
 	if (cs->count > ARRAY_SIZE(helper))
-		kvfree(helpers);
+		kfree(helpers);
 	return ret;
 }
 EXPORT_SYMBOL(v4l2_g_ext_ctrls);
@@ -3087,8 +3085,8 @@ static int try_set_ext_ctrls(struct v4l2_fh *fh, struct v4l2_ctrl_handler *hdl,
 		return class_check(hdl, cs->which);
 
 	if (cs->count > ARRAY_SIZE(helper)) {
-		helpers = kvmalloc_array(cs->count, sizeof(helper[0]),
-					 GFP_KERNEL);
+		helpers = kmalloc_array(cs->count, sizeof(helper[0]),
+					GFP_KERNEL);
 		if (!helpers)
 			return -ENOMEM;
 	}
@@ -3165,7 +3163,7 @@ static int try_set_ext_ctrls(struct v4l2_fh *fh, struct v4l2_ctrl_handler *hdl,
 	}
 
 	if (cs->count > ARRAY_SIZE(helper))
-		kvfree(helpers);
+		kfree(helpers);
 	return ret;
 }
 

@@ -180,9 +180,8 @@ struct display_timings *of_get_display_timings(struct device_node *np)
 		goto entryfail;
 	}
 
-	disp->timings = kcalloc(disp->num_timings,
-				sizeof(struct display_timing *),
-				GFP_KERNEL);
+	disp->timings = kzalloc(sizeof(struct display_timing *) *
+				disp->num_timings, GFP_KERNEL);
 	if (!disp->timings) {
 		pr_err("%s: could not allocate timings array\n",
 			of_node_full_name(np));

@@ -72,7 +72,7 @@ avmcard *b1_alloc_card(int nr_controllers)
 	if (!card)
 		return NULL;
 
-	cinfo = kcalloc(nr_controllers, sizeof(*cinfo), GFP_KERNEL);
+	cinfo = kzalloc(sizeof(*cinfo) * nr_controllers, GFP_KERNEL);
 	if (!cinfo) {
 		kfree(card);
 		return NULL;

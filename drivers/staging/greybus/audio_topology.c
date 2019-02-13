@@ -142,7 +142,7 @@ static const char **gb_generate_enum_strings(struct gbaudio_module_info *gb,
 	int i;
 	__u8 *data;
 
-	strings = devm_kcalloc(gb->dev, gbenum->items, sizeof(char *),
+	strings = devm_kzalloc(gb->dev, sizeof(char *) * gbenum->items,
 			       GFP_KERNEL);
 	data = gbenum->names;
 

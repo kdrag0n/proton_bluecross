@@ -767,12 +767,12 @@ void acpi_irq_stats_init(void)
 	num_gpes = acpi_current_gpe_count;
 	num_counters = num_gpes + ACPI_NUM_FIXED_EVENTS + NUM_COUNTERS_EXTRA;
 
-	all_attrs = kcalloc(num_counters + 1, sizeof(struct attribute *),
+	all_attrs = kzalloc(sizeof(struct attribute *) * (num_counters + 1),
 			    GFP_KERNEL);
 	if (all_attrs == NULL)
 		return;
 
-	all_counters = kcalloc(num_counters, sizeof(struct event_counter),
+	all_counters = kzalloc(sizeof(struct event_counter) * (num_counters),
 			       GFP_KERNEL);
 	if (all_counters == NULL)
 		goto fail;
@@ -781,7 +781,7 @@ void acpi_irq_stats_init(void)
 	if (ACPI_FAILURE(status))
 		goto fail;
 
-	counter_attrs = kcalloc(num_counters, sizeof(struct kobj_attribute),
+	counter_attrs = kzalloc(sizeof(struct kobj_attribute) * (num_counters),
 				GFP_KERNEL);
 	if (counter_attrs == NULL)
 		goto fail;

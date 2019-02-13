@@ -347,9 +347,8 @@ static int acpi_processor_get_performance_states(struct acpi_processor *pr)
 
 	pr->performance->state_count = pss->package.count;
 	pr->performance->states =
-	    kmalloc_array(pss->package.count,
-			  sizeof(struct acpi_processor_px),
-			  GFP_KERNEL);
+	    kmalloc(sizeof(struct acpi_processor_px) * pss->package.count,
+		    GFP_KERNEL);
 	if (!pr->performance->states) {
 		result = -ENOMEM;
 		goto end;

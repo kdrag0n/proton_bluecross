@@ -477,9 +477,7 @@ static int htcpld_setup_chips(struct platform_device *pdev)
 
 	/* Setup each chip's output GPIOs */
 	htcpld->nchips = pdata->num_chip;
-	htcpld->chip = devm_kcalloc(dev,
-				    htcpld->nchips,
-				    sizeof(struct htcpld_chip),
+	htcpld->chip = devm_kzalloc(dev, sizeof(struct htcpld_chip) * htcpld->nchips,
 				    GFP_KERNEL);
 	if (!htcpld->chip) {
 		dev_warn(dev, "Unable to allocate memory for chips\n");

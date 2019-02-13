@@ -399,8 +399,7 @@ megasas_alloc_cmdlist_fusion(struct megasas_instance *instance)
 	 * Allocate the dynamic array first and then allocate individual
 	 * commands.
 	 */
-	fusion->cmd_list = kcalloc(max_cmd,
-						sizeof(struct megasas_cmd_fusion *),
+	fusion->cmd_list = kzalloc(sizeof(struct megasas_cmd_fusion *) * max_cmd,
 						GFP_KERNEL);
 	if (!fusion->cmd_list) {
 		dev_err(&instance->pdev->dev,

@@ -469,8 +469,7 @@ static int proc_pid_stack(struct seq_file *m, struct pid_namespace *ns,
 	if (!file_ns_capable(m->file, &init_user_ns, CAP_SYS_ADMIN))
 		return -EACCES;
 
-	entries = kmalloc_array(MAX_STACK_TRACE_DEPTH, sizeof(*entries),
-				GFP_KERNEL);
+	entries = kmalloc(MAX_STACK_TRACE_DEPTH * sizeof(*entries), GFP_KERNEL);
 	if (!entries)
 		return -ENOMEM;
 

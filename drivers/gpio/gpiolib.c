@@ -3433,7 +3433,8 @@ struct gpio_descs *__must_check gpiod_get_array(struct device *dev,
 	if (count < 0)
 		return ERR_PTR(count);
 
-	descs = kzalloc(struct_size(descs, desc, count), GFP_KERNEL);
+	descs = kzalloc(sizeof(*descs) + sizeof(descs->desc[0]) * count,
+			GFP_KERNEL);
 	if (!descs)
 		return ERR_PTR(-ENOMEM);
 

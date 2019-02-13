@@ -706,7 +706,7 @@ static int ses_intf_add(struct device *cdev,
 		ses_dev->page10_len = len;
 		buf = NULL;
 	}
-	scomp = kcalloc(components, sizeof(struct ses_component), GFP_KERNEL);
+	scomp = kzalloc(sizeof(struct ses_component) * components, GFP_KERNEL);
 	if (!scomp)
 		goto err_free;
 

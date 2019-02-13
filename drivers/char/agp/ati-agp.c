@@ -107,8 +107,7 @@ static int ati_create_gatt_pages(int nr_tables)
 	int retval = 0;
 	int i;
 
-	tables = kcalloc(nr_tables + 1, sizeof(struct ati_page_map *),
-			 GFP_KERNEL);
+	tables = kzalloc((nr_tables + 1) * sizeof(struct ati_page_map *),GFP_KERNEL);
 	if (tables == NULL)
 		return -ENOMEM;
 

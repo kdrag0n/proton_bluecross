@@ -2817,7 +2817,7 @@ int __init amd_iommu_init_api(void)
 	for_each_possible_cpu(cpu) {
 		struct flush_queue *queue = per_cpu_ptr(&flush_queue, cpu);
 
-		queue->entries = kcalloc(FLUSH_QUEUE_SIZE,
+		queue->entries = kzalloc(FLUSH_QUEUE_SIZE *
 					 sizeof(*queue->entries),
 					 GFP_KERNEL);
 		if (!queue->entries)

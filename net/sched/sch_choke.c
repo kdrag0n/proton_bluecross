@@ -437,7 +437,7 @@ static int choke_change(struct Qdisc *sch, struct nlattr *opt)
 		ntab = kcalloc(mask + 1, sizeof(struct sk_buff *),
 			       GFP_KERNEL | __GFP_NOWARN);
 		if (!ntab)
-			ntab = vzalloc(array_size(sizeof(struct sk_buff *), (mask + 1)));
+			ntab = vzalloc((mask + 1) * sizeof(struct sk_buff *));
 		if (!ntab)
 			return -ENOMEM;
 

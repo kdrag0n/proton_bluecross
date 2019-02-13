@@ -692,9 +692,9 @@ struct xhci_stream_info *xhci_alloc_stream_info(struct xhci_hcd *xhci,
 	stream_info->num_stream_ctxs = num_stream_ctxs;
 
 	/* Initialize the array of virtual pointers to stream rings. */
-	stream_info->stream_rings = kcalloc(num_streams,
-					    sizeof(struct xhci_ring *),
-					    mem_flags);
+	stream_info->stream_rings = kzalloc(
+			sizeof(struct xhci_ring *)*num_streams,
+			mem_flags);
 	if (!stream_info->stream_rings)
 		goto cleanup_info;
 
@@ -1067,9 +1067,9 @@ int xhci_alloc_virt_device(struct xhci_hcd *xhci, int slot_id,
 		goto fail;
 
 	/* Allocate pointers to the ring cache */
-	dev->ring_cache = kcalloc(XHCI_MAX_RINGS_CACHED,
-				  sizeof(struct xhci_ring *),
-				  flags);
+	dev->ring_cache = kzalloc(
+			sizeof(struct xhci_ring *)*XHCI_MAX_RINGS_CACHED,
+			flags);
 	if (!dev->ring_cache)
 		goto fail;
 	dev->num_rings_cached = 0;
@@ -1730,12 +1730,12 @@ static int scratchpad_alloc(struct xhci_hcd *xhci, gfp_t flags)
 	if (!xhci->scratchpad->sp_array)
 		goto fail_sp2;
 
-	xhci->scratchpad->sp_buffers = kcalloc(num_sp, sizeof(void *), flags);
+	xhci->scratchpad->sp_buffers = kzalloc(sizeof(void *) * num_sp, flags);
 	if (!xhci->scratchpad->sp_buffers)
 		goto fail_sp3;
 
 	xhci->scratchpad->sp_dma_buffers =
-		kcalloc(num_sp, sizeof(dma_addr_t), flags);
+		kzalloc(sizeof(dma_addr_t) * num_sp, flags);
 
 	if (!xhci->scratchpad->sp_dma_buffers)
 		goto fail_sp4;
@@ -2382,12 +2382,11 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
 	u32 cap_start;
 
 	num_ports = HCS_MAX_PORTS(xhci->hcs_params1);
-	xhci->port_array = kcalloc(num_ports, sizeof(*xhci->port_array),
-				   flags);
+	xhci->port_array = kzalloc(sizeof(*xhci->port_array)*num_ports, flags);
 	if (!xhci->port_array)
 		return -ENOMEM;
 
-	xhci->rh_bw = kcalloc(num_ports, sizeof(*xhci->rh_bw), flags);
+	xhci->rh_bw = kzalloc(sizeof(*xhci->rh_bw)*num_ports, flags);
 	if (!xhci->rh_bw)
 		return -ENOMEM;
 	for (i = 0; i < num_ports; i++) {
@@ -2414,7 +2413,7 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
 						      XHCI_EXT_CAPS_PROTOCOL);
 	}
 
-	xhci->ext_caps = kcalloc(cap_count, sizeof(*xhci->ext_caps), flags);
+	xhci->ext_caps = kzalloc(sizeof(*xhci->ext_caps) * cap_count, flags);
 	if (!xhci->ext_caps)
 		return -ENOMEM;
 
@@ -2456,9 +2455,8 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
 	 * Not sure how the USB core will handle a hub with no ports...
 	 */
 	if (xhci->num_usb2_ports) {
-		xhci->usb2_ports = kmalloc_array(xhci->num_usb2_ports,
-						 sizeof(*xhci->usb2_ports),
-						 flags);
+		xhci->usb2_ports = kmalloc(sizeof(*xhci->usb2_ports)*
+				xhci->num_usb2_ports, flags);
 		if (!xhci->usb2_ports)
 			return -ENOMEM;
 
@@ -2482,9 +2480,8 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
 		}
 	}
 	if (xhci->num_usb3_ports) {
-		xhci->usb3_ports = kmalloc_array(xhci->num_usb3_ports,
-						 sizeof(*xhci->usb3_ports),
-						 flags);
+		xhci->usb3_ports = kmalloc(sizeof(*xhci->usb3_ports)*
+				xhci->num_usb3_ports, flags);
 		if (!xhci->usb3_ports)
 			return -ENOMEM;
 

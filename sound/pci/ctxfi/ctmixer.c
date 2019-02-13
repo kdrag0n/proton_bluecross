@@ -910,14 +910,13 @@ static int ct_mixer_get_mem(struct ct_mixer **rmixer)
 	if (!mixer)
 		return -ENOMEM;
 
-	mixer->amixers = kcalloc(NUM_CT_AMIXERS * CHN_NUM, sizeof(void *),
+	mixer->amixers = kzalloc(sizeof(void *)*(NUM_CT_AMIXERS*CHN_NUM),
 				 GFP_KERNEL);
 	if (!mixer->amixers) {
 		err = -ENOMEM;
 		goto error1;
 	}
-	mixer->sums = kcalloc(NUM_CT_SUMS * CHN_NUM, sizeof(void *),
-			      GFP_KERNEL);
+	mixer->sums = kzalloc(sizeof(void *)*(NUM_CT_SUMS*CHN_NUM), GFP_KERNEL);
 	if (!mixer->sums) {
 		err = -ENOMEM;
 		goto error2;

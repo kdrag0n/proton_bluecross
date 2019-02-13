@@ -161,10 +161,8 @@ static int msm_vidc_load_reg_table(struct msm_vidc_platform_resources *res)
 		return rc;
 	}
 
-	reg_set->reg_tbl = devm_kcalloc(&pdev->dev,
-					reg_set->count,
-					sizeof(*(reg_set->reg_tbl)),
-					GFP_KERNEL);
+	reg_set->reg_tbl = devm_kzalloc(&pdev->dev, reg_set->count *
+			sizeof(*(reg_set->reg_tbl)), GFP_KERNEL);
 	if (!reg_set->reg_tbl) {
 		dprintk(VIDC_ERR, "%s Failed to alloc register table\n",
 			__func__);
@@ -212,9 +210,8 @@ static int msm_vidc_load_qdss_table(struct msm_vidc_platform_resources *res)
 		return rc;
 	}
 
-	qdss_addr_set->addr_tbl = devm_kcalloc(&pdev->dev,
-			qdss_addr_set->count,
-			sizeof(*qdss_addr_set->addr_tbl),
+	qdss_addr_set->addr_tbl = devm_kzalloc(&pdev->dev,
+			qdss_addr_set->count * sizeof(*qdss_addr_set->addr_tbl),
 			GFP_KERNEL);
 	if (!qdss_addr_set->addr_tbl) {
 		dprintk(VIDC_ERR, "%s Failed to alloc register table\n",
@@ -254,8 +251,8 @@ static int msm_vidc_load_subcache_info(struct msm_vidc_platform_resources *res)
 		goto err_load_subcache_table_fail;
 	}
 
-	subcaches->subcache_tbl = devm_kcalloc(&pdev->dev,
-		num_subcaches, sizeof(*subcaches->subcache_tbl), GFP_KERNEL);
+	subcaches->subcache_tbl = devm_kzalloc(&pdev->dev,
+		sizeof(*subcaches->subcache_tbl) * num_subcaches, GFP_KERNEL);
 	if (!subcaches->subcache_tbl) {
 		dprintk(VIDC_ERR,
 			"Failed to allocate memory for subcache tbl\n");
@@ -321,7 +318,7 @@ int msm_vidc_load_u32_table(struct platform_device *pdev,
 	}
 	num_elemts /= struct_size / sizeof(u32);
 
-	ptbl = devm_kcalloc(&pdev->dev, struct_size, num_elemts, GFP_KERNEL);
+	ptbl = devm_kzalloc(&pdev->dev, num_elemts * struct_size, GFP_KERNEL);
 	if (!ptbl) {
 		dprintk(VIDC_ERR, "Failed to alloc table %s\n", table_name);
 		return -ENOMEM;
@@ -485,8 +482,8 @@ static int msm_vidc_load_buffer_usage_table(
 		return 0;
 	}
 
-	buffer_usage_set->buffer_usage_tbl = devm_kcalloc(&pdev->dev,
-			buffer_usage_set->count,
+	buffer_usage_set->buffer_usage_tbl = devm_kzalloc(&pdev->dev,
+			buffer_usage_set->count *
 			sizeof(*buffer_usage_set->buffer_usage_tbl),
 			GFP_KERNEL);
 	if (!buffer_usage_set->buffer_usage_tbl) {
@@ -541,9 +538,9 @@ static int msm_vidc_load_regulator_table(
 		reg_count++;
 	}
 
-	regulators->regulator_tbl = devm_kcalloc(&pdev->dev,
-			reg_count, sizeof(*regulators->regulator_tbl),
-			GFP_KERNEL);
+	regulators->regulator_tbl = devm_kzalloc(&pdev->dev,
+			sizeof(*regulators->regulator_tbl) *
+			reg_count, GFP_KERNEL);
 
 	if (!regulators->regulator_tbl) {
 		rc = -ENOMEM;
@@ -625,9 +622,8 @@ static int msm_vidc_load_clock_table(
 		goto err_load_clk_table_fail;
 	}
 
-	clock_props = devm_kcalloc(&pdev->dev,
-				   num_clocks, sizeof(*clock_props),
-				   GFP_KERNEL);
+	clock_props = devm_kzalloc(&pdev->dev, num_clocks *
+			sizeof(*clock_props), GFP_KERNEL);
 	if (!clock_props) {
 		dprintk(VIDC_ERR, "No memory to read clock properties\n");
 		rc = -ENOMEM;
@@ -642,10 +638,8 @@ static int msm_vidc_load_clock_table(
 		goto err_load_clk_prop_fail;
 	}
 
-	clocks->clock_tbl = devm_kcalloc(&pdev->dev,
-					 num_clocks,
-					 sizeof(*clocks->clock_tbl),
-					 GFP_KERNEL);
+	clocks->clock_tbl = devm_kzalloc(&pdev->dev, sizeof(*clocks->clock_tbl)
+			* num_clocks, GFP_KERNEL);
 	if (!clocks->clock_tbl) {
 		dprintk(VIDC_ERR, "Failed to allocate memory for clock tbl\n");
 		rc = -ENOMEM;

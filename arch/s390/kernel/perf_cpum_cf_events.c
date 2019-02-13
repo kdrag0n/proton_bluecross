@@ -274,7 +274,7 @@ static __init struct attribute **merge_attr(struct attribute **a,
 		j++;
 	j++;
 
-	new = kmalloc_array(j, sizeof(struct attribute *), GFP_KERNEL);
+	new = kmalloc(sizeof(struct attribute *) * j, GFP_KERNEL);
 	if (!new)
 		return NULL;
 	j = 0;

@@ -711,9 +711,8 @@ skip_sync:
 		uadev[card_num].num_intf =
 			subs->dev->config->desc.bNumInterfaces;
 		uadev[card_num].info =
-			kcalloc(uadev[card_num].num_intf,
-				sizeof(struct intf_info),
-				GFP_KERNEL);
+			kzalloc(sizeof(struct intf_info) *
+			uadev[card_num].num_intf, GFP_KERNEL);
 		if (!uadev[card_num].info) {
 			ret = -ENOMEM;
 			goto unmap_sync;

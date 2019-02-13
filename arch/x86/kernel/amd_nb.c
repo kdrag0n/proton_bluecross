@@ -74,7 +74,7 @@ int amd_cache_northbridges(void)
 	if (!i)
 		return -ENODEV;
 
-	nb = kcalloc(i, sizeof(struct amd_northbridge), GFP_KERNEL);
+	nb = kzalloc(i * sizeof(struct amd_northbridge), GFP_KERNEL);
 	if (!nb)
 		return -ENOMEM;
 
@@ -226,7 +226,7 @@ static void amd_cache_gart(void)
 	if (!amd_nb_has_feature(AMD_NB_GART))
 		return;
 
-	flush_words = kmalloc_array(amd_nb_num(), sizeof(u32), GFP_KERNEL);
+	flush_words = kmalloc(amd_nb_num() * sizeof(u32), GFP_KERNEL);
 	if (!flush_words) {
 		amd_northbridges.flags &= ~AMD_NB_GART;
 		pr_notice("Cannot initialize GART flush words, GART support disabled\n");

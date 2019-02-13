@@ -21,7 +21,6 @@
  */
 
 #include <linux/ioctl.h>
-#include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/videodev2.h>
@@ -582,14 +581,13 @@ v4l2_subdev_alloc_pad_config(struct v4l2_subdev *sd)
 	if (!sd->entity.num_pads)
 		return NULL;
 
-	cfg = kvmalloc_array(sd->entity.num_pads, sizeof(*cfg),
-			     GFP_KERNEL | __GFP_ZERO);
+	cfg = kcalloc(sd->entity.num_pads, sizeof(*cfg), GFP_KERNEL);
 	if (!cfg)
 		return NULL;
 
 	ret = v4l2_subdev_call(sd, pad, init_cfg, cfg);
 	if (ret < 0 && ret != -ENOIOCTLCMD) {
-		kvfree(cfg);
+		kfree(cfg);
 		return NULL;
 	}
 
@@ -599,7 +597,7 @@ EXPORT_SYMBOL_GPL(v4l2_subdev_alloc_pad_config);
 
 void v4l2_subdev_free_pad_config(struct v4l2_subdev_pad_config *cfg)
 {
-	kvfree(cfg);
+	kfree(cfg);
 }
 EXPORT_SYMBOL_GPL(v4l2_subdev_free_pad_config);
 #endif /* CONFIG_MEDIA_CONTROLLER */

@@ -247,9 +247,8 @@ p9pdu_vreadf(struct p9_fcall *pdu, int proto_version, const char *fmt,
 								"w", nwname);
 				if (!errcode) {
 					*wnames =
-					    kmalloc_array(*nwname,
-							  sizeof(char *),
-							  GFP_NOFS);
+					    kmalloc(sizeof(char *) * *nwname,
+						    GFP_NOFS);
 					if (!*wnames)
 						errcode = -ENOMEM;
 				}
@@ -291,9 +290,9 @@ p9pdu_vreadf(struct p9_fcall *pdu, int proto_version, const char *fmt,
 				    p9pdu_readf(pdu, proto_version, "w", nwqid);
 				if (!errcode) {
 					*wqids =
-					    kmalloc_array(*nwqid,
-							  sizeof(struct p9_qid),
-							  GFP_NOFS);
+					    kmalloc(*nwqid *
+						    sizeof(struct p9_qid),
+						    GFP_NOFS);
 					if (*wqids == NULL)
 						errcode = -ENOMEM;
 				}

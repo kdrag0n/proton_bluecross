@@ -3387,19 +3387,20 @@ int dvb_dmx_init(struct dvb_demux *dvbdemux)
 
 	dvbdemux->cnt_storage = NULL;
 	dvbdemux->users = 0;
-	dvbdemux->filter = vmalloc(array_size(sizeof(struct dvb_demux_filter), dvbdemux->filternum));
+	dvbdemux->filter = vmalloc(dvbdemux->filternum * sizeof(struct dvb_demux_filter));
 
 	if (!dvbdemux->filter)
 		return -ENOMEM;
 
-	dvbdemux->feed = vmalloc(array_size(sizeof(struct dvb_demux_feed), dvbdemux->feednum));
+	dvbdemux->feed = vmalloc(dvbdemux->feednum * sizeof(struct dvb_demux_feed));
 	if (!dvbdemux->feed) {
 		vfree(dvbdemux->filter);
 		dvbdemux->filter = NULL;
 		return -ENOMEM;
 	}
 
-	dvbdemux->rec_info_pool = vmalloc(array_size(sizeof(struct dvb_demux_rec_info), dvbdemux->feednum));
+	dvbdemux->rec_info_pool = vmalloc(dvbdemux->feednum *
+		sizeof(struct dvb_demux_rec_info));
 	if (!dvbdemux->rec_info_pool) {
 		vfree(dvbdemux->feed);
 		vfree(dvbdemux->filter);

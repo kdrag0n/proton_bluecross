@@ -486,7 +486,7 @@ int mlx4_init_resource_tracker(struct mlx4_dev *dev)
 	int max_vfs_guarantee_counter = get_max_gauranteed_vfs_counter(dev);
 
 	priv->mfunc.master.res_tracker.slave_list =
-		kcalloc(dev->num_slaves, sizeof(struct slave_list),
+		kzalloc(dev->num_slaves * sizeof(struct slave_list),
 			GFP_KERNEL);
 	if (!priv->mfunc.master.res_tracker.slave_list)
 		return -ENOMEM;
@@ -506,20 +506,19 @@ int mlx4_init_resource_tracker(struct mlx4_dev *dev)
 	for (i = 0; i < MLX4_NUM_OF_RESOURCE_TYPE; i++) {
 		struct resource_allocator *res_alloc =
 			&priv->mfunc.master.res_tracker.res_alloc[i];
-		res_alloc->quota = kmalloc_array(dev->persist->num_vfs + 1,
-						 sizeof(int),
-						 GFP_KERNEL);
-		res_alloc->guaranteed = kmalloc_array(dev->persist->num_vfs + 1,
-						      sizeof(int),
-						      GFP_KERNEL);
+		res_alloc->quota = kmalloc((dev->persist->num_vfs + 1) *
+					   sizeof(int), GFP_KERNEL);
+		res_alloc->guaranteed = kmalloc((dev->persist->num_vfs + 1) *
+						sizeof(int), GFP_KERNEL);
 		if (i == RES_MAC || i == RES_VLAN)
-			res_alloc->allocated = kcalloc(MLX4_MAX_PORTS * (dev->persist->num_vfs + 1),
-						       sizeof(int),
-						       GFP_KERNEL);
+			res_alloc->allocated = kzalloc(MLX4_MAX_PORTS *
+						       (dev->persist->num_vfs
+						       + 1) *
+						       sizeof(int), GFP_KERNEL);
 		else
-			res_alloc->allocated = kcalloc(dev->persist->num_vfs + 1,
-						       sizeof(int),
-						       GFP_KERNEL);
+			res_alloc->allocated = kzalloc((dev->persist->
+							num_vfs + 1) *
+						       sizeof(int), GFP_KERNEL);
 		/* Reduce the sink counter */
 		if (i == RES_COUNTER)
 			res_alloc->res_free = dev->caps.max_counters - 1;
@@ -1234,7 +1233,7 @@ static int add_res_range(struct mlx4_dev *dev, int slave, u64 base, int count,
 	struct mlx4_resource_tracker *tracker = &priv->mfunc.master.res_tracker;
 	struct rb_root *root = &tracker->res_tree[type];
 
-	res_arr = kcalloc(count, sizeof(*res_arr), GFP_KERNEL);
+	res_arr = kzalloc(count * sizeof *res_arr, GFP_KERNEL);
 	if (!res_arr)
 		return -ENOMEM;
 

@@ -729,7 +729,7 @@ static struct urb **alloc_urbs(struct snd_usb_caiaqdev *cdev, int dir, int *ret)
 		usb_sndisocpipe(usb_dev, ENDPOINT_PLAYBACK) :
 		usb_rcvisocpipe(usb_dev, ENDPOINT_CAPTURE);
 
-	urbs = kmalloc_array(N_URBS, sizeof(*urbs), GFP_KERNEL);
+	urbs = kmalloc(N_URBS * sizeof(*urbs), GFP_KERNEL);
 	if (!urbs) {
 		dev_err(dev, "unable to kmalloc() urbs, OOM!?\n");
 		*ret = -ENOMEM;
@@ -744,8 +744,7 @@ static struct urb **alloc_urbs(struct snd_usb_caiaqdev *cdev, int dir, int *ret)
 		}
 
 		urbs[i]->transfer_buffer =
-			kmalloc_array(BYTES_PER_FRAME, FRAMES_PER_URB,
-				      GFP_KERNEL);
+			kmalloc(FRAMES_PER_URB * BYTES_PER_FRAME, GFP_KERNEL);
 		if (!urbs[i]->transfer_buffer) {
 			dev_err(dev, "unable to kmalloc() transfer buffer, OOM!?\n");
 			*ret = -ENOMEM;
@@ -861,7 +860,7 @@ int snd_usb_caiaq_audio_init(struct snd_usb_caiaqdev *cdev)
 				&snd_usb_caiaq_ops);
 
 	cdev->data_cb_info =
-		kmalloc_array(N_URBS, sizeof(struct snd_usb_caiaq_cb_info),
+		kmalloc(sizeof(struct snd_usb_caiaq_cb_info) * N_URBS,
 					GFP_KERNEL);
 
 	if (!cdev->data_cb_info)

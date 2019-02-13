@@ -240,7 +240,7 @@ static int of_read_clocks(struct device *dev, struct clk ***clks_ref,
 		return -EINVAL;
 	}
 
-	clks = devm_kcalloc(dev, clk_count, sizeof(struct clk *),
+	clks = devm_kzalloc(dev, sizeof(struct clk *) * clk_count,
 				GFP_KERNEL);
 	if (!clks)
 		return -ENOMEM;
@@ -299,7 +299,7 @@ static int of_read_regs(struct device *dev, struct reg_info **regs_ref,
 		return -EINVAL;
 	}
 
-	regs = devm_kcalloc(dev, reg_count, sizeof(struct reg_info),
+	regs = devm_kzalloc(dev, sizeof(struct reg_info) * reg_count,
 				GFP_KERNEL);
 	if (!regs)
 		return -ENOMEM;

@@ -196,9 +196,8 @@ static int32_t cam_actuator_driver_i2c_probe(struct i2c_client *client,
 
 	a_ctrl->i2c_data.per_frame =
 		(struct i2c_settings_array *)
-		kcalloc(MAX_PER_FRAME_ARRAY,
-			sizeof(struct i2c_settings_array),
-			GFP_KERNEL);
+		kzalloc(sizeof(struct i2c_settings_array) *
+		MAX_PER_FRAME_ARRAY, GFP_KERNEL);
 	if (a_ctrl->i2c_data.per_frame == NULL) {
 		rc = -ENOMEM;
 		goto unreg_subdev;
@@ -374,9 +373,8 @@ static int32_t cam_actuator_driver_platform_probe(
 
 	a_ctrl->i2c_data.per_frame =
 		(struct i2c_settings_array *)
-		kcalloc(MAX_PER_FRAME_ARRAY,
-			sizeof(struct i2c_settings_array),
-			GFP_KERNEL);
+		kzalloc(sizeof(struct i2c_settings_array) *
+		MAX_PER_FRAME_ARRAY, GFP_KERNEL);
 	if (a_ctrl->i2c_data.per_frame == NULL) {
 		rc = -ENOMEM;
 		goto free_soc;

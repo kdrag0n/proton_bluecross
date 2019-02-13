@@ -27,7 +27,6 @@
 #include <linux/ratelimit.h>
 #include <linux/uidgid.h>
 #include <linux/gfp.h>
-#include <linux/overflow.h>
 #include <asm/device.h>
 
 struct device;
@@ -670,12 +669,9 @@ static inline void *devm_kzalloc(struct device *dev, size_t size, gfp_t gfp)
 static inline void *devm_kmalloc_array(struct device *dev,
 				       size_t n, size_t size, gfp_t flags)
 {
-	size_t bytes;
-
-	if (unlikely(check_mul_overflow(n, size, &bytes)))
+	if (size != 0 && n > SIZE_MAX / size)
 		return NULL;
-
-	return devm_kmalloc(dev, bytes, flags);
+	return devm_kmalloc(dev, n * size, flags);
 }
 static inline void *devm_kcalloc(struct device *dev,
 				 size_t n, size_t size, gfp_t flags)

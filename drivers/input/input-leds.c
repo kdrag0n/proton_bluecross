@@ -98,7 +98,8 @@ static int input_leds_connect(struct input_handler *handler,
 	if (!num_leds)
 		return -ENXIO;
 
-	leds = kzalloc(struct_size(leds, leds, num_leds), GFP_KERNEL);
+	leds = kzalloc(sizeof(*leds) + num_leds * sizeof(*leds->leds),
+		       GFP_KERNEL);
 	if (!leds)
 		return -ENOMEM;
 

@@ -244,9 +244,8 @@ struct ib_fmr_pool *ib_create_fmr_pool(struct ib_pd             *pd,
 
 	if (params->cache) {
 		pool->cache_bucket =
-			kmalloc_array(IB_FMR_HASH_SIZE,
-				      sizeof(*pool->cache_bucket),
-				      GFP_KERNEL);
+			kmalloc(IB_FMR_HASH_SIZE * sizeof *pool->cache_bucket,
+				GFP_KERNEL);
 		if (!pool->cache_bucket) {
 			pr_warn(PFX "Failed to allocate cache in pool\n");
 			ret = -ENOMEM;

@@ -1139,9 +1139,8 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	}
 
 	num_slaves = twl_get_num_slaves();
-	twl_priv->twl_modules = devm_kcalloc(&client->dev,
-					 num_slaves,
-					 sizeof(struct twl_client),
+	twl_priv->twl_modules = devm_kzalloc(&client->dev,
+					 sizeof(struct twl_client) * num_slaves,
 					 GFP_KERNEL);
 	if (!twl_priv->twl_modules) {
 		status = -ENOMEM;

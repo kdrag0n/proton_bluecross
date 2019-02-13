@@ -82,7 +82,8 @@ int module_frob_arch_sections(Elf_Ehdr *hdr, Elf_Shdr *sechdrs,
 
 	/* Allocate room for one syminfo structure per symbol. */
 	module->arch.nsyms = symtab->sh_size / sizeof(Elf_Sym);
-	module->arch.syminfo = vmalloc(array_size(sizeof(struct mod_arch_syminfo), module->arch.nsyms));
+	module->arch.syminfo = vmalloc(module->arch.nsyms
+				   * sizeof(struct mod_arch_syminfo));
 	if (!module->arch.syminfo)
 		return -ENOMEM;
 

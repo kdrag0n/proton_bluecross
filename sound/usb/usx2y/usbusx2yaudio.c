@@ -438,9 +438,7 @@ static int usX2Y_urbs_allocate(struct snd_usX2Y_substream *subs)
 		}
 		if (!is_playback && !(*purb)->transfer_buffer) {
 			/* allocate a capture buffer per urb */
-			(*purb)->transfer_buffer = kmalloc_array(subs->maxpacksize,
-								 nr_of_packs(),
-								 GFP_KERNEL);
+			(*purb)->transfer_buffer = kmalloc(subs->maxpacksize * nr_of_packs(), GFP_KERNEL);
 			if (NULL == (*purb)->transfer_buffer) {
 				usX2Y_urbs_release(subs);
 				return -ENOMEM;
@@ -666,8 +664,7 @@ static int usX2Y_rate_set(struct usX2Ydev *usX2Y, int rate)
 			err = -ENOMEM;
 			goto cleanup;
 		}
-		usbdata = kmalloc_array(NOOF_SETRATE_URBS, sizeof(int),
-					GFP_KERNEL);
+		usbdata = kmalloc(sizeof(int) * NOOF_SETRATE_URBS, GFP_KERNEL);
 		if (NULL == usbdata) {
 			err = -ENOMEM;
 			goto cleanup;

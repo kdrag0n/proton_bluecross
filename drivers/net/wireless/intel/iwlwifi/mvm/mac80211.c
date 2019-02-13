@@ -2853,7 +2853,9 @@ static int iwl_mvm_mac_set_key(struct ieee80211_hw *hw,
 
 			mvmsta = iwl_mvm_sta_from_mac80211(sta);
 			WARN_ON(rcu_access_pointer(mvmsta->ptk_pn[keyidx]));
-			ptk_pn = kzalloc(struct_size(ptk_pn, q, mvm->trans->num_rx_queues),
+			ptk_pn = kzalloc(sizeof(*ptk_pn) +
+					 mvm->trans->num_rx_queues *
+						sizeof(ptk_pn->q[0]),
 					 GFP_KERNEL);
 			if (!ptk_pn) {
 				ret = -ENOMEM;

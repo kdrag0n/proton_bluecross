@@ -83,7 +83,7 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev,
 	if (count < 0) {
 		return NULL;
 	} else if (count > 0) {
-		resources = kcalloc(count, sizeof(struct resource),
+		resources = kzalloc(count * sizeof(struct resource),
 				    GFP_KERNEL);
 		if (!resources) {
 			dev_err(&adev->dev, "No memory for resources\n");

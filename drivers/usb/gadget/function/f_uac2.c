@@ -1224,7 +1224,7 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 	if (agdev->enable_capture) {
 		prm = &agdev->uac2.c_prm;
 		prm->max_psize = hs_epout_desc.wMaxPacketSize;
-		prm->rbuf = kcalloc(prm->max_psize, USB_XFERS, GFP_KERNEL);
+		prm->rbuf = kzalloc(prm->max_psize * USB_XFERS, GFP_KERNEL);
 		if (!prm->rbuf) {
 			prm->max_psize = 0;
 			goto err_free_descs;
@@ -1233,7 +1233,7 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 
 	prm = &agdev->uac2.p_prm;
 	prm->max_psize = hs_epin_desc.wMaxPacketSize;
-	prm->rbuf = kcalloc(prm->max_psize, USB_XFERS, GFP_KERNEL);
+	prm->rbuf = kzalloc(prm->max_psize * USB_XFERS, GFP_KERNEL);
 	if (!prm->rbuf) {
 		prm->max_psize = 0;
 		goto err;

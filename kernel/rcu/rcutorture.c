@@ -842,7 +842,8 @@ rcu_torture_cbflood(void *arg)
 	    cbflood_intra_holdoff > 0 &&
 	    cur_ops->call &&
 	    cur_ops->cb_barrier) {
-		rhp = vmalloc(array3_size(cbflood_n_burst, cbflood_n_per_burst, sizeof(*rhp)));
+		rhp = vmalloc(sizeof(*rhp) *
+			      cbflood_n_burst * cbflood_n_per_burst);
 		err = !rhp;
 	}
 	if (err) {
@@ -1544,10 +1545,10 @@ static int rcu_torture_barrier_init(void)
 	atomic_set(&barrier_cbs_count, 0);
 	atomic_set(&barrier_cbs_invoked, 0);
 	barrier_cbs_tasks =
-		kcalloc(n_barrier_cbs, sizeof(barrier_cbs_tasks[0]),
+		kzalloc(n_barrier_cbs * sizeof(barrier_cbs_tasks[0]),
 			GFP_KERNEL);
 	barrier_cbs_wq =
-		kcalloc(n_barrier_cbs, sizeof(barrier_cbs_wq[0]),
+		kzalloc(n_barrier_cbs * sizeof(barrier_cbs_wq[0]),
 			GFP_KERNEL);
 	if (barrier_cbs_tasks == NULL || !barrier_cbs_wq)
 		return -ENOMEM;
@@ -1786,7 +1787,7 @@ rcu_torture_init(void)
 	if (firsterr)
 		goto unwind;
 	if (nfakewriters > 0) {
-		fakewriter_tasks = kcalloc(nfakewriters,
+		fakewriter_tasks = kzalloc(nfakewriters *
 					   sizeof(fakewriter_tasks[0]),
 					   GFP_KERNEL);
 		if (fakewriter_tasks == NULL) {
@@ -1801,7 +1802,7 @@ rcu_torture_init(void)
 		if (firsterr)
 			goto unwind;
 	}
-	reader_tasks = kcalloc(nrealreaders, sizeof(reader_tasks[0]),
+	reader_tasks = kzalloc(nrealreaders * sizeof(reader_tasks[0]),
 			       GFP_KERNEL);
 	if (reader_tasks == NULL) {
 		VERBOSE_TOROUT_ERRSTRING("out of memory");

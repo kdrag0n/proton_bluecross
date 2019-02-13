@@ -1246,7 +1246,7 @@ static int macvtap_queue_resize(struct macvlan_dev *vlan)
 	int n = vlan->numqueues;
 	int ret, i = 0;
 
-	arrays = kmalloc_array(n, sizeof(*arrays), GFP_KERNEL);
+	arrays = kmalloc(sizeof *arrays * n, GFP_KERNEL);
 	if (!arrays)
 		return -ENOMEM;
 

@@ -3163,7 +3163,7 @@ static int copy_translation_tables(struct intel_iommu *iommu)
 	/* This is too big for the stack - allocate it from slab */
 	ctxt_table_entries = ext ? 512 : 256;
 	ret = -ENOMEM;
-	ctxt_tbls = kcalloc(ctxt_table_entries, sizeof(void *), GFP_KERNEL);
+	ctxt_tbls = kzalloc(ctxt_table_entries * sizeof(void *), GFP_KERNEL);
 	if (!ctxt_tbls)
 		goto out_unmap;
 
@@ -3254,7 +3254,7 @@ static int __init init_dmars(void)
 		struct deferred_flush_data *dfd = per_cpu_ptr(&deferred_flush,
 							      cpu);
 
-		dfd->tables = kcalloc(g_num_of_iommus,
+		dfd->tables = kzalloc(g_num_of_iommus *
 				      sizeof(struct deferred_flush_table),
 				      GFP_KERNEL);
 		if (!dfd->tables) {
@@ -4182,7 +4182,7 @@ static int iommu_suspend(void)
 	unsigned long flag;
 
 	for_each_active_iommu(iommu, drhd) {
-		iommu->iommu_state = kcalloc(MAX_SR_DMAR_REGS, sizeof(u32),
+		iommu->iommu_state = kzalloc(sizeof(u32) * MAX_SR_DMAR_REGS,
 						 GFP_ATOMIC);
 		if (!iommu->iommu_state)
 			goto nomem;

@@ -1073,12 +1073,12 @@ nct6775_create_attr_group(struct device *dev,
 	if (group == NULL)
 		return ERR_PTR(-ENOMEM);
 
-	attrs = devm_kcalloc(dev, repeat * count + 1, sizeof(*attrs),
+	attrs = devm_kzalloc(dev, sizeof(*attrs) * (repeat * count + 1),
 			     GFP_KERNEL);
 	if (attrs == NULL)
 		return ERR_PTR(-ENOMEM);
 
-	su = devm_kzalloc(dev, array3_size(repeat, count, sizeof(*su)),
+	su = devm_kzalloc(dev, sizeof(*su) * repeat * count,
 			       GFP_KERNEL);
 	if (su == NULL)
 		return ERR_PTR(-ENOMEM);

@@ -272,8 +272,7 @@ static int find_boot_record(struct INFTLrecord *inftl)
 		inftl->nb_blocks = ip->lastUnit + 1;
 
 		/* Memory alloc */
-		inftl->PUtable = kmalloc_array(inftl->nb_blocks, sizeof(u16),
-					       GFP_KERNEL);
+		inftl->PUtable = kmalloc(inftl->nb_blocks * sizeof(u16), GFP_KERNEL);
 		if (!inftl->PUtable) {
 			printk(KERN_WARNING "INFTL: allocation of PUtable "
 				"failed (%zd bytes)\n",
@@ -281,8 +280,7 @@ static int find_boot_record(struct INFTLrecord *inftl)
 			return -ENOMEM;
 		}
 
-		inftl->VUtable = kmalloc_array(inftl->nb_blocks, sizeof(u16),
-					       GFP_KERNEL);
+		inftl->VUtable = kmalloc(inftl->nb_blocks * sizeof(u16), GFP_KERNEL);
 		if (!inftl->VUtable) {
 			kfree(inftl->PUtable);
 			printk(KERN_WARNING "INFTL: allocation of VUtable "

@@ -1045,9 +1045,8 @@ EXPORT_SYMBOL(shdma_cleanup);
 
 static int __init shdma_enter(void)
 {
-	shdma_slave_used = kcalloc(DIV_ROUND_UP(slave_num, BITS_PER_LONG),
-				   sizeof(long),
-				   GFP_KERNEL);
+	shdma_slave_used = kzalloc(DIV_ROUND_UP(slave_num, BITS_PER_LONG) *
+				    sizeof(long), GFP_KERNEL);
 	if (!shdma_slave_used)
 		return -ENOMEM;
 	return 0;

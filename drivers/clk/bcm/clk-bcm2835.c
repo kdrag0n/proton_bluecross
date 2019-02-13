@@ -681,7 +681,7 @@ static int bcm2835_pll_debug_init(struct clk_hw *hw,
 	const struct bcm2835_pll_data *data = pll->data;
 	struct debugfs_reg32 *regs;
 
-	regs = devm_kcalloc(cprman->dev, 7, sizeof(*regs), GFP_KERNEL);
+	regs = devm_kzalloc(cprman->dev, 7 * sizeof(*regs), GFP_KERNEL);
 	if (!regs)
 		return -ENOMEM;
 
@@ -812,7 +812,7 @@ static int bcm2835_pll_divider_debug_init(struct clk_hw *hw,
 	const struct bcm2835_pll_divider_data *data = divider->data;
 	struct debugfs_reg32 *regs;
 
-	regs = devm_kcalloc(cprman->dev, 7, sizeof(*regs), GFP_KERNEL);
+	regs = devm_kzalloc(cprman->dev, 7 * sizeof(*regs), GFP_KERNEL);
 	if (!regs)
 		return -ENOMEM;
 
@@ -1868,8 +1868,8 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 	size_t i;
 	int ret;
 
-	cprman = devm_kzalloc(dev,
-			      CHECKME_struct_size(&*cprman, *cprman->onecell.hws, asize),
+	cprman = devm_kzalloc(dev, sizeof(*cprman) +
+			      sizeof(*cprman->onecell.hws) * asize,
 			      GFP_KERNEL);
 	if (!cprman)
 		return -ENOMEM;

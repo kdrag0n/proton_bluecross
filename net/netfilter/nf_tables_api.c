@@ -4859,8 +4859,8 @@ static int __init nf_tables_module_init(void)
 {
 	int err;
 
-	info = kmalloc_array(NFT_RULE_MAXEXPRS, sizeof(struct nft_expr_info),
-			     GFP_KERNEL);
+	info = kmalloc(sizeof(struct nft_expr_info) * NFT_RULE_MAXEXPRS,
+		       GFP_KERNEL);
 	if (info == NULL) {
 		err = -ENOMEM;
 		goto err1;

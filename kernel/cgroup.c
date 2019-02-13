@@ -4491,9 +4491,9 @@ struct cgroup_pidlist {
 static void *pidlist_allocate(int count)
 {
 	if (PIDLIST_TOO_LARGE(count))
-		return vmalloc(array_size(count, sizeof(pid_t)));
+		return vmalloc(count * sizeof(pid_t));
 	else
-		return kmalloc_array(count, sizeof(pid_t), GFP_KERNEL);
+		return kmalloc(count * sizeof(pid_t), GFP_KERNEL);
 }
 
 static void pidlist_free(void *p)
@@ -5272,8 +5272,8 @@ static struct cgroup *cgroup_create(struct cgroup *parent)
 	int ret;
 
 	/* allocate the cgroup and its ID, 0 is reserved for the root */
-	cgrp = kzalloc(struct_size(cgrp, ancestor_ids, (level + 1)),
-		       GFP_KERNEL);
+	cgrp = kzalloc(sizeof(*cgrp) +
+		       sizeof(cgrp->ancestor_ids[0]) * (level + 1), GFP_KERNEL);
 	if (!cgrp)
 		return ERR_PTR(-ENOMEM);
 

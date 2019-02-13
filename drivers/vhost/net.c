@@ -174,9 +174,8 @@ static int vhost_net_set_ubuf_info(struct vhost_net *n)
 		zcopy = vhost_net_zcopy_mask & (0x1 << i);
 		if (!zcopy)
 			continue;
-		n->vqs[i].ubuf_info = kmalloc_array(UIO_MAXIOV,
-						    sizeof(*n->vqs[i].ubuf_info),
-						    GFP_KERNEL);
+		n->vqs[i].ubuf_info = kmalloc(sizeof(*n->vqs[i].ubuf_info) *
+					      UIO_MAXIOV, GFP_KERNEL);
 		if  (!n->vqs[i].ubuf_info)
 			goto err;
 	}
@@ -810,7 +809,7 @@ static int vhost_net_open(struct inode *inode, struct file *f)
 		if (!n)
 			return -ENOMEM;
 	}
-	vqs = kmalloc_array(VHOST_NET_VQ_MAX, sizeof(*vqs), GFP_KERNEL);
+	vqs = kmalloc(VHOST_NET_VQ_MAX * sizeof(*vqs), GFP_KERNEL);
 	if (!vqs) {
 		kvfree(n);
 		return -ENOMEM;

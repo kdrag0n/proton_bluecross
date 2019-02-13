@@ -156,7 +156,7 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 		struct scatterlist *sg;
 		int i, j, k = 0;
 
-		buffer->pages = vmalloc(array_size(num_pages, sizeof(struct page *)));
+		buffer->pages = vmalloc(sizeof(struct page *) * num_pages);
 		if (!buffer->pages) {
 			ret = -ENOMEM;
 			goto err;

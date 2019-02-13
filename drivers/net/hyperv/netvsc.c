@@ -73,7 +73,8 @@ static struct netvsc_device *alloc_net_device(void)
 		return NULL;
 	}
 
-	net_device->mrc[0].buf = vzalloc(array_size(NETVSC_RECVSLOT_MAX, sizeof(struct recv_comp_data)));
+	net_device->mrc[0].buf = vzalloc(NETVSC_RECVSLOT_MAX *
+					 sizeof(struct recv_comp_data));
 
 	init_waitqueue_head(&net_device->wait_drain);
 	net_device->destroy = false;

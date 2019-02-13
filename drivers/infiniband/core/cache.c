@@ -1053,16 +1053,16 @@ static void ib_cache_update(struct ib_device *device,
 		goto err;
 	}
 
-	pkey_cache = kmalloc(struct_size(pkey_cache, table, tprops->pkey_tbl_len),
-			     GFP_KERNEL);
+	pkey_cache = kmalloc(sizeof *pkey_cache + tprops->pkey_tbl_len *
+			     sizeof *pkey_cache->table, GFP_KERNEL);
 	if (!pkey_cache)
 		goto err;
 
 	pkey_cache->table_len = tprops->pkey_tbl_len;
 
 	if (!use_roce_gid_table) {
-		gid_cache = kmalloc(struct_size(gid_cache, table, tprops->gid_tbl_len),
-				    GFP_KERNEL);
+		gid_cache = kmalloc(sizeof(*gid_cache) + tprops->gid_tbl_len *
+			    sizeof(*gid_cache->table), GFP_KERNEL);
 		if (!gid_cache)
 			goto err;
 
@@ -1158,12 +1158,12 @@ int ib_cache_setup_one(struct ib_device *device)
 	rwlock_init(&device->cache.lock);
 
 	device->cache.pkey_cache =
-		kcalloc(rdma_end_port(device) - rdma_start_port(device) + 1,
-			sizeof(*device->cache.pkey_cache),
-			GFP_KERNEL);
-	device->cache.lmc_cache = kmalloc_array(rdma_end_port(device) - rdma_start_port(device) + 1,
-						sizeof(*device->cache.lmc_cache),
-						GFP_KERNEL);
+		kzalloc(sizeof *device->cache.pkey_cache *
+			(rdma_end_port(device) - rdma_start_port(device) + 1), GFP_KERNEL);
+	device->cache.lmc_cache = kmalloc(sizeof *device->cache.lmc_cache *
+					  (rdma_end_port(device) -
+					   rdma_start_port(device) + 1),
+					  GFP_KERNEL);
 	if (!device->cache.pkey_cache ||
 	    !device->cache.lmc_cache) {
 		err = -ENOMEM;

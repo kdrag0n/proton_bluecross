@@ -2746,7 +2746,7 @@ int dsi_panel_parse_esd_reg_read_configs(struct dsi_panel *panel,
 	}
 
 	esd_config->status_value =
-		kzalloc(array3_size(sizeof(u32), status_len, esd_config->groups),
+		kzalloc(sizeof(u32) * status_len * esd_config->groups,
 			GFP_KERNEL);
 	if (!esd_config->status_value) {
 		rc = -ENOMEM;

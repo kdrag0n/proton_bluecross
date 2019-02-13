@@ -3070,7 +3070,7 @@ static long kvm_vm_ioctl(struct file *filp,
 			goto out;
 		if (routing.nr) {
 			r = -ENOMEM;
-			entries = vmalloc(array_size(sizeof(*entries), routing.nr));
+			entries = vmalloc(routing.nr * sizeof(*entries));
 			if (!entries)
 				goto out;
 			r = -EFAULT;

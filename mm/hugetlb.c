@@ -2807,8 +2807,7 @@ static int __init hugetlb_init(void)
 	num_fault_mutexes = 1;
 #endif
 	hugetlb_fault_mutex_table =
-		kmalloc_array(num_fault_mutexes, sizeof(struct mutex),
-			      GFP_KERNEL);
+		kmalloc(sizeof(struct mutex) * num_fault_mutexes, GFP_KERNEL);
 	BUG_ON(!hugetlb_fault_mutex_table);
 
 	for (i = 0; i < num_fault_mutexes; i++)

@@ -108,7 +108,7 @@ static int adp5520_led_probe(struct platform_device *pdev)
 		return -EFAULT;
 	}
 
-	led = devm_kcalloc(&pdev->dev, pdata->num_leds, sizeof(*led),
+	led = devm_kzalloc(&pdev->dev, sizeof(*led) * pdata->num_leds,
 				GFP_KERNEL);
 	if (!led)
 		return -ENOMEM;

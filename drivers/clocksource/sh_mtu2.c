@@ -418,7 +418,7 @@ static int sh_mtu2_setup(struct sh_mtu2_device *mtu,
 	/* Allocate and setup the channels. */
 	mtu->num_channels = 3;
 
-	mtu->channels = kcalloc(mtu->num_channels, sizeof(*mtu->channels),
+	mtu->channels = kzalloc(sizeof(*mtu->channels) * mtu->num_channels,
 				GFP_KERNEL);
 	if (mtu->channels == NULL) {
 		ret = -ENOMEM;
