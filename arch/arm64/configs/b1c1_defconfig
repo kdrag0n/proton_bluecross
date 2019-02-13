@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 4.9.155 Kernel Configuration
+# Linux/arm64 4.9.156 Kernel Configuration
 #
 CONFIG_ARM64=y
 CONFIG_64BIT=y
@@ -4947,7 +4947,6 @@ CONFIG_MESSAGE_LOGLEVEL_DEFAULT=4
 #
 # Compile-time checks and compiler options
 #
-CONFIG_OPTIMIZE_INLINING=y
 CONFIG_ENABLE_WARN_DEPRECATED=y
 CONFIG_ENABLE_MUST_CHECK=y
 CONFIG_FRAME_WARN=2048
