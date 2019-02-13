@@ -2342,13 +2342,6 @@ config TRIM_UNUSED_KSYMS
 
 	  If unsure, or if you need to build out-of-tree modules, say N.
 
-config MODULE_STRIPPED
-	bool "Reduce module size"
-	depends on MODULES
-	help
-	  Remove module parameter descriptions, author info, version, aliases,
-	  device tables, etc.
-
 endif # MODULES
 
 config MODULES_TREE_LOOKUP
