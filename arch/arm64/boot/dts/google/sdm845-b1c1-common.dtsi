@@ -116,6 +116,55 @@
 		label = "ramoops";
 		memory-region = <&alt_ramoops_mem>;
 	};
+
+	/* Disable SMP2P Remote Debug for production */
+	qcom,smp2pgpio-rdbg-2-in {
+		status = "disabled";
+	};
+
+	qcom,smp2pgpio_client_rdbg_2_in {
+		status = "disabled";
+	};
+
+	qcom,smp2pgpio-rdbg-2-out {
+		status = "disabled";
+	};
+
+	qcom,smp2pgpio_client_rdbg_2_out {
+		status = "disabled";
+	};
+
+	qcom,smp2pgpio-rdbg-1-in {
+		status = "disabled";
+	};
+
+	qcom,smp2pgpio_client_rdbg_1_in {
+		status = "disabled";
+	};
+
+	qcom,smp2pgpio-rdbg-1-out {
+		status = "disabled";
+	};
+
+	qcom,smp2pgpio_client_rdbg_1_out {
+		status = "disabled";
+	};
+
+	qcom,smp2pgpio-rdbg-5-in {
+		status = "disabled";
+	};
+
+	qcom,smp2pgpio_client_rdbg_5_in {
+		status = "disabled";
+	};
+
+	qcom,smp2pgpio-rdbg-5-out {
+		status = "disabled";
+	};
+
+	qcom,smp2pgpio_client_rdbg_5_out {
+		status = "disabled";
+	};
 };
 
 &ufsphy_mem {
