@@ -35,9 +35,9 @@ if [ -d $ramdisk/.backup ]; then
   ui_print "  • Patching ramdisk"
   patch_cmdline "skip_override" "skip_override"
 
+  chmod +x $TMPDIR/overlay/*.sh
+  mv $TMPDIR/overlay/init.proton.rc $TMPDIR/overlay/init.$(getprop ro.hardware).rc
   mv $TMPDIR/overlay $ramdisk
-  cp /system_root/init.rc $ramdisk/overlay
-  insert_line $ramdisk/overlay/init.rc "init.proton.rc" after "import /init.usb.configfs.rc" "import /init.proton.rc"
 else
   patch_cmdline "skip_override" ""
   ui_print '  ! Magisk is not installed; some tweaks will be missing'

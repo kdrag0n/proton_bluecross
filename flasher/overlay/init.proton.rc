@@ -19,67 +19,11 @@ on property:sys.boot_completed=1
 
 
 # Profiles
-on property:persist.proton.profile=battery
-	setprop proton.big_max 1056000
-	setprop proton.little_max 1516800
-	setprop proton.big_boost 0
-	setprop proton.little_boost 979200
-	setprop proton.boost_duration 64
-	setprop proton.cpu_governor schedutil
-	setprop proton.gpu_governor msm-adreno-tz
-
-on property:persist.proton.profile=balanced
-	setprop proton.big_max 2649600
-	setprop proton.little_max 1766400
-	setprop proton.big_boost 902400
-	setprop proton.little_boost 1056000
-	setprop proton.boost_duration 80
-	setprop proton.cpu_governor schedutil
-	setprop proton.gpu_governor msm-adreno-tz
-
-on property:persist.proton.profile=performance
-	setprop proton.big_max 2803200
-	setprop proton.little_max 1766400
-	setprop proton.big_boost 1363200
-	setprop proton.little_boost 1516800
-	setprop proton.boost_duration 125
-	setprop proton.cpu_governor schedutil
-	setprop proton.gpu_governor msm-adreno-tz
-
-
-# Profile engine
-# Sets the maximum frequency of the big CPU cluster
-on property:proton.big_max=*
-	write /sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq ${proton.big_max}
-
-# Sets the maximum frequency of the little CPU cluster
-on property:proton.little_max=*
-	write /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq ${proton.little_max}
-
-# Sets the input boost frequency of the little CPU cluster
-on property:proton.little_boost=*
-	write /sys/module/cpu_input_boost/parameters/input_boost_freq_lp ${proton.little_boost}
-
-# Sets the input boost frequency of the big CPU cluster
-on property:proton.big_boost=*
-	write /sys/module/cpu_input_boost/parameters/input_boost_freq_hp ${proton.big_boost}
-
-# Sets the length of an input boost
-on property:proton.boost_duration=*
-	write /sys/module/cpu_input_boost/parameters/input_boost_duration ${proton.boost_duration}
-
-# Sets the frequency governor of both CPU clusters
-on property:proton.cpu_governor=*
-	write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ${proton.cpu_governor}
-	write /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor ${proton.cpu_governor}
-
-# Sets the frequency governor of the GPU
-on property:proton.gpu_governor=*
-	write /sys/class/kgsl/kgsl-3d0/devfreq/governor ${proton.cpu_governor}
-
+on property:persist.proton.profile=*
+	exec u:r:magisk:s0 root root -- /init.proton.sh ${persist.proton.profile}
 
 # Profile bridges: Franco Kernel Manager
-# Update the Spectrum profile, that'll be our primary set
+# Update the Spectrum profile setting
 on property:fku.perf.profile=0
 	setprop persist.spectrum.profile 2
 
@@ -91,6 +35,10 @@ on property:fku.perf.profile=2
 
 
 # Profile bridges: Spectrum
+# Battery
+on property:persist.spectrum.profile=2
+	setprop persist.proton.profile battery
+
 # Balanced
 on property:persist.spectrum.profile=0
 	setprop persist.proton.profile balanced
@@ -99,34 +47,19 @@ on property:persist.spectrum.profile=0
 on property:persist.spectrum.profile=1
 	setprop persist.proton.profile performance
 
-# Battery
-on property:persist.spectrum.profile=2
-	setprop persist.proton.profile battery
-
 # Gaming
 on property:persist.spectrum.profile=3
 	setprop persist.proton.profile performance
 
 
 # USB mass storage support
-on property:sys.usb.config=mass_storage && property:sys.usb.configfs=1
-	write /config/usb_gadget/g1/configs/b.1/strings/0x409/configuration "msc"
-	symlink /config/usb_gadget/g1/functions/mass_storage.0 /config/usb_gadget/g1/configs/b.1/f1
-	write /config/usb_gadget/g1/UDC ${sys.usb.controller}
-	setprop sys.usb.state ${sys.usb.config}
+on property:sys.usb.config=mass_storage
+	exec u:r:magisk:s0 root root -- /init.proton.sh usb_msc
 
-on property:sys.usb.config=mass_storage,adb && property:sys.usb.configfs=1
-	start adbd
-
-on property:sys.usb.ffs.ready=1 && property:sys.usb.config=mass_storage,adb && property:sys.usb.configfs=1
-	write /config/usb_gadget/g1/configs/b.1/strings/0x409/configuration "adb_msc"
-	symlink /config/usb_gadget/g1/functions/mass_storage.0 /config/usb_gadget/g1/configs/b.1/f1
-	symlink /config/usb_gadget/g1/functions/ffs.adb /config/usb_gadget/g1/configs/b.1/f2
-	write /config/usb_gadget/g1/UDC ${sys.usb.controller}
-	setprop sys.usb.state ${sys.usb.config}
-
-
-# rm /config/usb_gadget/g1/configs/b.1/function0
-# ln -s /config/usb_gadget/g1/functions/mass_storage.0 function0
-# echo msc > /config/usb_gadget/g1/configs/b.1/strings/0x409/configuration
-# echo a600000.dwc3 > /config/usb_gadget/g1/UDC
+# Original init.${ro.hardware}.rc contents
+# zygote need to be started after otapreopt which will be done on post-fs-data
+on zygote-start
+	# zygote is started in common init.rc
+	# and now we can continue to initialize /data/
+	# create the directory for preload content.
+	mkdir /data/preloads 0775 system system
