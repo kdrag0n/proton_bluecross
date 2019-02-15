@@ -49,7 +49,7 @@ on property:persist.spectrum.profile=1
 
 # Gaming
 on property:persist.spectrum.profile=3
-	setprop persist.proton.profile performance
+	setprop persist.proton.profile turbo
 
 
 # USB mass storage support
