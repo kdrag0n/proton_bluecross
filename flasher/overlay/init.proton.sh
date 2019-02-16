@@ -67,7 +67,7 @@ case "$1" in
 		big_gov_param hispeed_freq 0
 		# CPU: Governor
 		gov_param hispeed_load 90
-		gov_param iowait_boost_enable 1
+		gov_param iowait_boost_enable 0
 		# CPU: Boost
 		stune_boost 25
 		stune_general_boost 10
