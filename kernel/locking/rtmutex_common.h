@@ -49,7 +49,7 @@ rt_mutex_top_waiter(struct rt_mutex *lock)
 {
 	struct rt_mutex_waiter *w;
 
-	w = rb_entry(READ_ONCE(lock->waiters_leftmost), struct rt_mutex_waiter,
+	w = rb_entry(lock->waiters_leftmost, struct rt_mutex_waiter,
 		     tree_entry);
 	BUG_ON(w->lock != lock);
 
@@ -103,7 +103,6 @@ extern void rt_mutex_init_proxy_locked(struct rt_mutex *lock,
 				       struct task_struct *proxy_owner);
 extern void rt_mutex_proxy_unlock(struct rt_mutex *lock,
 				  struct task_struct *proxy_owner);
-extern void rt_mutex_init_waiter(struct rt_mutex_waiter *waiter);
 extern int rt_mutex_start_proxy_lock(struct rt_mutex *lock,
 				     struct rt_mutex_waiter *waiter,
 				     struct task_struct *task);
