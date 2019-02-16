@@ -556,6 +556,17 @@ config LTO_CLANG
 
 endchoice
 
+config LTO_CLANG_THIN
+	bool "Use clang ThinLTO over full LTO (EXPERIMENTAL)"
+	depends on LTO_CLANG
+	help
+	  This option replaces clang's traditional full LTO with ThinLTO, which
+	  can be a fair compromise between full LTO and no LTO. ThinLTO compiles
+	  significantly faster, especially during incremental builds, while
+	  preserving a considerable amount of the performance gain of full LTO
+	  in most cases. This is typically useful for development but may not be
+	  desired for release builds.
+
 config CFI
 	bool
 
