@@ -84,7 +84,6 @@ static void __init fix_embedded_dt(void *bl_dt, const void *kern_dt)
 	 * kernel and bootloader DTs are valid.
 	 */
 	copy_dt_root_subnode(kern_dt_new, bl_dt, "/chosen");
-	copy_dt_root_subnode(kern_dt_new, bl_dt, "/firmware");
 	copy_dt_root_subnode(kern_dt_new, bl_dt, "/memory");
 
 	ret = fdt_pack(kern_dt_new);
