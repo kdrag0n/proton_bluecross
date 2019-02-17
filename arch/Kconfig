@@ -540,7 +540,7 @@ config LTO
 config ARCH_SUPPORTS_LTO_CLANG
 	bool
 	help
-	  An architecture should select this option it supports:
+	  An architecture should select this option if it supports:
 	  - compiling with clang,
 	  - compiling inline assembly with clang's integrated assembler,
 	  - and linking with either lld or GNU gold w/ LLVMgold.
