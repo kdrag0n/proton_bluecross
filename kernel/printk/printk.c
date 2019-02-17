@@ -743,7 +743,7 @@ static ssize_t devkmsg_write(struct kiocb *iocb, struct iov_iter *from)
 		return -ENOMEM;
 
 	buf[len] = '\0';
-	if (!copy_from_iter_full(buf, len, from)) {
+	if (copy_from_iter(buf, len, from) != len) {
 		kfree(buf);
 		return -EFAULT;
 	}

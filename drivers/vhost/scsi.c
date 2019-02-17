@@ -923,7 +923,8 @@ vhost_scsi_handle_vq(struct vhost_scsi *vs, struct vhost_virtqueue *vq)
 		 */
 		iov_iter_init(&out_iter, WRITE, vq->iov, out, out_size);
 
-		if (unlikely(!copy_from_iter_full(req, req_size, &out_iter))) {
+		ret = copy_from_iter(req, req_size, &out_iter);
+		if (unlikely(ret != req_size)) {
 			vq_err(vq, "Faulted on copy_from_iter\n");
 			vhost_scsi_send_bad_target(vs, vq, head, out);
 			continue;
