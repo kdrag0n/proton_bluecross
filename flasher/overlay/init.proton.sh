@@ -72,11 +72,11 @@ case "$1" in
 		# CPU: Little
 		little_min 576000
 		little_max 1766400
-		little_boost 1132800
+		little_boost 1228800
 		little_gov_param hispeed_freq 1228800
 		# CPU: Big
 		big_max 2803200
-		big_boost 1209600
+		big_boost 1363200
 		big_gov_param hispeed_freq 1363200
 		# CPU: Governor
 		gov_param hispeed_load 15
