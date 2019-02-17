@@ -321,6 +321,13 @@ config INPUT_BOOST_FREQ_PERF
 	help
 	  Input boost frequency for the performance CPU cluster.
 
+config FRAME_BOOST_TIMEOUT
+	int "Post-input timeout for frame boost"
+	default "3250"
+	help
+	  The amount of time in milliseconds to boost on frame updates after the
+	  last input event.
+
 config INPUT_BOOST_STUNE_LEVEL
 	int "Foreground app schedtune input boost level"
 	depends on DYNAMIC_STUNE_BOOST
