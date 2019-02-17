@@ -1083,7 +1083,7 @@ long keyctl_instantiate_key_common(key_serial_t id,
 		}
 
 		ret = -EFAULT;
-		if (!copy_from_iter_full(payload, plen, from))
+		if (copy_from_iter(payload, plen, from) != plen)
 			goto error2;
 	}
 

@@ -181,7 +181,7 @@ static inline ssize_t vhci_get_user(struct vhci_data *data,
 	if (!skb)
 		return -ENOMEM;
 
-	if (!copy_from_iter_full(skb_put(skb, len), len, from)) {
+	if (copy_from_iter(skb_put(skb, len), len, from) != len) {
 		kfree_skb(skb);
 		return -EFAULT;
 	}
