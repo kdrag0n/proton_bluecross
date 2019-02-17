@@ -20,6 +20,10 @@ ifeq ($(CONFIG_RELOCATABLE), y)
 # with the relocation offsets always being zero.
 LDFLAGS_vmlinux		+= -pie -Bsymbolic \
 			$(call ld-option, --no-apply-dynamic-relocs)
+
+ifeq ($(ld-name),lld)
+LDFLAGS_vmlinux		+= -z notext
+endif
 endif
 
 ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
