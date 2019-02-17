@@ -207,6 +207,10 @@ struct page {
 #ifdef LAST_CPUPID_NOT_IN_PAGE_FLAGS
 	int _last_cpupid;
 #endif
+
+#ifdef CONFIG_ANDROID_SIMPLE_LMK
+	bool reserved_for_lmk;
+#endif
 } _struct_page_alignment;
 
 struct page_frag {
