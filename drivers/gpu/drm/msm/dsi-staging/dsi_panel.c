@@ -26,6 +26,7 @@
 
 #include "dsi_panel.h"
 #include "dsi_ctrl_hw.h"
+#include "exposure_adjustment.h"
 
 /**
  * topology is currently defined by a set of following 3 values:
@@ -558,6 +559,15 @@ static int dsi_panel_tx_cmd_set(struct dsi_panel *panel,
 
 	if (panel->type == EXT_BRIDGE)
 		return 0;
+
+#ifdef CONFIG_EXPOSURE_ADJUSTMENT
+	if (ea_enabled) {
+		if (type == DSI_CMD_SET_ON)
+			ea_panel_mode_ctrl(panel, true);
+		else if (type == DSI_CMD_SET_OFF)
+			ea_panel_mode_ctrl(panel, false);
+	}
+#endif
 
 	mode = panel->cur_mode;
 

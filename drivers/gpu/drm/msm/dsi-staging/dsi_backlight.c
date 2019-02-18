@@ -21,6 +21,7 @@
 #include <video/mipi_display.h>
 
 #include "dsi_panel.h"
+#include "exposure_adjustment.h"
 
 #define BL_NODE_NAME_SIZE 32
 
@@ -297,10 +298,15 @@ static u32 dsi_backlight_calculate(struct dsi_backlight_config *bl,
 			brightness, bl->bl_scale, bl->bl_scale_ad, bl_lvl,
 			panel->hbm_mode);
 
+#ifdef CONFIG_EXPOSURE_ADJUSTMENT
+	if (ea_enabled)
+		bl_lvl = ea_panel_calc_backlight(bl_lvl);
+#endif
+
 	return bl_lvl;
 }
 
-static int dsi_backlight_update_status(struct backlight_device *bd)
+int dsi_backlight_update_status(struct backlight_device *bd)
 {
 	struct dsi_backlight_config *bl = bl_get_data(bd);
 	struct dsi_panel *panel = container_of(bl, struct dsi_panel, bl_config);

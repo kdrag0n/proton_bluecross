@@ -17,6 +17,8 @@
  *
  */
 
+#define pr_fmt(fmt) "exposure_adjustment: " fmt
+
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/notifier.h>
@@ -29,6 +31,40 @@
 static struct drm_msm_pcc pcc_blk = {0};
 static bool pcc_backlight_enable = false;
 static u32 last_level = ELVSS_OFF_THRESHOLD;
+unsigned int ea_enabled __read_mostly = 0;
+
+static int param_ea_enabled_set(const char *buf, const struct kernel_param *kp)
+{
+	struct dsi_display *display;
+	struct dsi_panel *panel;
+	int ret;
+
+	ret = param_set_uint(buf, kp);
+	if (ret < 0)
+		return ret;
+
+	if (pcc_backlight_enable != ea_enabled) {
+		display = main_display;
+		if (!display)
+			return -ENODEV;
+
+		panel = display->panel;
+		ea_panel_mode_ctrl(panel, ea_enabled);
+
+		ret = backlight_update_status(panel->bl_config.bl_device);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+static const struct kernel_param_ops ea_enabled_param_ops = {
+	.set = param_ea_enabled_set,
+	.get = param_get_uint,
+};
+
+module_param_cb(flickerfree_enabled, &ea_enabled_param_ops, &ea_enabled, 0644);
 
 static int ea_panel_crtc_send_pcc(struct dsi_display *display,
 			       u32 r_data, u32 g_data, u32 b_data)
@@ -91,7 +127,7 @@ static int ea_panel_send_pcc(u32 bl_lvl)
 	struct dsi_display *display = NULL;
 	u32 ea_coeff, r_data, g_data, b_data;
 
- 	display = get_main_display();
+	display = main_display;
 	if (!display) {
 		pr_err("ERROR: Cannot find display of this panel\n");
 		return -ENODEV;
@@ -102,7 +138,7 @@ static int ea_panel_send_pcc(u32 bl_lvl)
 	else
 		ea_coeff = EXPOSURE_ADJUSTMENT_MAX;
 
-	pr_info("ea_coeff = %X\n", ea_coeff);
+	pr_info("ea_coeff = 0x%X\n", ea_coeff);
 	r_data = ea_coeff;
 	g_data = ea_coeff;
 	b_data = ea_coeff;
@@ -113,9 +149,12 @@ static int ea_panel_send_pcc(u32 bl_lvl)
 void ea_panel_mode_ctrl(struct dsi_panel *panel, bool enable)
 {
 	if (pcc_backlight_enable != enable) {
+		struct dsi_backlight_config *bl = &panel->bl_config;
+
 		pcc_backlight_enable = enable;
 		pr_info("Recover backlight level = %d\n", last_level);
-		dsi_panel_set_backlight(panel, last_level);
+		if (dsi_panel_initialized(panel) && bl->update_bl)
+			bl->update_bl(bl, last_level);
 		if (!enable) {
 			ea_panel_send_pcc(ELVSS_OFF_THRESHOLD);
 		}

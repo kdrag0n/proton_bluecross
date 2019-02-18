@@ -678,4 +678,6 @@ int dsi_display_get_panel_vfp(void *display,
  */
 int dsi_display_get_esd_mode(void *display);
 
+extern struct dsi_display *main_display;
+
 #endif /* _DSI_DISPLAY_H_ */
