@@ -493,13 +493,15 @@ config THIN_ARCHIVES
 
 choice
 	prompt "Kernel linker"
-	default LD_BFD
+	default LD_BFD if !LTO_CLANG
+	default LD_GOLD if LTO_CLANG
 	help
 	  This option allows the linker used for linking the kernel to be
 	  customized as desired out of a list of supported linkers.
 
 config LD_BFD
 	bool "bfd"
+	depends on !LTO_CLANG
 	help
 	  Use the standard ld.bfd linker, which is the default and is part of
 	  GNU binutils.

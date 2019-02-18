@@ -516,7 +516,7 @@ CLANG_TARGET	:= --target=$(notdir $(CLANG_TRIPLE:%-=%))
 ifeq ($(shell $(srctree)/scripts/clang-android.sh $(CC) $(CLANG_TARGET)), y)
 $(error "Clang with Android --target detected. Did you specify CLANG_TRIPLE?")
 endif
-GCC_TOOLCHAIN_DIR := $(dir $(shell which $(LD)))
+GCC_TOOLCHAIN_DIR := $(dir $(shell which $(CROSS_COMPILE)elfedit))
 CLANG_PREFIX	:= --prefix=$(GCC_TOOLCHAIN_DIR)
 GCC_TOOLCHAIN	:= $(realpath $(GCC_TOOLCHAIN_DIR)/..)
 endif
@@ -668,8 +668,14 @@ LDFINAL_vmlinux := $(LD)
 LD		:= $(LDGOLD)
 endif
 ifdef CONFIG_LD_LLD
-LDFINAL_vmlinux := $(LD)
 LD		:= $(LDLLD)
+endif
+
+ifeq ($(cc-name),clang)
+ifeq ($(ld-name),lld)
+KBUILD_CFLAGS	+= -fuse-ld=lld
+LDFLAGS		+= -O2
+endif
 endif
 
 ifdef CONFIG_LTO_CLANG
@@ -724,6 +730,10 @@ endif
 ifdef CONFIG_LTO
 lto-flags	:= $(lto-clang-flags)
 KBUILD_CFLAGS	+= $(lto-flags)
+
+ifeq ($(ld-name),lld)
+LDFLAGS		+= --lto-O3
+endif
 
 DISABLE_LTO	:= $(DISABLE_LTO_CLANG)
 export DISABLE_LTO
