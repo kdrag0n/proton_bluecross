@@ -54,7 +54,7 @@ static const struct of_device_id dsi_display_dt_match[] = {
 	{}
 };
 
-static struct dsi_display *main_display;
+struct dsi_display *main_display;
 
 static void dsi_display_mask_ctrl_error_interrupts(struct dsi_display *display,
 			u32 mask, bool enable)
