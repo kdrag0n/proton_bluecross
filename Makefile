@@ -732,6 +732,11 @@ ifdef CONFIG_LTO
 lto-flags	:= $(lto-clang-flags)
 KBUILD_CFLAGS	+= $(lto-flags)
 
+ifeq ($(ld-name),lld)
+KBUILD_LDFLAGS	+= --lto-O3
+LDFLAGS_vmlinux	+= $(call ld-option, --lto-O3,)
+endif
+
 DISABLE_LTO	:= $(DISABLE_LTO_CLANG)
 export DISABLE_LTO
 
