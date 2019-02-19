@@ -130,7 +130,7 @@ static inline unsigned long __percpu_read(void *ptr, int size)
 	return ret;
 }
 
-static inline void __percpu_write(void *ptr, unsigned long val, int size)
+static __always_inline void __percpu_write(void *ptr, unsigned long val, int size)
 {
 	switch (size) {
 	case 1:
