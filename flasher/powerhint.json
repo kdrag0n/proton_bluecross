@@ -28,7 +28,7 @@
       "Name": "CPUBigClusterMaxFreq",
       "Path": "/sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq",
       "Values": [
-        "2803200",
+        "2323200",
         "1996800",
         "1459200",
         "1363200",
@@ -41,7 +41,7 @@
       "Name": "CPUBigClusterMinFreq",
       "Path": "/sys/devices/system/cpu/cpu4/cpufreq/scaling_min_freq",
       "Values": [
-        "2803200",
+        "2323200",
         "1459200",
         "1286400",
         "1209600",
@@ -362,7 +362,7 @@
       "PowerHint": "LAUNCH",
       "Node": "CPUBigClusterMaxFreq",
       "Duration": 3000,
-      "Value": "2803200"
+      "Value": "2323200"
     },
     {
       "PowerHint": "LAUNCH",
@@ -434,7 +434,7 @@
       "PowerHint": "CAMERA_LAUNCH",
       "Node": "CPUBigClusterMaxFreq",
       "Duration": 1000,
-      "Value": "2803200"
+      "Value": "2323200"
     },
     {
       "PowerHint": "CAMERA_LAUNCH",
@@ -470,7 +470,7 @@
       "PowerHint": "CAMERA_SHOT",
       "Node": "CPUBigClusterMaxFreq",
       "Duration": 1000,
-      "Value": "2803200"
+      "Value": "2323200"
     },
     {
       "PowerHint": "CAMERA_SHOT",
