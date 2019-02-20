@@ -12,6 +12,7 @@
 #include <linux/oom.h>
 #include <linux/sched.h>
 #include <linux/simple_lmk.h>
+#include <linux/state_notifier.h>
 
 /* Duration to boost CPU and DDR bus to the max per memory reclaim event */
 #define BOOST_DURATION_MS (250)
@@ -125,8 +126,10 @@ static unsigned long do_lmk_reclaim(unsigned long pages_needed)
 	unsigned long pages_freed = 0;
 	int i;
 
-	cpu_input_boost_kick_max(BOOST_DURATION_MS);
-	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, BOOST_DURATION_MS);
+	if (!state_suspended) {
+		cpu_input_boost_kick_max(BOOST_DURATION_MS);
+		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, BOOST_DURATION_MS);
+	}
 
 	for (i = 1; i < ARRAY_SIZE(adj_prio); i++) {
 		pages_freed += scan_and_kill(adj_prio[i], adj_prio[i - 1],
