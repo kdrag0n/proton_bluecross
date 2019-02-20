@@ -54,6 +54,17 @@ config CPU_FREQ_TIMES
 
          If in doubt, say N.
 
+config CPU_FREQ_DEFAULT_PERF_MAX
+	int "Default maximum frequency for the performance cluster"
+	default "0"
+	help
+	  This option sets the maximum CPU frequency of the performance (big)
+	  cluster in KHz that will be set on boot. This overrides the default
+	  maximum frequency, which is typically the true maximum frequency
+	  supported by the CPU.
+
+	  A value of 0 will disable this override functionality.
+
 choice
 	prompt "Default CPUFreq governor"
 	default CPU_FREQ_DEFAULT_GOV_USERSPACE if ARM_SA1100_CPUFREQ || ARM_SA1110_CPUFREQ
