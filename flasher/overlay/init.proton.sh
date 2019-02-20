@@ -14,6 +14,7 @@ little_gov_param() { echo $2 > /sys/devices/system/cpu/cpu0/cpufreq/$(cat /sys/d
 big_gov_param() { echo $2 > /sys/devices/system/cpu/cpu4/cpufreq/$(cat /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor)/$1; }
 gov_param() { little_gov_param $1 $2; big_gov_param $1 $2; }
 boost_duration() { echo $1 > /sys/module/cpu_input_boost/parameters/input_boost_duration; }
+boost_timeout() { echo $1 > /sys/module/cpu_input_boost/parameters/frame_boost_timeout; }
 stune_boost() { echo $1 > /sys/module/cpu_input_boost/parameters/dynamic_stune_boost; }
 stune_general_boost() { echo $1 > /sys/module/cpu_input_boost/parameters/general_stune_boost; }
 gpu_min() { echo $1 > /sys/class/kgsl/kgsl-3d0/devfreq/min_freq; }
@@ -48,6 +49,7 @@ case "$1" in
 		stune_boost 15
 		stune_general_boost 1
 		boost_duration 32
+		boost_timeout 2500
 
 		# GPU
 		gpu_min 180000000
@@ -72,6 +74,7 @@ case "$1" in
 		stune_boost 25
 		stune_general_boost 10
 		boost_duration 64
+		boost_timeout 3250
 
 		# GPU
 		gpu_min 180000000
@@ -96,6 +99,7 @@ case "$1" in
 		stune_boost 50
 		stune_general_boost 25
 		boost_duration 125
+		boost_timeout 15000
 
 		# GPU
 		gpu_min 342000000
@@ -120,6 +124,7 @@ case "$1" in
 		stune_boost 50
 		stune_general_boost 25
 		boost_duration 125
+		boost_timeout 30000
 
 		# GPU
 		gpu_min 342000000
