@@ -620,6 +620,7 @@ static const struct seq_operations kallsyms_op = {
 	.show = s_show
 };
 
+#ifdef CONFIG_PROC_KALLSYMS
 static int kallsyms_open(struct inode *inode, struct file *file)
 {
 	/*
@@ -635,6 +636,7 @@ static int kallsyms_open(struct inode *inode, struct file *file)
 
 	return 0;
 }
+#endif
 
 #ifdef	CONFIG_KGDB_KDB
 const char *kdb_walk_kallsyms(loff_t *pos)
@@ -656,6 +658,7 @@ const char *kdb_walk_kallsyms(loff_t *pos)
 }
 #endif	/* CONFIG_KGDB_KDB */
 
+#ifdef CONFIG_PROC_KALLSYMS
 static const struct file_operations kallsyms_operations = {
 	.open = kallsyms_open,
 	.read = seq_read,
@@ -669,3 +672,4 @@ static int __init kallsyms_init(void)
 	return 0;
 }
 device_initcall(kallsyms_init);
+#endif

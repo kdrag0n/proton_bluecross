@@ -1706,6 +1706,16 @@ config KALLSYMS_BASE_RELATIVE
 	  time constants, and no relocation pass is required at runtime to fix
 	  up the entries based on the runtime load address of the kernel.
 
+config PROC_KALLSYMS
+	bool "Expose kallsyms data in procfs"
+	depends on KALLSYMS
+	help
+	  This option will make the kernel expose all the kernel symbol data
+	  offered by kallsyms to userspace through procfs. Symbols will be
+	  accessible from userspace under the /proc/kallsyms node. This may be
+	  desirable for debugging, but can be a security risk because it exposes
+	  information about the kernel's internals.
+
 config PRINTK
 	default y
 	bool "Enable support for printk" if EXPERT
