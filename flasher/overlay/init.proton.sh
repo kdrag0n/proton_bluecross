@@ -49,7 +49,7 @@ case "$1" in
 		stune_boost 15
 		stune_general_boost 1
 		boost_duration 32
-		boost_timeout 2500
+		boost_timeout 1750
 
 		# GPU
 		gpu_min 180000000
