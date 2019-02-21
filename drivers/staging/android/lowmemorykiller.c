@@ -715,10 +715,7 @@ void add_2_adj_tree(struct task_struct *task)
 void delete_from_adj_tree(struct task_struct *task)
 {
 	spin_lock(&lmk_lock);
-	if (!RB_EMPTY_NODE(&task->adj_node)) {
-		rb_erase(&task->adj_node, &tasks_scoreadj);
-		RB_CLEAR_NODE(&task->adj_node);
-	}
+	rb_erase(&task->adj_node, &tasks_scoreadj);
 	spin_unlock(&lmk_lock);
 }
 
