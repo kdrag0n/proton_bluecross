@@ -157,6 +157,12 @@ static void unboost_all_cpus(struct boost_drv *b)
 
 bool cpu_input_boost_should_boost_frame(void)
 {
+	if (frame_boost_timeout == 0)
+		return true;
+
+	if (frame_boost_timeout < 0)
+		return false;
+
 	return time_before(jiffies, last_input_jiffies +
 			   msecs_to_jiffies(frame_boost_timeout));
 }
