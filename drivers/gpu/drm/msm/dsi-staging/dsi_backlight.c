@@ -30,12 +30,32 @@
 #define BL_STATE_LP2		BL_CORE_DRIVER2
 #define BL_HBM 			1023
 
-bool backlight_dimmer = 0;
-module_param(backlight_dimmer, bool, 0644);
-
+static bool backlight_dimmer __read_mostly;
 static int hbm_enable = 0;
 static struct dsi_backlight_config *bl_g;
 static struct device *fb0_device;
+
+static int param_bl_dimmer_set(const char *buf, const struct kernel_param *kp)
+{
+	int ret;
+
+	ret = param_set_bool(buf, kp);
+	if (ret < 0)
+		return ret;
+
+	ret = backlight_update_status(bl_g->bl_device);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static const struct kernel_param_ops bl_dimmer_param_ops = {
+	.set = param_bl_dimmer_set,
+	.get = param_get_bool,
+};
+
+module_param_cb(backlight_dimmer, &bl_dimmer_param_ops, &backlight_dimmer, 0644);
 
 static void enable_hbm(int enable)
 {
