@@ -303,24 +303,21 @@ config INPUT_BOOST_FREQ_PERF
 	help
 	  Input boost frequency for the performance CPU cluster.
 
+config INPUT_STUNE_BOOST
+	int "Input SchedTune boost value for top-app"
+	depends on DYNAMIC_STUNE_BOOST
+	default "25"
+	help
+	  SchedTune boost value for input boost. This alters the perceived load
+	  of process groups in order to bias core selection as well as CPU
+	  frequency selection. A value of 0 disables this functionality.
+
 config FRAME_BOOST_TIMEOUT
 	int "Post-input timeout for frame boost"
 	default "3250"
 	help
 	  The amount of time in milliseconds to boost on frame updates after the
 	  last input event.
-
-config INPUT_BOOST_STUNE_LEVEL
-	int "Foreground app schedtune input boost level"
-	depends on DYNAMIC_STUNE_BOOST
-	default "25"
-	help
-	  Input boost level for the EAS SchedTune boosting system. This
-	  artifically increases perceived load of certain processes in order
-	  to prioritize and increase their usage of big cores as well as
-	  influence system-wide CPU frequency selection. Negative values are
-	  accepted for testing purposes. A value of 0 disables SchedTune
-	  boosting for this level.
 
 config REMOVE_INPUT_BOOST_FREQ_LP
 	int "Low-power cluster return frequency"
@@ -354,29 +351,23 @@ config GENERAL_BOOST_FREQ_PERF
 	help
 	  General boost frequency for the performance CPU cluster.
 
-config GENERAL_BOOST_STUNE_LEVEL
-	int "Foreground app schedtune general boost level"
+config GENERAL_STUNE_BOOST
+	int "General SchedTune boost value for top-app"
 	depends on DYNAMIC_STUNE_BOOST
 	default "10"
 	help
-	  General boost level for the EAS SchedTune boosting system. This
-	  artifically increases perceived load of certain processes in order
-	  to prioritize and increase their usage of big cores as well as
-	  influence system-wide CPU frequency selection. Negative values are
-	  accepted for testing purposes. A value of 0 disables SchedTune
-	  boosting for this level.
+	  SchedTune boost value for max boost. This alters the perceived load
+	  of process groups in order to bias core selection as well as CPU
+	  frequency selection. A value of 0 disables this functionality.
 
-config MAX_BOOST_STUNE_LEVEL
-	int "Foreground app schedtune max boost level"
+config MAX_STUNE_BOOST
+	int "Max SchedTune boost value for top-app"
 	depends on DYNAMIC_STUNE_BOOST
 	default "50"
 	help
-	  Maximum boost level for the EAS SchedTune boosting system. This
-	  artifically increases perceived load of certain processes in order
-	  to prioritize and increase their usage of big cores as well as
-	  influence system-wide CPU frequency selection. Negative values are
-	  accepted for testing purposes. A value of 0 disables SchedTune
-	  boosting for this level.
+	  SchedTune boost value for max boost. This alters the perceived load
+	  of process groups in order to bias core selection as well as CPU
+	  frequency selection. A value of 0 disables this functionality.
 
 endif
 
