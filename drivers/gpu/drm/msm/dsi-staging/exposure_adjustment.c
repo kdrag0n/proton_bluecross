@@ -19,6 +19,7 @@
 
 #define pr_fmt(fmt) "exposure_adjustment: " fmt
 
+#include <linux/b1c1_info.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/notifier.h>
@@ -38,6 +39,9 @@ static int param_ea_enabled_set(const char *buf, const struct kernel_param *kp)
 	struct dsi_display *display;
 	struct dsi_panel *panel;
 	int ret;
+
+	if (!is_google_crosshatch())
+		return -ENODEV;
 
 	ret = param_set_uint(buf, kp);
 	if (ret < 0)
