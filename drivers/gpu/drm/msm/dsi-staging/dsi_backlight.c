@@ -23,6 +23,10 @@
 #include "dsi_panel.h"
 #include "exposure_adjustment.h"
 
+#ifdef CONFIG_KLAPSE
+#include "../sde/klapse.h"
+#endif
+
 #define BL_NODE_NAME_SIZE 32
 
 #define BL_STATE_STANDBY	BL_CORE_FBBLANK
@@ -318,6 +322,9 @@ static u32 dsi_backlight_calculate(struct dsi_backlight_config *bl,
 			brightness, bl->bl_scale, bl->bl_scale_ad, bl_lvl,
 			panel->hbm_mode);
 
+#ifdef CONFIG_KLAPSE
+	set_rgb_slider(bl_lvl);
+#endif
 #ifdef CONFIG_EXPOSURE_ADJUSTMENT
 	if (ea_enabled)
 		bl_lvl = ea_panel_calc_backlight(bl_lvl);
