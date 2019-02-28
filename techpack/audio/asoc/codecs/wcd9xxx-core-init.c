@@ -11,13 +11,14 @@
  */
 
 #include <linux/module.h>
+#include <linux/b1c1_init.h>
 #include "msm-cdc-pinctrl.h"
 #include "wcd9xxx-irq.h"
 #include "core.h"
 
 #define NUM_DRIVERS_REG_RET 3
 
-static int __init wcd9xxx_core_init(void)
+static int wcd9xxx_core_init(void)
 {
 	int ret[NUM_DRIVERS_REG_RET] = {0};
 	int i = 0;
@@ -41,7 +42,7 @@ static int __init wcd9xxx_core_init(void)
 
 	return 0;
 }
-module_init(wcd9xxx_core_init);
+b1c1_init(wcd9xxx_core_init, B1C1_WCD_CORE);
 
 static void __exit wcd9xxx_core_exit(void)
 {

@@ -22,6 +22,7 @@
 #include <linux/cdev.h>
 #include <linux/platform_device.h>
 #include <linux/vmalloc.h>
+#include <linux/b1c1_init.h>
 #include <soc/qcom/glink.h>
 #include "sound/wcd-dsp-glink.h"
 
@@ -1237,7 +1238,11 @@ static struct platform_driver wdsp_glink_driver = {
 	},
 };
 
-module_platform_driver(wdsp_glink_driver);
+static int wdsp_glink_driver_init(void)
+{
+	return platform_driver_register(&wdsp_glink_driver);
+}
+b1c1_init(wdsp_glink_driver_init, B1C1_WCD_DSP_GLINK);
 
 MODULE_DESCRIPTION("SoC WCD_DSP GLINK Driver");
 MODULE_LICENSE("GPL v2");
