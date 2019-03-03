@@ -1311,7 +1311,4 @@ config TOUCHSCREEN_HIMAX_CHIPSET
 
 source "drivers/input/touchscreen/hxchipset/Kconfig"
 
-config WAKE_GESTURES
-	bool "wake gestures"
-
 endif

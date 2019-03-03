@@ -33,7 +33,6 @@
 #include <linux/leds.h>
 #include <linux/platform_device.h>
 #include <linux/platform_data/cs40l2x.h>
-#include <linux/wake_gestures.h>
 
 #include "cs40l2x.h"
 
@@ -74,8 +73,6 @@ struct cs40l2x_private {
 	int pbq_remain;
 	struct led_classdev led_dev;
 };
-
-static struct cs40l2x_private *cs40l2x_g;
 
 static const char * const cs40l2x_supplies[] = {
 	"VA",
@@ -1568,14 +1565,6 @@ static void cs40l2x_vibe_brightness_set(struct led_classdev *led_cdev,
 		queue_work(cs40l2x->vibe_workqueue, &cs40l2x->vibe_start_work);
 }
 
-void set_vibrate()
-{
-	struct led_classdev *led_dev = &cs40l2x_g->led_dev;
-	cs40l2x_vibe_brightness_set(led_dev, LED_FULL);
-	msleep(1);
-	cs40l2x_vibe_brightness_set(led_dev, LED_OFF);
-}
-
 static void cs40l2x_create_led(struct cs40l2x_private *cs40l2x)
 {
 	int ret;
@@ -2996,8 +2985,6 @@ static int cs40l2x_i2c_probe(struct i2c_client *i2c_client,
 		goto err;
 
 	cs40l2x_create_led(cs40l2x);
-
-	cs40l2x_g = cs40l2x;
 
 	return 0;
 err:
