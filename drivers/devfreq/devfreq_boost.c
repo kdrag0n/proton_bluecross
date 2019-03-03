@@ -21,13 +21,13 @@ struct boost_dev {
 	unsigned long boost_freq;
 	unsigned long max_boost_expires;
 	unsigned long max_boost_jiffies;
-	bool disable;
 	spinlock_t lock;
 };
 
 struct df_boost_drv {
 	struct boost_dev devices[DEVFREQ_MAX];
 	struct notifier_block msm_drm_notif;
+	atomic_t screen_awake;
 };
 
 static struct df_boost_drv *df_boost_drv_g __read_mostly;
@@ -37,7 +37,7 @@ static void __devfreq_boost_kick(struct boost_dev *b)
 	unsigned long flags;
 
 	spin_lock_irqsave(&b->lock, flags);
-	if (!b->df || b->disable) {
+	if (!b->df) {
 		spin_unlock_irqrestore(&b->lock, flags);
 		return;
 	}
@@ -53,16 +53,19 @@ void devfreq_boost_kick(enum df_device device)
 	if (!d)
 		return;
 
+	if (!atomic_read(&d->screen_awake))
+		return;
+
 	__devfreq_boost_kick(d->devices + device);
 }
 
 static void __devfreq_boost_kick_max(struct boost_dev *b,
-	unsigned int duration_ms)
+				     unsigned int duration_ms)
 {
 	unsigned long flags, new_expires;
 
 	spin_lock_irqsave(&b->lock, flags);
-	if (!b->df || b->disable) {
+	if (!b->df) {
 		spin_unlock_irqrestore(&b->lock, flags);
 		return;
 	}
@@ -84,6 +87,9 @@ void devfreq_boost_kick_max(enum df_device device, unsigned int duration_ms)
 	struct df_boost_drv *d = df_boost_drv_g;
 
 	if (!d)
+		return;
+
+	if (!atomic_read(&d->screen_awake))
 		return;
 
 	__devfreq_boost_kick_max(d->devices + device, duration_ms);
@@ -131,20 +137,6 @@ static unsigned long devfreq_abs_min_freq(struct boost_dev *b)
 		b->abs_min_freq = 0;
 
 	return b->abs_min_freq;
-}
-
-static void devfreq_disable_boosting(struct df_boost_drv *d, bool disable)
-{
-	int i;
-
-	for (i = 0; i < DEVFREQ_MAX; i++) {
-		struct boost_dev *b = d->devices + i;
-		unsigned long flags;
-
-		spin_lock_irqsave(&b->lock, flags);
-		b->disable = disable;
-		spin_unlock_irqrestore(&b->lock, flags);
-	}
 }
 
 static void devfreq_unboost_all(struct df_boost_drv *d)
@@ -260,7 +252,7 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 
 	/* Boost when the screen turns on and unboost when it turns off */
 	screen_awake = *blank == MSM_DRM_BLANK_UNBLANK;
-	devfreq_disable_boosting(d, !screen_awake);
+	atomic_set(&d->screen_awake, screen_awake);
 	if (screen_awake) {
 		int i;
 
@@ -280,6 +272,9 @@ static void devfreq_boost_input_event(struct input_handle *handle,
 {
 	struct df_boost_drv *d = handle->handler->private;
 	int i;
+
+	if (!atomic_read(&d->screen_awake))
+		return;
 
 	for (i = 0; i < DEVFREQ_MAX; i++)
 		__devfreq_boost_kick(d->devices + i);
