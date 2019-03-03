@@ -9,8 +9,7 @@
         "1324800",
         "1228800"
       ],
-      "DefaultIndex": 0,
-      "ResetOnInit": true
+      "DefaultIndex": 0
     },
     {
       "Name": "CPULittleClusterMinFreq",
@@ -34,8 +33,7 @@
         "1363200",
         "1286400"
       ],
-      "DefaultIndex": 0,
-      "ResetOnInit": true
+      "DefaultIndex": 0
     },
     {
       "Name": "CPUBigClusterMinFreq",
@@ -240,33 +238,9 @@
   "Actions": [
     {
       "PowerHint": "SUSTAINED_PERFORMANCE",
-      "Node": "CPUBigClusterMaxFreq",
-      "Duration": 0,
-      "Value": "1363200"
-    },
-    {
-      "PowerHint": "SUSTAINED_PERFORMANCE",
-      "Node": "CPULittleClusterMaxFreq",
-      "Duration": 0,
-      "Value": "1228800"
-    },
-    {
-      "PowerHint": "SUSTAINED_PERFORMANCE",
       "Node": "GPUMaxFreq",
       "Duration": 0,
       "Value": "342000000"
-    },
-    {
-      "PowerHint": "VR_MODE",
-      "Node": "CPUBigClusterMaxFreq",
-      "Duration": 0,
-      "Value": "1459200"
-    },
-    {
-      "PowerHint": "VR_MODE",
-      "Node": "CPULittleClusterMaxFreq",
-      "Duration": 0,
-      "Value": "1420800"
     },
     {
       "PowerHint": "VR_MODE",
@@ -291,18 +265,6 @@
       "Node": "VRKernelCpuSet",
       "Duration": 0,
       "Value": "2,3"
-    },
-    {
-      "PowerHint": "VR_SUSTAINED_PERFORMANCE",
-      "Node": "CPUBigClusterMaxFreq",
-      "Duration": 0,
-      "Value": "1286400"
-    },
-    {
-      "PowerHint": "VR_SUSTAINED_PERFORMANCE",
-      "Node": "CPULittleClusterMaxFreq",
-      "Duration": 0,
-      "Value": "1324800"
     },
     {
       "PowerHint": "VR_SUSTAINED_PERFORMANCE",
@@ -357,12 +319,6 @@
       "Node": "SchedBoost",
       "Duration": 3000,
       "Value": "1"
-    },
-    {
-      "PowerHint": "LAUNCH",
-      "Node": "CPUBigClusterMaxFreq",
-      "Duration": 3000,
-      "Value": "2323200"
     },
     {
       "PowerHint": "LAUNCH",
@@ -432,21 +388,9 @@
     },
     {
       "PowerHint": "CAMERA_LAUNCH",
-      "Node": "CPUBigClusterMaxFreq",
-      "Duration": 1000,
-      "Value": "2323200"
-    },
-    {
-      "PowerHint": "CAMERA_LAUNCH",
       "Node": "PMQoSCpuDmaLatency",
       "Duration": 1000,
       "Value": "44"
-    },
-    {
-      "PowerHint": "CAMERA_STREAMING",
-      "Node": "CPUBigClusterMaxFreq",
-      "Duration": 0,
-      "Value": "1996800"
     },
     {
       "PowerHint": "CAMERA_STREAMING",
@@ -465,12 +409,6 @@
       "Node": "LLCCBWSampleMs",
       "Duration": 0,
       "Value": "10"
-    },
-    {
-      "PowerHint": "CAMERA_SHOT",
-      "Node": "CPUBigClusterMaxFreq",
-      "Duration": 1000,
-      "Value": "2323200"
     },
     {
       "PowerHint": "CAMERA_SHOT",
