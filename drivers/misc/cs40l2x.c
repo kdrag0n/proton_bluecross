@@ -33,7 +33,6 @@
 #include <linux/leds.h>
 #include <linux/platform_device.h>
 #include <linux/platform_data/cs40l2x.h>
-#include <linux/wake_gestures.h>
 
 #include "cs40l2x.h"
 
