@@ -26,7 +26,7 @@
  * @ELVSS_OFF_THRESHOLD: Minimum backlight threshold for disable smart elvss
  * @EXPOSURE_ADJUSTMENT_MIN: Minimum available PCC coefficient for OLED panel
  */
-#define ELVSS_OFF_THRESHOLD        258
+#define ELVSS_OFF_THRESHOLD        266
 #define EXPOSURE_ADJUSTMENT_MIN    100
 
 /* PCC coefficient when exposure is 255 */
