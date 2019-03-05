@@ -15,6 +15,7 @@
 #include <linux/msm_drm_notify.h>
 
 bool state_suspended;
+module_param(state_suspended, bool, 0444);
 
 static int msm_drm_notifier_cb(struct notifier_block *nb,
 			       unsigned long event, void *data)
