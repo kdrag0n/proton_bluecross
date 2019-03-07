@@ -43,7 +43,7 @@ case "$1" in
 		gov_param up_rate_limit_us 2000
 		gov_param down_rate_limit_us 4000
 		# CPU: Boost
-		stune_boost 15
+		stune_boost 10
 		boost_duration 32
 		boost_timeout 1750
 
@@ -67,7 +67,7 @@ case "$1" in
 		gov_param up_rate_limit_us 500
 		gov_param down_rate_limit_us 20000
 		# CPU: Boost
-		stune_boost 25
+		stune_boost 15
 		boost_duration 64
 		boost_timeout 3250
 
@@ -91,7 +91,7 @@ case "$1" in
 		gov_param up_rate_limit_us 400
 		gov_param down_rate_limit_us 25000
 		# CPU: Boost
-		stune_boost 50
+		stune_boost 20
 		boost_duration 125
 		boost_timeout 15000
 
@@ -113,7 +113,7 @@ case "$1" in
 		gov_param hispeed_load 15
 		gov_param iowait_boost_enable 1
 		# CPU: Boost
-		stune_boost 50
+		stune_boost 20
 		boost_duration 125
 		boost_timeout 30000
 
