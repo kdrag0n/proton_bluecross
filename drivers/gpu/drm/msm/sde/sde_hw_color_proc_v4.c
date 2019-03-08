@@ -15,9 +15,9 @@
 #include "sde_hw_color_proc_common_v4.h"
 #include "sde_hw_color_proc_v4.h"
 
-static unsigned short kcal_red = 256;
-static unsigned short kcal_green = 256;
-static unsigned short kcal_blue = 256;
+unsigned short kcal_red = 256;
+unsigned short kcal_green = 256;
+unsigned short kcal_blue = 256;
 static unsigned short kcal_hue = 0;
 static unsigned short kcal_sat = 255;
 static unsigned short kcal_val = 255;
@@ -30,6 +30,10 @@ module_param(kcal_hue, short, 0644);
 module_param(kcal_sat, short, 0644);
 module_param(kcal_val, short, 0644);
 module_param(kcal_cont, short, 0644);
+
+#ifdef CONFIG_KLAPSE
+#include "klapse.h"
+#endif
 
 static int sde_write_3d_gamut(struct sde_hw_blk_reg_map *hw,
 		struct drm_msm_3d_gamut *payload, u32 base,
