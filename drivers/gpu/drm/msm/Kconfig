@@ -157,7 +157,7 @@ config EXPOSURE_ADJUSTMENT
           panel hardware brightness to avoid PWM flicker on OLED devices.
 
 config KLAPSE
-	bool CONFIG_KLAPSE
+	bool "KLapse dynamic RGB scaling module"
 	depends on DRM_MSM
 	help
 	  A simple dynamic RGB lapsing module similar to LineageOS' LiveDisplay.
