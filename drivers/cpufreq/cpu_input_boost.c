@@ -121,7 +121,7 @@ static void clear_stune_boost(struct boost_drv *b, bool *active, int slot)
 static void unboost_all_cpus(struct boost_drv *b)
 {
 	if (!cancel_delayed_work_sync(&b->input_unboost) &&
-		!cancel_delayed_work_sync(&b->max_unboost))
+	    !cancel_delayed_work_sync(&b->max_unboost))
 		return;
 
 	clear_boost_bit(b, INPUT_BOOST | MAX_BOOST);
@@ -143,6 +143,15 @@ bool cpu_input_boost_should_boost_frame(void)
 			   msecs_to_jiffies(frame_boost_timeout));
 }
 
+static void __cpu_input_boost_kick(struct boost_drv *b)
+{
+	if (!(get_boost_state(b) & SCREEN_AWAKE))
+		return;
+
+	if (likely(input_boost_duration))
+		queue_work(b->wq, &b->input_boost);
+}
+
 void cpu_input_boost_kick(void)
 {
 	struct boost_drv *b = boost_drv_g;
@@ -150,14 +159,16 @@ void cpu_input_boost_kick(void)
 	if (!b)
 		return;
 
-	if (likely(input_boost_duration))
-		queue_work(b->wq, &b->input_boost);
+	__cpu_input_boost_kick(b);
 }
 
 static void __cpu_input_boost_kick_max(struct boost_drv *b,
 				       unsigned int duration_ms)
 {
 	unsigned long curr_expires, new_expires;
+
+	if (!(get_boost_state(b) & SCREEN_AWAKE))
+		return;
 
 	do {
 		curr_expires = atomic64_read(&b->max_boost_expires);
@@ -298,15 +309,8 @@ static void cpu_input_boost_input_event(struct input_handle *handle,
 					int value)
 {
 	struct boost_drv *b = handle->handler->private;
-	u32 state;
 
-	state = get_boost_state(b);
-
-	if (!(state & SCREEN_AWAKE))
-		return;
-
-	if (likely(input_boost_duration))
-		queue_work(b->wq, &b->input_boost);
+	__cpu_input_boost_kick(b);
 
 	last_input_jiffies = jiffies;
 }
