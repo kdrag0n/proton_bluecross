@@ -344,3 +344,18 @@ config CPU_PM
 config DEDUCE_WAKEUP_REASONS
 	bool
 	default n
+
+config COREPOWER
+	bool "CorePower system power state optimizer"
+	help
+	  CorePower adapts the system for optimal power consumption in various
+	  power states in real-time. Power state transitions are event-based.
+
+config COREPOWER_WAKE_TIMEOUT
+	int "Wakeup timeout"
+	default 500
+	depends on COREPOWER
+	help
+	  The timeout for temporary wake-up power state boosts. After this
+	  timeout has passed, the power state will be reverted to sleep if the
+	  system has not finished waking up.
