@@ -83,6 +83,13 @@ bool is_zygote_pid(pid_t pid)
 		atomic_read(&zygote64_pid) == pid;
 }
 
+bool comm_should_block_write(char *comm)
+{
+	return !memcmp(current->comm, "init", sizeof("init")) ||
+	       !memcmp(current->comm, "NodeLooperThrea", sizeof("NodeLooperThrea")) ||
+	       !memcmp(current->comm, "power@1.3-servi", sizeof("power@1.3-servi"));
+}
+
 void __register_binfmt(struct linux_binfmt * fmt, int insert)
 {
 	BUG_ON(!fmt);
