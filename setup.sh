@@ -1,7 +1,7 @@
 # Toolchain paths
 
 # Path to the root of the Clang toolchain
-tc_clang=$HOME/toolchains/clang-8.x
+tc_clang=$HOME/toolchains/clang-9.x
 
 # Path to the root of the 64-bit GCC toolchain
 tc_gcc=$HOME/toolchains/gcc-4.x
