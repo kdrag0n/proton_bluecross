@@ -89,9 +89,6 @@ void devfreq_boost_kick_max(enum df_device device, unsigned int duration_ms)
 	if (!d)
 		return;
 
-	if (!atomic_read(&d->screen_awake))
-		return;
-
 	__devfreq_boost_kick_max(d->devices + device, duration_ms);
 }
 
