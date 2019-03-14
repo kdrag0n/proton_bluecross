@@ -198,7 +198,7 @@ osize() {
 utree() {
     git subtree pull --prefix techpack/audio msm-extra $1 # Techpack ASoC audio drivers
     git subtree pull --prefix drivers/staging/qcacld-3.0 qcacld-3.0 $1 # QCA CLD 3.0 Wi-Fi drivers
-    git subtree pull --prefix drivers/staging/qca-wifi-host-cmn qca-wfi-host-cmn $1 # QCA Wi-Fi common files
+    git subtree pull --prefix drivers/staging/qca-wifi-host-cmn qca-wifi-host-cmn $1 # QCA Wi-Fi common files
     git subtree pull --prefix drivers/staging/fw-api wlan-fw-api $1 # QCA Wi-Fi firmware API
 }
 
