@@ -20,6 +20,7 @@ static __read_mostly unsigned int input_boost_freq_hp = CONFIG_INPUT_BOOST_FREQ_
 static __read_mostly unsigned int input_boost_return_freq_lp = CONFIG_REMOVE_INPUT_BOOST_FREQ_LP;
 static __read_mostly unsigned int input_boost_return_freq_hp = CONFIG_REMOVE_INPUT_BOOST_FREQ_PERF;
 static __read_mostly unsigned short input_boost_duration = CONFIG_INPUT_BOOST_DURATION_MS;
+static __read_mostly unsigned short wake_boost_duration = CONFIG_WAKE_BOOST_DURATION_MS;
 static __read_mostly int frame_boost_timeout = CONFIG_FRAME_BOOST_TIMEOUT;
 
 module_param(input_boost_freq_lp, uint, 0644);
@@ -27,6 +28,7 @@ module_param(input_boost_freq_hp, uint, 0644);
 module_param_named(remove_input_boost_freq_lp, input_boost_return_freq_lp, uint, 0644);
 module_param_named(remove_input_boost_freq_perf, input_boost_return_freq_hp, uint, 0644);
 module_param(input_boost_duration, short, 0644);
+module_param(wake_boost_duration, short, 0644);
 module_param(frame_boost_timeout, int, 0644);
 
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
@@ -194,7 +196,7 @@ void cpu_input_boost_kick_max(unsigned int duration_ms)
 
 void cpu_input_boost_kick_wake(void)
 {
-	cpu_input_boost_kick_max(CONFIG_WAKE_BOOST_DURATION_MS);
+	cpu_input_boost_kick_max(wake_boost_duration);
 }
 
 static void input_boost_worker(struct work_struct *work)
@@ -298,7 +300,7 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 	/* Boost when the screen turns on and unboost when it turns off */
 	if (*blank == MSM_DRM_BLANK_UNBLANK) {
 		set_boost_bit(b, SCREEN_AWAKE);
-		__cpu_input_boost_kick_max(b, CONFIG_WAKE_BOOST_DURATION_MS);
+		__cpu_input_boost_kick_max(b, wake_boost_duration);
 	} else {
 		clear_boost_bit(b, SCREEN_AWAKE);
 		unboost_all_cpus(b);
@@ -317,7 +319,7 @@ static void cpu_input_boost_input_event(struct input_handle *handle,
 
 	if (type == EV_KEY && code == KEY_POWER && value == 1 &&
 	    !(get_boost_state(b) & SCREEN_AWAKE))
-		__cpu_input_boost_kick_max(b, CONFIG_WAKE_BOOST_DURATION_MS);
+		__cpu_input_boost_kick_max(b, wake_boost_duration);
 
 	last_input_jiffies = jiffies;
 }
