@@ -26,6 +26,7 @@
 
 #include <linux/atomic.h>
 #include <linux/cpu_input_boost.h>
+#include <linux/corepower.h>
 #include <linux/delay.h>
 #include <linux/devfreq_boost.h>
 #include <linux/device.h>
@@ -447,6 +448,7 @@ static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
 	}
 
 	if (!is_display_on()) {
+		corepower_wake();
 		cpu_input_boost_kick_wake();
 		devfreq_boost_kick_wake(DEVFREQ_MSM_CPUBW);
 	}
