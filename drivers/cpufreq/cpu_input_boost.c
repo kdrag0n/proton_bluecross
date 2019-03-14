@@ -168,9 +168,6 @@ static void __cpu_input_boost_kick_max(struct boost_drv *b,
 {
 	unsigned long curr_expires, new_expires;
 
-	if (!(get_boost_state(b) & SCREEN_AWAKE))
-		return;
-
 	do {
 		curr_expires = atomic64_read(&b->max_boost_expires);
 		new_expires = jiffies + msecs_to_jiffies(duration_ms);
