@@ -141,9 +141,6 @@ struct alloc_context {
 	int migratetype;
 	enum zone_type high_zoneidx;
 	bool spread_dirty_pages;
-#ifdef CONFIG_ANDROID_SIMPLE_LMK
-	bool is_lmk_alloc;
-#endif
 };
 
 #define ac_classzone_idx(ac) zonelist_zone_idx(ac->preferred_zoneref)
