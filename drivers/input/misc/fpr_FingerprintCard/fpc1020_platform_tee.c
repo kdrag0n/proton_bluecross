@@ -446,12 +446,12 @@ static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
 		__pm_wakeup_event(&fpc1020->ttw_wakesrc, FPC_TTW_HOLD_TIME);
 	}
 
-	sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_irq.attr.name);
-
 	if (state_suspended) {
 		cpu_input_boost_kick_wake();
 		devfreq_boost_kick_wake(DEVFREQ_MSM_CPUBW);
 	}
+
+	sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_irq.attr.name);
 
 	return IRQ_HANDLED;
 }
