@@ -34,6 +34,10 @@
 #include <linux/compat.h>
 #include <linux/cn_proc.h>
 #include <linux/compiler.h>
+#include <linux/cpu_input_boost.h>
+#include <linux/devfreq_boost.h>
+#include <linux/display_state.h>
+#include <linux/oom.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/signal.h>
@@ -1337,16 +1341,69 @@ int __kill_pgrp_info(int sig, struct siginfo *info, struct pid *pgrp)
 	return success ? 0 : retval;
 }
 
+static void mark_lmkd_victim(struct task_struct *tsk)
+{
+	struct mm_struct *mm = tsk->mm;
+
+	if (!cmpxchg(&tsk->signal->oom_mm, NULL, mm)) {
+		atomic_inc(&tsk->signal->oom_mm->mm_count);
+		set_bit(MMF_OOM_VICTIM, &mm->flags);
+	}
+}
+
 int kill_pid_info(int sig, struct siginfo *info, struct pid *pid)
 {
+#ifdef CONFIG_MEMCG
+	static const struct sched_param rt_param = {
+		.sched_priority = MAX_RT_PRIO - 1
+	};
+#endif
 	int error = -ESRCH;
 	struct task_struct *p;
 
 	for (;;) {
 		rcu_read_lock();
 		p = pid_task(pid, PIDTYPE_PID);
-		if (p)
+		if (p) {
+#ifdef CONFIG_MEMCG
+			bool is_lmkd = false;
+
+			/* Accelerate lmkd task killing */
+			if (sig == SIGKILL && is_lmkd_pid(current->pid)) {
+				is_lmkd = true;
+				info = SEND_SIG_PRIV;
+				preempt_disable();
+
+				sched_setscheduler_nocheck(p, SCHED_FIFO,
+							   &rt_param);
+				set_cpus_allowed_ptr(p, cpu_perf_mask);
+
+				if (is_display_on()) {
+					cpu_input_boost_kick_max(250);
+					devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW,
+							       250);
+				}
+			}
+#endif
+
 			error = group_send_sig_info(sig, info, p);
+
+#ifdef CONFIG_MEMCG
+			if (is_lmkd) {
+				preempt_enable();
+
+				if (!error) {
+					task_lock(p);
+					if (p->mm && !test_bit(MMF_OOM_SKIP,
+					    &p->mm->flags)) {
+						mark_lmkd_victim(p);
+						wake_oom_reaper(p);
+					}
+					task_unlock(p);
+				}
+			}
+#endif
+		}
 		rcu_read_unlock();
 		if (likely(!p || error != -ESRCH))
 			return error;
