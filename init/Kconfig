@@ -795,6 +795,19 @@ config RCU_NOCB_CPU_ALL
 
 endchoice
 
+config RCU_NOCB_CPU_BIND_LP
+	bool "Bind offloaded RCU callback threads to low-power CPUs"
+	depends on RCU_NOCB_CPU
+	help
+	  This option binds kthreads dedicated to running offloaded RCU
+	  callbacks for no-CBs CPUs (per-CPU rcuo kthreads) to the low-power CPU
+	  cluster in order to improve energy efficiency as the no-CBs mechanism
+	  was meant to do. For optimal results, all CPUs should be marked as
+	  no-CBs, especially those from the performance cluster.
+
+	  Select this if energy efficiency is critical and no-CBs
+	  high-performance CPUs are present in the system.
+
 endmenu # "RCU Subsystem"
 
 config BUILD_BIN2C

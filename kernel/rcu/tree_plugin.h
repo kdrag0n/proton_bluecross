@@ -2323,8 +2323,13 @@ static void rcu_spawn_one_nocb_kthread(struct rcu_state *rsp, int cpu)
 	}
 
 	/* Spawn the kthread for this CPU and RCU flavor. */
+#ifdef CONFIG_RCU_NOCB_CPU_BIND_LP
+	t = kthread_run_low_power(rcu_nocb_kthread, rdp_spawn,
+			"rcuo%c/%d", rsp->abbr, cpu);
+#else
 	t = kthread_run(rcu_nocb_kthread, rdp_spawn,
 			"rcuo%c/%d", rsp->abbr, cpu);
+#endif
 	BUG_ON(IS_ERR(t));
 	WRITE_ONCE(rdp_spawn->nocb_kthread, t);
 }
