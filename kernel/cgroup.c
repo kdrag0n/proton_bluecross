@@ -65,7 +65,7 @@
 #include <linux/binfmts.h>
 #include <linux/cpu_input_boost.h>
 #include <linux/devfreq_boost.h>
-#include <linux/state_notifier.h>
+#include <linux/display_state.h>
 #include <net/sock.h>
 
 #define CREATE_TRACE_POINTS
@@ -2963,7 +2963,7 @@ static ssize_t __cgroup_procs_write(struct kernfs_open_file *of, char *buf,
 		ret = cgroup_attach_task(cgrp, tsk, threadgroup);
 
 	/* This covers boosting for app launches and app transitions */
-	if (!ret && !threadgroup && !state_suspended &&
+	if (!ret && !threadgroup && is_display_on() &&
 		!memcmp(of->kn->parent->name, "top-app", sizeof("top-app")) &&
 		is_zygote_pid(tsk->parent->pid)) {
 		cpu_input_boost_kick_max(500);
