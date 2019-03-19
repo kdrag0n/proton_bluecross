@@ -13,7 +13,7 @@
 #include <linux/module.h>
 #include <linux/cpu_input_boost.h>
 #include <linux/devfreq_boost.h>
-#include <linux/state_notifier.h>
+#include <linux/display_state.h>
 #include <cam_sensor_cmn_header.h>
 #include "cam_actuator_core.h"
 #include "cam_sensor_util.h"
@@ -505,7 +505,7 @@ int32_t cam_actuator_i2c_pkt_parse(struct cam_actuator_ctrl_t *a_ctrl,
 
 	switch (csl_packet->header.op_code & 0xFFFFFF) {
 	case CAM_ACTUATOR_PACKET_OPCODE_INIT:
-		if (!state_suspended) {
+		if (is_display_on()) {
 			cpu_input_boost_kick_max(500);
 			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 500);
 		}

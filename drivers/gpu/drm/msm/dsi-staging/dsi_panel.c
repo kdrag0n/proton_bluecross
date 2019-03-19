@@ -20,9 +20,6 @@
 #include <linux/of_gpio.h>
 #include <video/mipi_display.h>
 #include <linux/firmware.h>
-#ifdef CONFIG_STATE_NOTIFIER
-#include <linux/state_notifier.h>
-#endif
 
 #include "dsi_panel.h"
 #include "dsi_ctrl_hw.h"
