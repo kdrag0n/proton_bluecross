@@ -866,12 +866,6 @@ config FORCE_FAST_CHARGE
 	help
 	  This drivers allows users to override default charge rate for USB.
 
-config STATE_NOTIFIER
-	bool "Suspend state tracker"
-	help
-	  A unified display state tracker for kernel drivers for easy porting
-	  between different devices.
-
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
