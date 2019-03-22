@@ -301,6 +301,7 @@ static int msm_drm_notifier_callback(struct notifier_block *self,
 	blank = evdata->data;
 	switch (*blank) {
 	case MSM_DRM_BLANK_POWERDOWN:
+	case MSM_DRM_BLANK_LP:
 		screen_on = false;
 		queue_work(system_power_efficient_wq, &f2fs_gc_fb_worker);
 		break;
