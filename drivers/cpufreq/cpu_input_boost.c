@@ -8,6 +8,7 @@
 
 #include <linux/cpu.h>
 #include <linux/cpufreq.h>
+#include <linux/display_state.h>
 #include <linux/input.h>
 #include <linux/moduleparam.h>
 #include <linux/msm_drm_notify.h>
@@ -40,9 +41,8 @@ module_param(max_stune_boost, int, 0644);
 #endif
 
 /* Available bits for boost_drv state */
-#define SCREEN_AWAKE		BIT(0)
-#define INPUT_BOOST		BIT(1)
-#define MAX_BOOST		BIT(2)
+#define INPUT_BOOST		BIT(0)
+#define MAX_BOOST		BIT(1)
 
 struct boost_drv {
 	struct workqueue_struct *wq;
@@ -148,7 +148,7 @@ bool cpu_input_boost_should_boost_frame(void)
 
 static void __cpu_input_boost_kick(struct boost_drv *b)
 {
-	if (!(get_boost_state(b) & SCREEN_AWAKE))
+	if (!is_display_on())
 		return;
 
 	if (likely(input_boost_duration))
@@ -298,13 +298,10 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 		return NOTIFY_OK;
 
 	/* Boost when the screen turns on and unboost when it turns off */
-	if (*blank == MSM_DRM_BLANK_UNBLANK) {
-		set_boost_bit(b, SCREEN_AWAKE);
+	if (*blank == MSM_DRM_BLANK_UNBLANK)
 		__cpu_input_boost_kick_max(b, wake_boost_duration);
-	} else {
-		clear_boost_bit(b, SCREEN_AWAKE);
+	else
 		unboost_all_cpus(b);
-	}
 
 	return NOTIFY_OK;
 }
@@ -318,7 +315,7 @@ static void cpu_input_boost_input_event(struct input_handle *handle,
 	__cpu_input_boost_kick(b);
 
 	if (type == EV_KEY && code == KEY_POWER && value == 1 &&
-	    !(get_boost_state(b) & SCREEN_AWAKE))
+	    !is_display_on())
 		__cpu_input_boost_kick_max(b, wake_boost_duration);
 
 	last_input_jiffies = jiffies;
