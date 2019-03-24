@@ -290,7 +290,6 @@ static int msm_drm_notifier_callback(struct notifier_block *self,
 				unsigned long event, void *data)
 {
 	struct msm_drm_notifier *evdata = data;
-	int *blank;
 
 	if (event != MSM_DRM_EVENT_BLANK)
 		return NOTIFY_DONE;
@@ -298,16 +297,7 @@ static int msm_drm_notifier_callback(struct notifier_block *self,
 	if (!evdata || !evdata->data || evdata->id != MSM_DRM_PRIMARY_DISPLAY)
 		return NOTIFY_DONE;
 
-	blank = evdata->data;
-	switch (*blank) {
-	case MSM_DRM_BLANK_POWERDOWN:
-	case MSM_DRM_BLANK_LP:
-		queue_work(system_power_efficient_wq, &f2fs_gc_fb_worker);
-		break;
-	case MSM_DRM_BLANK_UNBLANK:
-		queue_work(system_power_efficient_wq, &f2fs_gc_fb_worker);
-		break;
-	}
+	queue_work(system_power_efficient_wq, &f2fs_gc_fb_worker);
 
 	return NOTIFY_OK;
 }
