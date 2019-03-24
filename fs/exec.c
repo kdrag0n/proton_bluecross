@@ -75,19 +75,18 @@ static DEFINE_RWLOCK(binfmt_lock);
 #define ZYGOTE32_BIN	"/system/bin/app_process32"
 #define ZYGOTE64_BIN	"/system/bin/app_process64"
 #define LMKD_BIN	"/system/bin/lmkd"
-static atomic_t zygote32_pid;
-static atomic_t zygote64_pid;
-static atomic_t lmkd_pid;
+static pid_t zygote32_pid;
+static pid_t zygote64_pid;
+static pid_t lmkd_pid;
 
 bool is_zygote_pid(pid_t pid)
 {
-	return atomic_read(&zygote32_pid) == pid ||
-		atomic_read(&zygote64_pid) == pid;
+	return pid == zygote32_pid || pid == zygote64_pid;
 }
 
 bool is_lmkd_pid(pid_t pid)
 {
-	return atomic_read(&lmkd_pid) == pid;
+	return pid == lmkd_pid;
 }
 
 bool comm_should_block_write(char *comm)
@@ -1813,11 +1812,11 @@ static int do_execveat_common(int fd, struct filename *filename,
 
 	if (capable(CAP_SYS_ADMIN)) {
 		if (unlikely(!strcmp(filename->name, ZYGOTE32_BIN)))
-			atomic_set(&zygote32_pid, current->pid);
+			zygote32_pid = current->pid;
 		else if (unlikely(!strcmp(filename->name, ZYGOTE64_BIN)))
-			atomic_set(&zygote64_pid, current->pid);
+			zygote64_pid = current->pid;
 		else if (unlikely(!strcmp(filename->name, LMKD_BIN)))
-			atomic_set(&lmkd_pid, current->pid);
+			lmkd_pid = current->pid;
 	}
 
 	/* execve succeeded */
