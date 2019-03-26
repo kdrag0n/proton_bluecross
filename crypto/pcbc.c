@@ -49,7 +49,7 @@ static int crypto_pcbc_encrypt_segment(struct skcipher_request *req,
 	unsigned int nbytes = walk->nbytes;
 	u8 *src = walk->src.virt.addr;
 	u8 *dst = walk->dst.virt.addr;
-	u8 *iv = walk->iv;
+	u8 * const iv = walk->iv;
 
 	do {
 		crypto_xor(iv, src, bsize);
@@ -71,7 +71,7 @@ static int crypto_pcbc_encrypt_inplace(struct skcipher_request *req,
 	int bsize = crypto_cipher_blocksize(tfm);
 	unsigned int nbytes = walk->nbytes;
 	u8 *src = walk->src.virt.addr;
-	u8 *iv = walk->iv;
+	u8 * const iv = walk->iv;
 	u8 tmpbuf[bsize];
 
 	do {
@@ -83,8 +83,6 @@ static int crypto_pcbc_encrypt_inplace(struct skcipher_request *req,
 
 		src += bsize;
 	} while ((nbytes -= bsize) >= bsize);
-
-	memcpy(walk->iv, iv, bsize);
 
 	return nbytes;
 }
@@ -121,7 +119,7 @@ static int crypto_pcbc_decrypt_segment(struct skcipher_request *req,
 	unsigned int nbytes = walk->nbytes;
 	u8 *src = walk->src.virt.addr;
 	u8 *dst = walk->dst.virt.addr;
-	u8 *iv = walk->iv;
+	u8 * const iv = walk->iv;
 
 	do {
 		crypto_cipher_decrypt_one(tfm, dst, src);
@@ -133,8 +131,6 @@ static int crypto_pcbc_decrypt_segment(struct skcipher_request *req,
 		dst += bsize;
 	} while ((nbytes -= bsize) >= bsize);
 
-	memcpy(walk->iv, iv, bsize);
-
 	return nbytes;
 }
 
@@ -145,7 +141,7 @@ static int crypto_pcbc_decrypt_inplace(struct skcipher_request *req,
 	int bsize = crypto_cipher_blocksize(tfm);
 	unsigned int nbytes = walk->nbytes;
 	u8 *src = walk->src.virt.addr;
-	u8 *iv = walk->iv;
+	u8 * const iv = walk->iv;
 	u8 tmpbuf[bsize] __attribute__ ((aligned(__alignof__(u32))));
 
 	do {
@@ -157,8 +153,6 @@ static int crypto_pcbc_decrypt_inplace(struct skcipher_request *req,
 
 		src += bsize;
 	} while ((nbytes -= bsize) >= bsize);
-
-	memcpy(walk->iv, iv, bsize);
 
 	return nbytes;
 }
