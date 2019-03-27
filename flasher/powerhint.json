@@ -224,15 +224,6 @@
         "0-7"
       ],
       "ResetOnInit": true
-    },
-    {
-      "Name": "SchedBoost",
-      "Path": "/proc/sys/kernel/sched_boost",
-      "Values": [
-        "1",
-        "0"
-      ],
-      "ResetOnInit": true
     }
   ],
   "Actions": [
@@ -313,12 +304,6 @@
       "Node": "LLCCBWMinFreq",
       "Duration": 0,
       "Value": "2597"
-    },
-    {
-      "PowerHint": "LAUNCH",
-      "Node": "SchedBoost",
-      "Duration": 3000,
-      "Value": "1"
     },
     {
       "PowerHint": "LAUNCH",
