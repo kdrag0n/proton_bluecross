@@ -124,6 +124,6 @@ extern void set_binfmt(struct linux_binfmt *new);
 extern ssize_t read_code(struct file *, unsigned long, loff_t, size_t);
 extern bool is_zygote_pid(pid_t pid);
 extern bool is_lmkd_pid(pid_t pid);
-extern bool comm_should_block_write(char *comm);
+extern bool is_boost_comm(char *comm);
 
 #endif /* _LINUX_BINFMTS_H */

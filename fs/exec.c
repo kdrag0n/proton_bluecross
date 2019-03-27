@@ -89,7 +89,7 @@ bool is_lmkd_pid(pid_t pid)
 	return pid == lmkd_pid;
 }
 
-bool comm_should_block_write(char *comm)
+bool is_boost_comm(char *comm)
 {
 	return !strcmp(current->comm, "init") ||
 	       !strcmp(current->comm, "NodeLooperThrea") ||
