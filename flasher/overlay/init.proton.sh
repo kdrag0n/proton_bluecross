@@ -53,9 +53,9 @@ case "$1" in
 		;;
 	'balanced')
 		# CPU: Little
-		little_min 300000
+		little_min 576000
 		little_max 1766400
-		little_boost 825600
+		little_boost 1056000
 		little_gov_param hispeed_freq 0
 		# CPU: Big
 		big_max 2323200
@@ -77,7 +77,7 @@ case "$1" in
 		;;
 	'performance')
 		# CPU: Little
-		little_min 576000
+		little_min 748800
 		little_max 1766400
 		little_boost 1516800
 		little_gov_param hispeed_freq 1228800
@@ -91,7 +91,7 @@ case "$1" in
 		gov_param up_rate_limit_us 400
 		gov_param down_rate_limit_us 25000
 		# CPU: Boost
-		stune_boost 20
+		stune_boost 15
 		boost_duration 125
 		boost_timeout 15000
 
@@ -101,7 +101,7 @@ case "$1" in
 		;;
 	'turbo')
 		# CPU: Little
-		little_min 576000
+		little_min 748800
 		little_max 1766400
 		little_boost 1516800
 		little_gov_param hispeed_freq 1228800
@@ -112,14 +112,16 @@ case "$1" in
 		# CPU: Governor
 		gov_param hispeed_load 15
 		gov_param iowait_boost_enable 1
+		gov_param up_rate_limit_us 400
+		gov_param down_rate_limit_us 25000
 		# CPU: Boost
-		stune_boost 20
+		stune_boost 15
 		boost_duration 125
 		boost_timeout 30000
 
 		# GPU
 		gpu_min 342000000
-		gpu_gov performance
+		gpu_gov msm-adreno-tz
 		;;
 	*)
 		echo "Valid actions: [usb] usb_msc, [profiles] battery, balanced, performance, turbo"
