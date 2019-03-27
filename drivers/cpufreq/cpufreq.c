@@ -796,7 +796,7 @@ static ssize_t store_##file_name					\
 									\
 	if (IS_ENABLED(CONFIG_MSM_THERMAL_SIMPLE) &&			\
 	    &policy->object == &policy->max &&				\
-	    comm_should_block_write(current->comm))			\
+	    is_boost_comm(current->comm))				\
 		return count;						\
 									\
 	memcpy(&new_policy, policy, sizeof(*policy));			\
