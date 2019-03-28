@@ -16,33 +16,23 @@
  */
 unsigned long int_sqrt(unsigned long x)
 {
-	unsigned long tmp;
-	unsigned long place;
-	unsigned long root;
-	unsigned long remainder;
+	unsigned long b, m, y = 0;
 
 	if (x <= 1)
 		return x;
 
-	root = 0;
-	remainder = x;
-	place = 1UL << (BITS_PER_LONG - 2);
-	
-	while (place > remainder)  
-		place >>= 2;
+	m = 1UL << (BITS_PER_LONG - 2);
+	while (m != 0) {
+		b = y + m;
+		y >>= 1;
 
-	while (place != 0) {
-		tmp = root + place;
-
-		if (remainder >= tmp) 
-		{
-			remainder -= tmp;
-			root += (place << 1);
+		if (x >= b) {
+			x -= b;
+			y += m;
 		}
-		root >>= 1;
-		place >>= 2;
+		m >>= 2;
 	}
 
-	return root;
+	return y;
 }
 EXPORT_SYMBOL(int_sqrt);
