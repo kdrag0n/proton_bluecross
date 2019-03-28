@@ -58,17 +58,13 @@
 #define CORE_DCVS_CTRL			0xbc
 #define PSTATE_STATUS			0x700
 
-#define DCVS_PERF_STATE_DESIRED_REG_0_V1	0x780
-#define DCVS_PERF_STATE_DESIRED_REG_0_V2	0x920
-#define DCVS_PERF_STATE_DESIRED_REG(n, v1) \
-	(((v1) ? DCVS_PERF_STATE_DESIRED_REG_0_V1 \
-		: DCVS_PERF_STATE_DESIRED_REG_0_V2) + 4 * (n))
+#define DCVS_PERF_STATE_DESIRED_REG_0	0x920
+#define DCVS_PERF_STATE_DESIRED_REG(n) \
+	(DCVS_PERF_STATE_DESIRED_REG_0 + 4 * (n))
 
-#define OSM_CYCLE_COUNTER_STATUS_REG_0_V1	0x7d0
-#define OSM_CYCLE_COUNTER_STATUS_REG_0_V2	0x9c0
-#define OSM_CYCLE_COUNTER_STATUS_REG(n, v1) \
-	(((v1) ? OSM_CYCLE_COUNTER_STATUS_REG_0_V1 \
-		: OSM_CYCLE_COUNTER_STATUS_REG_0_V2) + 4 * (n))
+#define OSM_CYCLE_COUNTER_STATUS_REG_0	0x9c0
+#define OSM_CYCLE_COUNTER_STATUS_REG(n) \
+	(OSM_CYCLE_COUNTER_STATUS_REG_0 + 4 * (n))
 
 static DEFINE_VDD_REGS_INIT(vdd_l3_mx_ao, 1);
 static DEFINE_VDD_REGS_INIT(vdd_pwrcl_mx_ao, 1);
@@ -100,8 +96,6 @@ struct clk_osm {
 	ktime_t last_update;
 	struct mutex update_lock;
 };
-
-static bool is_sdm845v1;
 
 static inline struct clk_osm *to_clk_osm(struct clk_hw *_hw)
 {
@@ -224,9 +218,7 @@ static int clk_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
 	}
 
 	core_num = parent->per_core_dcvs ? c->core_num : 0;
-	clk_osm_write_reg(parent, index,
-				DCVS_PERF_STATE_DESIRED_REG(core_num,
-							is_sdm845v1));
+	clk_osm_write_reg(parent, index, DCVS_PERF_STATE_DESIRED_REG(core_num));
 
 	/* Make sure the write goes through before proceeding */
 	clk_osm_mb(parent);
@@ -246,9 +238,7 @@ static unsigned long clk_cpu_recalc_rate(struct clk_hw *hw,
 		return -EINVAL;
 
 	core_num = parent->per_core_dcvs ? c->core_num : 0;
-	index = clk_osm_read_reg(parent,
-				DCVS_PERF_STATE_DESIRED_REG(core_num,
-							is_sdm845v1));
+	index = clk_osm_read_reg(parent, DCVS_PERF_STATE_DESIRED_REG(core_num));
 	return parent->osm_table[index].frequency;
 }
 
@@ -292,8 +282,7 @@ static int l3_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 	}
 	pr_debug("rate: %lu --> index %d\n", rate, index);
 
-	clk_osm_write_reg(cpuclk, index,
-				DCVS_PERF_STATE_DESIRED_REG(0, is_sdm845v1));
+	clk_osm_write_reg(cpuclk, index, DCVS_PERF_STATE_DESIRED_REG(0));
 
 	/* Make sure the write goes through before proceeding */
 	clk_osm_mb(cpuclk);
@@ -329,8 +318,7 @@ static unsigned long l3_clk_recalc_rate(struct clk_hw *hw,
 	if (!cpuclk)
 		return -EINVAL;
 
-	index = clk_osm_read_reg(cpuclk,
-				DCVS_PERF_STATE_DESIRED_REG(0, is_sdm845v1));
+	index = clk_osm_read_reg(cpuclk, DCVS_PERF_STATE_DESIRED_REG(0));
 
 	pr_debug("%s: Index %d, freq %ld\n", __func__, index,
 				cpuclk->osm_table[index].frequency);
@@ -683,8 +671,7 @@ osm_set_index(struct clk_osm *c, unsigned int index)
 	/* Skip the update if the current rate is the same as the new one */
 	mutex_lock(&parent->update_lock);
 	current_index = clk_osm_read_reg(parent,
-				DCVS_PERF_STATE_DESIRED_REG(core_num,
-							is_sdm845v1));
+				DCVS_PERF_STATE_DESIRED_REG(core_num));
 	if (current_index == index)
 		goto unlock;
 
@@ -719,8 +706,7 @@ static unsigned int osm_cpufreq_get(unsigned int cpu)
 		return 0;
 
 	c = policy->driver_data;
-	index = clk_osm_read_reg(c,
-			DCVS_PERF_STATE_DESIRED_REG(c->core_num, is_sdm845v1));
+	index = clk_osm_read_reg(c, DCVS_PERF_STATE_DESIRED_REG(c->core_num));
 
 	if (policy->freq_table[index].frequency == OSM_INIT_RATE / 1000)
 		return OSM_INIT_RATE / 1000;
@@ -1012,7 +998,7 @@ static u64 clk_osm_get_cpu_cycle_counter(int cpu)
 	 */
 	core_num = parent->per_core_dcvs ? c->core_num : 0;
 	val = clk_osm_read_reg_no_log(parent,
-			OSM_CYCLE_COUNTER_STATUS_REG(core_num, is_sdm845v1));
+			OSM_CYCLE_COUNTER_STATUS_REG(core_num));
 
 	if (val < c->prev_cycle_counter) {
 		/* Handle counter overflow */
@@ -1248,9 +1234,6 @@ static int clk_cpu_osm_driver_probe(struct platform_device *pdev)
 			dev_err(dev, "Unable to get xo clock\n");
 		return PTR_ERR(ext_xo_clk);
 	}
-
-	is_sdm845v1 = of_device_is_compatible(pdev->dev.of_node,
-					"qcom,clk-cpu-osm");
 
 	if (of_device_is_compatible(pdev->dev.of_node,
 					 "qcom,clk-cpu-osm-sdm670"))
