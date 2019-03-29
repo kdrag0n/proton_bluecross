@@ -7,7 +7,6 @@
 
 #include <linux/kernel.h>
 #include <linux/export.h>
-#include <linux/bitops.h>
 
 /**
  * int_sqrt - computes the integer square root
@@ -22,7 +21,10 @@ unsigned long int_sqrt(unsigned long x)
 	if (x <= 1)
 		return x;
 
-	m = 1UL << (__fls(x) & ~1UL);
+	m = 1UL << (BITS_PER_LONG - 2);
+	while (m > x)
+		m >>= 2;
+
 	while (m != 0) {
 		b = y + m;
 		y >>= 1;
