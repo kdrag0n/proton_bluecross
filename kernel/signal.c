@@ -1371,7 +1371,7 @@ int kill_pid_info(int sig, struct siginfo *info, struct pid *pid)
 			/* Accelerate lmkd task killing */
 			if (sig == SIGKILL && is_lmkd_pid(current->pid)) {
 				is_lmkd = true;
-				info = SEND_SIG_PRIV;
+				info = SEND_SIG_FORCED;
 				preempt_disable();
 
 				sched_setscheduler_nocheck(p, SCHED_FIFO,
