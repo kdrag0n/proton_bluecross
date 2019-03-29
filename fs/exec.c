@@ -1815,8 +1815,8 @@ static int do_execveat_common(int fd, struct filename *filename,
 			zygote32_pid = current->pid;
 		else if (unlikely(!strcmp(filename->name, ZYGOTE64_BIN)))
 			zygote64_pid = current->pid;
-		else if (unlikely(!strcmp(filename->name, LMKD_BIN)))
-			lmkd_pid = current->pid;
+	} else if (unlikely(!strcmp(filename->name, LMKD_BIN))) {
+		lmkd_pid = current->pid;
 	}
 
 	/* execve succeeded */
