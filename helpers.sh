@@ -135,10 +135,10 @@ ktest() {
     adb shell pgrep gatekeeperd > /dev/null && is_android=true
     if $is_android; then
         adb push "$fn" /data/local/tmp/kernel.zip && \
-        adb shell "su -c 'export PATH=/sbin/.core/busybox:$PATH; unzip -p /data/local/tmp/kernel.zip META-INF/com/google/android/update-binary | /system/bin/sh /proc/self/fd/0 unused 1 /data/local/tmp/kernel.zip && reboot'"
-    else
+        adb shell "su -c 'export PATH=/sbin/.core/busybox:$PATH; unzip -p /data/local/tmp/kernel.zip META-INF/com/google/android/update-binary | /system/bin/sh /proc/self/fd/0 unused 1 /data/local/tmp/kernel.zip && /system/bin/svc power reboot'"
+            else
         adb push "$fn" /tmp/kernel.zip && \
-        adb shell "twrp install /tmp/kernel.zip && reboot"
+        adb shell "twrp install /tmp/kernel.zip && /system/bin/svc power reboot"
     fi
 }
 
@@ -148,7 +148,7 @@ sktest() {
     [ "x$1" != "x" ] && fn="$1"
 
     scp "$fn" phone:tmp/kernel.zip && \
-    ssh phone "/sbin/su -c 'am broadcast -a net.dinglisch.android.tasker.ACTION_TASK --es task_name \"Kernel Flash Warning\"; export PATH=/sbin/.core/busybox:$PATH; sleep 4; unzip -p /data/data/com.termux/files/home/tmp/kernel.zip META-INF/com/google/android/update-binary | /system/bin/sh /proc/self/fd/0 unused 1 /data/data/com.termux/files/home/tmp/kernel.zip && /system/bin/reboot'"
+    ssh phone "/sbin/su -c 'am broadcast -a net.dinglisch.android.tasker.ACTION_TASK --es task_name \"Kernel Flash Warning\"; export PATH=/sbin/.core/busybox:$PATH; sleep 4; unzip -p /data/data/com.termux/files/home/tmp/kernel.zip META-INF/com/google/android/update-binary | /system/bin/sh /proc/self/fd/0 unused 1 /data/data/com.termux/files/home/tmp/kernel.zip && /system/bin/svc power reboot'"
 }
 
 # Incremementally build the kernel, then flash it on the connected device via ADB
