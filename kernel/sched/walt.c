@@ -145,9 +145,9 @@ __read_mostly unsigned int sched_window_stats_policy =
 __read_mostly unsigned int sysctl_sched_window_stats_policy =
 	WINDOW_STATS_MAX_RECENT_AVG;
 
-/* Window size (in ns) = 8ms */
+/* Window size (in ns) = 20ms */
 __read_mostly unsigned int sched_ravg_window =
-					    (8000000 / TICK_NSEC) * TICK_NSEC;
+					    (20000000 / TICK_NSEC) * TICK_NSEC;
 
 /*
  * A after-boot constant divisor for cpu_util_freq_walt() to apply the load
