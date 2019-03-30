@@ -142,7 +142,7 @@ ktest() {
     fi
 }
 
-# Flash the latest kernel zip on the device via SSH
+# Flash the latest kernel zip on the device via SSH over LAN
 sktest() {
     fn="proton_kernel.zip"
     [ "x$1" != "x" ] && fn="$1"
@@ -151,14 +151,28 @@ sktest() {
     ssh phone "/sbin/su -c 'am broadcast -a net.dinglisch.android.tasker.ACTION_TASK --es task_name \"Kernel Flash Warning\"; export PATH=/sbin/.core/busybox:$PATH; sleep 4; unzip -p /data/data/com.termux/files/home/tmp/kernel.zip META-INF/com/google/android/update-binary | /system/bin/sh /proc/self/fd/0 unused 1 /data/data/com.termux/files/home/tmp/kernel.zip && /system/bin/svc power reboot'"
 }
 
+# Flash the latest kernel zip on the device via SSH over VPN
+vsktest() {
+    fn="proton_kernel.zip"
+    [ "x$1" != "x" ] && fn="$1"
+
+    scp "$fn" vphone:tmp/kernel.zip && \
+    ssh phone "/sbin/su -c 'am broadcast -a net.dinglisch.android.tasker.ACTION_TASK --es task_name \"Kernel Flash Warning\"; export PATH=/sbin/.core/busybox:$PATH; sleep 4; unzip -p /data/data/com.termux/files/home/tmp/kernel.zip META-INF/com/google/android/update-binary | /system/bin/sh /proc/self/fd/0 unused 1 /data/data/com.termux/files/home/tmp/kernel.zip && /system/bin/svc power reboot'"
+}
+
 # Incremementally build the kernel, then flash it on the connected device via ADB
 inc() {
     incbuild $@ && ktest
 }
 
-# Incremementally build the kernel, then flash it on the device via SSH
+# Incremementally build the kernel, then flash it on the device via SSH over LAN
 sinc() {
     incbuild $@ && sktest
+}
+
+# Incremementally build the kernel, then flash it on the device via SSH over VPN
+vsinc() {
+    incbuild $@ && vsktest
 }
 
 # Show differences between the committed defconfig and current config
