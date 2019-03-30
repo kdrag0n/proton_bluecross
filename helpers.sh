@@ -220,3 +220,9 @@ utree() {
 glink() {
     echo "https://github.com/kdrag0n/proton_bluecross/commit/$1"
 }
+
+# Retrieve the kernel version from a flashable zip package
+zver()
+{
+    unzip -p "$1" Image.lz4-dtb | lz4 -dc | strings | grep "Linux version 4"
+}
