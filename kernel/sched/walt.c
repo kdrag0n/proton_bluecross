@@ -365,21 +365,10 @@ static void update_task_cpu_cycles(struct task_struct *p, int cpu,
 		p->cpu_cycles = read_cycle_counter(cpu, wallclock);
 }
 
-static inline bool is_ed_enabled(void)
-{
-	return (walt_rotation_enabled || (sched_boost_policy() !=
-		SCHED_BOOST_NONE));
-}
-
 void clear_ed_task(struct task_struct *p, struct rq *rq)
 {
 	if (p == rq->ed_task)
 		rq->ed_task = NULL;
-}
-
-static inline bool is_ed_task(struct task_struct *p, u64 wallclock)
-{
-	return (wallclock - p->last_wake_ts >= EARLY_DETECTION_DURATION);
 }
 
 bool early_detection_notify(struct rq *rq, u64 wallclock)
@@ -387,7 +376,8 @@ bool early_detection_notify(struct rq *rq, u64 wallclock)
 	struct task_struct *p;
 	int loop_max = 10;
 
-	if (!is_ed_enabled() || !rq->cfs.h_nr_running)
+	if ((!walt_rotation_enabled && sched_boost_policy() ==
+			SCHED_BOOST_NONE) || !rq->cfs.h_nr_running)
 		return 0;
 
 	rq->ed_task = NULL;
@@ -395,7 +385,7 @@ bool early_detection_notify(struct rq *rq, u64 wallclock)
 		if (!loop_max)
 			break;
 
-		if (is_ed_task(p, wallclock)) {
+		if (wallclock - p->last_wake_ts >= EARLY_DETECTION_DURATION) {
 			rq->ed_task = p;
 			return 1;
 		}
@@ -905,13 +895,9 @@ void fixup_busy_time(struct task_struct *p, int new_cpu)
 		irq_work_queue(&walt_migration_irq_work);
 	}
 
-	if (is_ed_enabled()) {
-		if (p == src_rq->ed_task) {
-			src_rq->ed_task = NULL;
-			dest_rq->ed_task = p;
-		} else if (is_ed_task(p, wallclock)) {
-			dest_rq->ed_task = p;
-		}
+	if (p == src_rq->ed_task) {
+		src_rq->ed_task = NULL;
+		dest_rq->ed_task = p;
 	}
 
 done:
@@ -1685,13 +1671,6 @@ account_busy_for_task_demand(struct rq *rq, struct task_struct *p, int event)
 	 */
 	if (event == TASK_WAKE || (!SCHED_ACCOUNT_WAIT_TIME &&
 			 (event == PICK_NEXT_TASK || event == TASK_MIGRATE)))
-		return 0;
-
-	/*
-	 * The idle exit time is not accounted for the first task _picked_ up to
-	 * run on the idle CPU.
-	 */
-	if (event == PICK_NEXT_TASK && rq->curr == rq->idle)
 		return 0;
 
 	/*
