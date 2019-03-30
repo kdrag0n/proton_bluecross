@@ -79,7 +79,7 @@ rel() {
 
     # Compile kernel
     kmake oldconfig # solve a "cached" config
-    kmake $@
+    kmake "$@"
 
     # Pack zip
     mkzip "builds/ProtonKernel-pixel3-v$(cat "$kroot/out/.version").zip"
@@ -98,22 +98,22 @@ zerover() {
 
 # Make a clean build of the kernel and package it as a flashable zip
 cleanbuild() {
-    kmake clean && kmake $@ && mkzip
+    kmake clean && kmake "$@" && mkzip
 }
 
 # Incrementally build the kernel and package it as a flashable zip
 incbuild() {
-    kmake $@ && mkzip
+    kmake "$@" && mkzip
 }
 
 # Incrementally build the kernel and package it as a flashable test release zip
 dbuild() {
-    kmake $@ && dzip
+    kmake "$@" && dzip
 }
 
 # Incrementally build the kernel, package it as a flashable test release zip, then upload it to transfer.sh
 tbuild() {
-    kmake $@ && tzip
+    kmake "$@" && tzip
 }
 
 # Create a flashable test release zip
@@ -162,27 +162,27 @@ vsktest() {
 
 # Incremementally build the kernel, then flash it on the connected device via ADB
 inc() {
-    incbuild $@ && ktest
+    incbuild "$@" && ktest
 }
 
 # Incremementally build the kernel, then flash it on the device via SSH over LAN
 sinc() {
-    incbuild $@ && sktest
+    incbuild "$@" && sktest
 }
 
 # Incremementally build the kernel, then flash it on the device via SSH over VPN
 vsinc() {
-    incbuild $@ && vsktest
+    incbuild "$@" && vsktest
 }
 
 # Incremementally build the kernel, push the ZIP, and flash it on the device via SSH over LAN
 psinc() {
-    dbuild $@ && fn="builds/ProtonKernel-pixel3-test$(cat "$kroot/out/.version").zip" && scp "$fn" phone:/sdcard && sktest "$fn"
+    dbuild "$@" && fn="builds/ProtonKernel-pixel3-test$(cat "$kroot/out/.version").zip" && scp "$fn" phone:/sdcard && sktest "$fn"
 }
 
 # Incremementally build the kernel, push the ZIP, and flash it on the device via SSH over VPN
 pvsinc() {
-    dbuild $@ && fn="builds/ProtonKernel-pixel3-test$(cat "$kroot/out/.version").zip" && scp "$fn" vphone:/sdcard && vsktest "$fn"
+    dbuild "$@" && fn="builds/ProtonKernel-pixel3-test$(cat "$kroot/out/.version").zip" && scp "$fn" vphone:/sdcard && vsktest "$fn"
 }
 
 # Show differences between the committed defconfig and current config
