@@ -46,7 +46,7 @@ kmake() {
 
 _RELEASE=0
 
-# Create a flashable zip of the current kernel image
+# Create a flashable ZIP package with the current kernel image
 mkzip() {
     [ $_RELEASE -eq 0 ] && vprefix=test
     [ $_RELEASE -eq 1 ] && vprefix=v
@@ -126,7 +126,7 @@ tzip() {
     dzip && transfer "builds/ProtonKernel-pixel3-test$(cat "$kroot/out/.version").zip"
 }
 
-# Flash the latest kernel zip on the connected device via ADB
+# Flash the latest kernel ZIP on the connected device via ADB
 ktest() {
     adb wait-for-any && \
 
@@ -142,7 +142,7 @@ ktest() {
     fi
 }
 
-# Flash the latest kernel zip on the device via SSH over LAN
+# Flash the latest kernel ZIP on the device via SSH over LAN
 sktest() {
     fn="proton_kernel.zip"
     [ "x$1" != "x" ] && fn="$1"
@@ -151,7 +151,7 @@ sktest() {
     ssh phone "/sbin/su -c 'am broadcast -a net.dinglisch.android.tasker.ACTION_TASK --es task_name \"Kernel Flash Warning\"; export PATH=/sbin/.core/busybox:$PATH; sleep 4; unzip -p /data/data/com.termux/files/home/tmp/kernel.zip META-INF/com/google/android/update-binary | /system/bin/sh /proc/self/fd/0 unused 1 /data/data/com.termux/files/home/tmp/kernel.zip && /system/bin/svc power reboot'"
 }
 
-# Flash the latest kernel zip on the device via SSH over VPN
+# Flash the latest kernel ZIP on the device via SSH over VPN
 vsktest() {
     fn="proton_kernel.zip"
     [ "x$1" != "x" ] && fn="$1"
@@ -221,7 +221,7 @@ glink() {
     echo "https://github.com/kdrag0n/proton_bluecross/commit/$1"
 }
 
-# Retrieve the kernel version from a flashable zip package
+# Retrieve the kernel version from a flashable ZIP package
 zver()
 {
     unzip -p "$1" Image.lz4-dtb | lz4 -dc | strings | grep "Linux version 4"
