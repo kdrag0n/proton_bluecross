@@ -175,6 +175,16 @@ vsinc() {
     incbuild $@ && vsktest
 }
 
+# Incremementally build the kernel, push the ZIP, and flash it on the device via SSH over LAN
+psinc() {
+    dbuild $@ && fn="builds/ProtonKernel-pixel3-test$(cat "$kroot/out/.version").zip" && scp "$fn" phone:/sdcard && sktest "$fn"
+}
+
+# Incremementally build the kernel, push the ZIP, and flash it on the device via SSH over VPN
+pvsinc() {
+    dbuild $@ && fn="builds/ProtonKernel-pixel3-test$(cat "$kroot/out/.version").zip" && scp "$fn" vphone:/sdcard && vsktest "$fn"
+}
+
 # Show differences between the committed defconfig and current config
 dc() {
     diff arch/arm64/configs/b1c1_defconfig "$kroot/out/.config"
