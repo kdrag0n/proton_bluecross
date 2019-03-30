@@ -191,12 +191,20 @@ void cpu_input_boost_kick_max(unsigned int duration_ms)
 	if (!b)
 		return;
 
+	if (!is_display_on())
+		return;
+
 	__cpu_input_boost_kick_max(b, duration_ms);
 }
 
 void cpu_input_boost_kick_wake(void)
 {
-	cpu_input_boost_kick_max(wake_boost_duration);
+	struct boost_drv *b = boost_drv_g;
+
+	if (!b)
+		return;
+
+	__cpu_input_boost_kick_max(b, wake_boost_duration);
 }
 
 static void input_boost_worker(struct work_struct *work)
