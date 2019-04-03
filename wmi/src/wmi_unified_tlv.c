@@ -3935,10 +3935,9 @@ QDF_STATUS send_setup_install_key_cmd_tlv(wmi_unified_t wmi_handle,
 
 	status = wmi_unified_cmd_send(wmi_handle, buf, len,
 					      WMI_VDEV_INSTALL_KEY_CMDID);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		qdf_mem_zero(wmi_buf_data(buf), len);
+	if (QDF_IS_STATUS_ERROR(status))
 		wmi_buf_free(buf);
-	}
+
 	return status;
 }
 
