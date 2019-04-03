@@ -658,6 +658,7 @@ static enum power_supply_property max1720x_battery_props[] = {
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_CAPACITY,
+	POWER_SUPPLY_PROP_CAPACITY_RAW,
 	POWER_SUPPLY_PROP_CHARGE_COUNTER,
 	POWER_SUPPLY_PROP_CHARGE_FULL,
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
@@ -823,6 +824,18 @@ static ssize_t max1720x_set_offmode_charger(struct device *dev,
 static DEVICE_ATTR(offmode_charger, 0660,
 		   max1720x_get_offmode_charger,
 		   max1720x_set_offmode_charger);
+
+static int max1720x_get_battery_repsoc(struct max1720x_chip *chip)
+{
+	u16 data;
+	int err;
+
+	err = REGMAP_READ(chip->regmap, MAX1720X_REPSOC, &data);
+	if (err)
+		return err;
+
+	return data;
+}
 
 static int max1720x_get_battery_soc(struct max1720x_chip *chip)
 {
@@ -1039,6 +1052,11 @@ static int max1720x_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
 		val->intval = max1720x_get_battery_soc(chip);
+		if (val->intval < 0)
+			return val->intval;
+		break;
+	case POWER_SUPPLY_PROP_CAPACITY_RAW:
+		val->intval = max1720x_get_battery_repsoc(chip);
 		if (val->intval < 0)
 			return val->intval;
 		break;
