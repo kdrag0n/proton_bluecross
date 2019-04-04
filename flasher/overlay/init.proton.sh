@@ -65,7 +65,7 @@ case "$1" in
 		gov_param hispeed_load 90
 		gov_param iowait_boost_enable 1
 		gov_param up_rate_limit_us 10000
-		gov_param down_rate_limit_us 10000
+		gov_param down_rate_limit_us 20000
 		# CPU: Boost
 		stune_boost 15
 		boost_duration 64
