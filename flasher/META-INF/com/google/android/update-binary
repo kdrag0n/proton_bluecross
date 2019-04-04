@@ -135,7 +135,7 @@ fi;
 
 supported_ver="$(file_getprop anykernel.sh supported.versions | $bb tr -d '[:space:]')";
 if [ "$supported_ver" ]; then
-  ui_print "Checking Android version...";
+  ui_print "  • Checking Android version";
   android_ver="$(file_getprop /system/build.prop ro.build.version.release)";
   if [ "$(echo $supported_ver | $bb grep -)" ]; then
     lo_ver=$(echo $supported_ver | $bb cut -d- -f1);
@@ -151,10 +151,7 @@ if [ "$supported_ver" ]; then
       fi;
     done;
   fi;
-  if [ "$supported" ]; then
-    ui_print "$android_ver";
-    ui_print " ";
-  else
+  if [ ! "$supported" ]; then
     ui_print " ";
     abort "Unsupported Android version. Aborting...";
   fi;
