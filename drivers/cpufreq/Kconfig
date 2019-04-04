@@ -291,6 +291,20 @@ config WAKE_BOOST_DURATION_MS
 	help
 	  Wake boost duration in milliseconds.
 
+config BASE_BOOST_FREQ_LP
+	int "Low-power cluster base frequency"
+	default "0"
+	help
+	  Base frequency for the low-power CPU cluster. The cluster will revert
+	  to this frequency after all boosts have expired.
+
+config BASE_BOOST_FREQ_PERF
+	int "Performance cluster base frequency"
+	default "0"
+	help
+	  Base frequency for the performance CPU cluster. The cluster will
+	  revert to this frequency after all boosts have expired.
+
 config INPUT_BOOST_FREQ_LP
 	int "Low-power cluster boost freq"
 	default "0"
