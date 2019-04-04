@@ -10,7 +10,7 @@ do.cleanup=1
 do.cleanuponabort=0
 device.name1=blueline
 device.name2=crosshatch
-supported.versions=
+supported.versions=9
 '; } # end properties
 
 # shell variables
