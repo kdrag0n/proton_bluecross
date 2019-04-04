@@ -269,6 +269,7 @@ config CPU_FREQ_GOV_SCHEDUTIL
 
 config CPU_INPUT_BOOST
 	bool "CPU Input Boost"
+	depends on DRM_MSM
 	help
 	  Boosts the CPU on touchscreen and touchpad input, and allows for
 	  boosting on other custom events, mainly which is intended to be for
