@@ -10,6 +10,7 @@ do.cleanup=1
 do.cleanuponabort=0
 device.name1=blueline
 device.name2=crosshatch
+supported.versions=
 '; } # end properties
 
 # shell variables
@@ -21,7 +22,6 @@ ramdisk_compression=auto;
 ## AnyKernel methods (DO NOT CHANGE)
 # import patching functions/variables - see for reference
 . $TMPDIR/tools/ak2-core.sh;
-
 
 ## AnyKernel install
 ui_print "  • Unpacking image"
