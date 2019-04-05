@@ -136,11 +136,15 @@ config PM_SLEEP
 	select SRCU
 
 config PM_SLEEP_SMP
-	def_bool y
+	bool "Disable secondary CPUs during suspend"
+	default y
 	depends on SMP
 	depends on ARCH_SUSPEND_POSSIBLE || ARCH_HIBERNATION_POSSIBLE
 	depends on PM_SLEEP
 	select HOTPLUG_CPU
+	help
+	  Enable support for disabling secondary CPUs using the CPU hotplug
+	  subsystem when the system enters suspend.
 
 config PM_AUTOSLEEP
 	bool "Opportunistic sleep"
