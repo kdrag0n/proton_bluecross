@@ -36,6 +36,9 @@
 
 #include "drm_crtc_internal.h"
 
+static int frame_boost_timeout __read_mostly = CONFIG_DRM_FRAME_BOOST_TIMEOUT;
+module_param(frame_boost_timeout, int, 0644);
+
 static void crtc_commit_free(struct kref *kref)
 {
 	struct drm_crtc_commit *commit =
@@ -1863,6 +1866,17 @@ static void complete_crtc_signaling(struct drm_device *dev,
 	kfree(fence_state);
 }
 
+static void drm_kick_frame_boost(int timeout_ms)
+{
+	if (!timeout_ms)
+		return;
+
+	if (timeout_ms < 0 || cpu_input_boost_within_input(timeout_ms)) {
+		cpu_input_boost_kick();
+		devfreq_boost_kick(DEVFREQ_MSM_CPUBW);
+	}
+}
+
 int drm_mode_atomic_ioctl(struct drm_device *dev,
 			  void *data, struct drm_file *file_priv)
 {
@@ -1906,10 +1920,8 @@ int drm_mode_atomic_ioctl(struct drm_device *dev,
 			(arg->flags & DRM_MODE_PAGE_FLIP_EVENT))
 		return -EINVAL;
 
-	if (!(arg->flags & DRM_MODE_ATOMIC_TEST_ONLY)) {
-		cpu_input_boost_kick();
-		devfreq_boost_kick(DEVFREQ_MSM_CPUBW);
-	}
+	if (!(arg->flags & DRM_MODE_ATOMIC_TEST_ONLY))
+		drm_kick_frame_boost(frame_boost_timeout);
 
 	drm_modeset_acquire_init(&ctx, 0);
 
