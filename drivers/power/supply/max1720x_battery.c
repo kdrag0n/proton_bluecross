@@ -659,6 +659,7 @@ static enum power_supply_property max1720x_battery_props[] = {
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_CAPACITY,
 	POWER_SUPPLY_PROP_CAPACITY_RAW,
+	POWER_SUPPLY_PROP_CAPACITY_RAW_MAX,
 	POWER_SUPPLY_PROP_CHARGE_COUNTER,
 	POWER_SUPPLY_PROP_CHARGE_FULL,
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
@@ -1059,6 +1060,9 @@ static int max1720x_get_property(struct power_supply *psy,
 		val->intval = max1720x_get_battery_repsoc(chip);
 		if (val->intval < 0)
 			return val->intval;
+		break;
+	case POWER_SUPPLY_PROP_CAPACITY_RAW_MAX:
+		val->intval = 100 << 8;
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
 		err = max1720x_update_battery_qh_based_capacity(chip);
