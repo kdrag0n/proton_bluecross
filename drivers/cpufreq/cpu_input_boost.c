@@ -51,6 +51,7 @@ module_param(wake_boost_duration, short, 0644);
 #define SCREEN_OFF		BIT(0)
 #define INPUT_BOOST		BIT(1)
 #define MAX_BOOST		BIT(2)
+#define WAKE_BOOST		BIT(3)
 
 struct boost_drv {
 	struct delayed_work input_unboost;
@@ -170,9 +171,6 @@ static void __cpu_input_boost_kick_max(struct boost_drv *b,
 	unsigned long boost_jiffies = msecs_to_jiffies(duration_ms);
 	unsigned long curr_expires, new_expires;
 
-	if (get_boost_state(b) & SCREEN_OFF)
-		return;
-
 	do {
 		curr_expires = atomic64_read(&b->max_boost_expires);
 		new_expires = jiffies + boost_jiffies;
@@ -195,7 +193,26 @@ void cpu_input_boost_kick_max(unsigned int duration_ms)
 	if (!b)
 		return;
 
+	if (get_boost_state(b) & SCREEN_OFF)
+		return;
+
 	__cpu_input_boost_kick_max(b, duration_ms);
+}
+
+void __cpu_input_boost_kick_wake(struct boost_drv *b)
+{
+	set_boost_bit(b, WAKE_BOOST);
+	__cpu_input_boost_kick_max(b, wake_boost_duration);
+}
+
+void cpu_input_boost_kick_wake(void)
+{
+	struct boost_drv *b = boost_drv_g;
+
+	if (!b)
+		return;
+
+	__cpu_input_boost_kick_wake(b);
 }
 
 static void input_unboost_worker(struct work_struct *work)
@@ -212,7 +229,7 @@ static void max_unboost_worker(struct work_struct *work)
 	struct boost_drv *b = container_of(to_delayed_work(work),
 					   typeof(*b), max_unboost);
 
-	clear_boost_bit(b, MAX_BOOST);
+	clear_boost_bit(b, MAX_BOOST | WAKE_BOOST);
 	wake_up(&b->boost_waitq);
 }
 
@@ -252,6 +269,12 @@ static int cpu_notifier_cb(struct notifier_block *nb,
 
 	state = get_boost_state(b);
 
+	/* Boost CPU to max frequency on wake, regardless of screen state */
+	if (state & WAKE_BOOST) {
+		policy->min = get_max_boost_freq(policy);
+		return NOTIFY_OK;
+	}
+
 	/* Unboost when the screen is off */
 	if (state & SCREEN_OFF) {
 		policy->min = get_min_freq(policy);
@@ -290,7 +313,7 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 	/* Boost when the screen turns on and unboost when it turns off */
 	if (*blank == MSM_DRM_BLANK_UNBLANK) {
 		clear_boost_bit(b, SCREEN_OFF);
-		__cpu_input_boost_kick_max(b, wake_boost_duration);
+		__cpu_input_boost_kick_wake(b);
 	} else {
 		set_boost_bit(b, SCREEN_OFF);
 		wake_up(&b->boost_waitq);
