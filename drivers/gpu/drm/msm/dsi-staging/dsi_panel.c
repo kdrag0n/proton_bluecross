@@ -549,15 +549,6 @@ static int dsi_panel_tx_cmd_set(struct dsi_panel *panel,
 	if (panel->type == EXT_BRIDGE)
 		return 0;
 
-#ifdef CONFIG_EXPOSURE_ADJUSTMENT
-	if (ea_enabled) {
-		if (type == DSI_CMD_SET_ON)
-			ea_panel_mode_ctrl(panel, true);
-		else if (type == DSI_CMD_SET_OFF)
-			ea_panel_mode_ctrl(panel, false);
-	}
-#endif
-
 	mode = panel->cur_mode;
 
 	return dsi_panel_cmd_set_transfer(panel,

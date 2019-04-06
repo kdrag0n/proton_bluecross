@@ -325,10 +325,6 @@ static u32 dsi_backlight_calculate(struct dsi_backlight_config *bl,
 #ifdef CONFIG_KLAPSE
 	set_rgb_slider(bl_lvl);
 #endif
-#ifdef CONFIG_EXPOSURE_ADJUSTMENT
-	if (ea_enabled)
-		bl_lvl = ea_panel_calc_backlight(bl_lvl);
-#endif
 
 	return bl_lvl;
 }
@@ -359,6 +355,8 @@ int dsi_backlight_update_status(struct backlight_device *bd)
 		 */
 		if (panel->vr_mode && (bl_lvl < bl->bl_vr_min_safe_level))
 			bl_lvl = bl->bl_vr_min_safe_level;
+		else if (ea_is_enabled())
+			bl_lvl = ea_panel_calc_backlight(bl_lvl);
 
 		rc = bl->update_bl(bl, bl_lvl);
 		if (rc) {

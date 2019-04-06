@@ -27,7 +27,7 @@
  * @EXPOSURE_ADJUSTMENT_MIN: Minimum available PCC coefficient for OLED panel
  */
 #define ELVSS_OFF_THRESHOLD        266
-#define EXPOSURE_ADJUSTMENT_MIN    100
+#define EXPOSURE_ADJUSTMENT_MIN    480
 
 /* PCC coefficient when exposure is 255 */
 #define EXPOSURE_ADJUSTMENT_MAX    32768
@@ -35,8 +35,22 @@
 #define PCC_BACKLIGHT_SCALE \
 (EXPOSURE_ADJUSTMENT_MAX - EXPOSURE_ADJUSTMENT_MIN) / ELVSS_OFF_THRESHOLD
 
-extern unsigned int ea_enabled;
-
+#ifdef CONFIG_EXPOSURE_ADJUSTMENT
+bool ea_is_enabled(void);
 void ea_panel_mode_ctrl(struct dsi_panel *panel, bool enable);
 u32 ea_panel_calc_backlight(u32 bl_lvl);
+#else
+static inline bool ea_is_enabled(void)
+{
+	return false;
+}
+static inline void ea_panel_mode_ctrl(struct dsi_panel *panel, bool enable)
+{
+}
+static inline u32 ea_panel_calc_backlight(u32 bl_lvl)
+{
+	return bl_lvl;
+}
+#endif
+
 #endif /* EXPOSURE_ADJUSTMENT_H */
