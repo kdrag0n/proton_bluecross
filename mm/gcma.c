@@ -44,12 +44,11 @@
 #define BYTES_FS_DMEM_KEY	(sizeof(struct frontswap_dmem_key))
 #endif
 
-#ifdef CONFIG_CLEANCACHE
 #define BITS_CC_DMEM_HASH	8
 #define NR_CC_DMEM_HASH_BUCKS	(1 << BITS_CC_DMEM_HASH)
 #define BYTES_CC_DMEM_KEY	(sizeof(struct cleancache_dmem_key))
 #define MAX_CLEANCACHE_FS	16
-#endif
+
 
 /* XXX: What's the ideal? */
 #define NR_EVICT_BATCH	32
@@ -117,11 +116,9 @@ struct frontswap_dmem_key {
 };
 #endif
 
-#ifdef CONFIG_CLEANCACHE
 struct cleancache_dmem_key {
 	u8 key[sizeof(pgoff_t) + sizeof(struct cleancache_filekey)];
 };
-#endif
 
 static struct kmem_cache *dmem_entry_cache;
 
@@ -129,10 +126,8 @@ static struct kmem_cache *dmem_entry_cache;
 static struct dmem fs_dmem;	/* dmem for frontswap backend */
 #endif
 
-#ifdef CONFIG_CLEANCACHE
 static struct dmem cc_dmem;	/* dmem for cleancache backend */
 static atomic_t nr_cleancache_fses = ATOMIC_INIT(0);
-#endif
 
 /* configs from kernel parameter */
 #ifdef CONFIG_FRONTSWAP
@@ -140,10 +135,8 @@ static bool fs_disabled __read_mostly;
 module_param_named(fs_disabled, fs_disabled, bool, 0444);
 #endif
 
-#ifdef CONFIG_CLEANCACHE
 static bool cc_disabled __read_mostly;
 module_param_named(cc_disabled, cc_disabled, bool, 0444);
-#endif
 
 /* For statistics */
 #ifdef CONFIG_FRONTSWAP
@@ -156,7 +149,6 @@ static atomic_t gcma_fs_invalidated_pages = ATOMIC_INIT(0);
 static atomic_t gcma_fs_invalidated_areas = ATOMIC_INIT(0);
 #endif
 
-#ifdef CONFIG_CLEANCACHE
 static atomic_t gcma_cc_inits = ATOMIC_INIT(0);
 static atomic_t gcma_cc_stored_pages = ATOMIC_INIT(0);
 static atomic_t gcma_cc_loaded_pages = ATOMIC_INIT(0);
@@ -167,7 +159,6 @@ static atomic_t gcma_cc_invalidated_pages = ATOMIC_INIT(0);
 static atomic_t gcma_cc_invalidated_inodes = ATOMIC_INIT(0);
 static atomic_t gcma_cc_invalidated_fses = ATOMIC_INIT(0);
 static atomic_t gcma_cc_invalidate_failed_fses = ATOMIC_INIT(0);
-#endif
 
 static unsigned long dmem_evict_lru(struct dmem *dmem, unsigned long nr_pages);
 
@@ -517,13 +508,9 @@ static unsigned long dmem_evict_lru(struct dmem *dmem, unsigned long nr_pages)
 #ifdef CONFIG_FRONTSWAP
 	if (dmem == &fs_dmem)
 		atomic_add(evicted, &gcma_fs_evicted_pages);
-#endif
-#if defined(CONFIG_FRONTSWAP) && defined(CONFIG_CLEANCACHE)
 	else
 #endif
-#ifdef CONFIG_CLEANCACHE
 		atomic_add(evicted, &gcma_cc_evicted_pages);
-#endif
 	return evicted;
 }
 
@@ -893,7 +880,6 @@ static struct frontswap_ops gcma_frontswap_ops = {
 };
 #endif
 
-#ifdef CONFIG_CLEANCACHE
 static int cleancache_compare(void *lkey, void *rkey)
 {
 	/* Frontswap uses pgoff_t value as key */
@@ -1025,7 +1011,7 @@ struct cleancache_ops gcma_cleancache_ops = {
 	.invalidate_inode = gcma_cleancache_invalidate_inode,
 	.invalidate_fs = gcma_cleancache_invalidate_fs,
 };
-#endif
+
 
 /*
  * Return 0 if [start_pfn, end_pfn] is isolated.
@@ -1081,9 +1067,7 @@ int gcma_alloc_contig(struct gcma *gcma, unsigned long start_pfn,
 	LIST_HEAD(free_pages);
 	struct dmem_hashbucket *buck;
 	struct dmem_entry *entry;
-#ifdef CONFIG_CLEANCACHE
 	struct cleancache_dmem_key key;	/* cc key is larger than fs's */
-#endif
 	struct page *page, *n;
 	unsigned long offset;
 	unsigned long *bitmap;
@@ -1168,10 +1152,8 @@ next_page:
 		entry = dmem_entry(page);
 		lru_lock = &dmem_hashbuck(page)->dmem->lru_lock;
 
-#ifdef CONFIG_CLEANCACHE
 		if (lru_lock == &cc_dmem.lru_lock)
 			local_irq_save(flags);
-#endif
 		spin_lock(&buck->lock);
 		spin_lock(lru_lock);
 		/* drop refcount increased by above loop */
@@ -1182,17 +1164,12 @@ next_page:
 			dmem_put(buck, entry);
 		spin_unlock(lru_lock);
 		spin_unlock(&buck->lock);
-#ifdef CONFIG_CLEANCACHE
 		if (lru_lock == &cc_dmem.lru_lock) {
 			local_irq_restore(flags);
 			atomic_inc(&gcma_cc_reclaimed_pages);
 		}
-#endif
-#if defined(CONFIG_CLEANCACHE) && defined(CONFIG_FRONTSWAP)
-		else
-#endif
 #ifdef CONFIG_FRONTSWAP
-		{
+		else {
 			atomic_inc(&gcma_fs_reclaimed_pages);
 		}
 #endif
@@ -1256,7 +1233,6 @@ static int __init gcma_debugfs_init(void)
 			gcma_debugfs_root, &gcma_fs_invalidated_areas);
 #endif
 
-#ifdef CONFIG_CLEANCACHE
 	debugfs_create_atomic_t("cc_inits", S_IRUGO,
 			gcma_debugfs_root, &gcma_cc_inits);
 	debugfs_create_atomic_t("cc_stored_pages", S_IRUGO,
@@ -1277,7 +1253,6 @@ static int __init gcma_debugfs_init(void)
 			gcma_debugfs_root, &gcma_cc_invalidated_fses);
 	debugfs_create_atomic_t("cc_invalidate_failed_fses", S_IRUGO,
 			gcma_debugfs_root, &gcma_cc_invalidate_failed_fses);
-#endif
 
 	pr_info("gcma debugfs initialized\n");
 	return 0;
@@ -1300,9 +1275,7 @@ static int __init init_gcma(void)
 #ifdef CONFIG_FRONTSWAP
 	if (fs_disabled) {
 		pr_info("gcma frontswap is disabled. skip it\n");
-#ifdef CONFIG_CLEANCACHE
 		goto init_cleancache;
-#endif
 	}
 	fs_dmem.nr_pools = MAX_SWAPFILES;
 	fs_dmem.pools = kzalloc(sizeof(struct dmem_pool *) * fs_dmem.nr_pools,
@@ -1333,7 +1306,6 @@ static int __init init_gcma(void)
 
 init_cleancache:
 #endif
-#ifdef CONFIG_CLEANCACHE
 	if (cc_disabled) {
 		pr_info("gcma cleancache is disabled. skip it\n");
 		goto init_debugfs;
@@ -1357,7 +1329,6 @@ init_cleancache:
 	cc_dmem.hash_key = cleancache_hash_key;
 	cc_dmem.compare = cleancache_compare;
 	cleancache_register_ops(&gcma_cleancache_ops);
-#endif
 
 init_debugfs:
 	gcma_debugfs_init();
