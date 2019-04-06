@@ -6,7 +6,6 @@
 #define pr_fmt(fmt) "devfreq_boost: " fmt
 
 #include <linux/devfreq_boost.h>
-#include <linux/display_state.h>
 #include <linux/msm_drm_notify.h>
 #include <linux/input.h>
 #include <linux/slab.h>
@@ -28,6 +27,7 @@ struct boost_dev {
 struct df_boost_drv {
 	struct boost_dev devices[DEVFREQ_MAX];
 	struct notifier_block msm_drm_notif;
+	atomic_t screen_awake;
 };
 
 static struct df_boost_drv *df_boost_drv_g __read_mostly;
@@ -53,7 +53,7 @@ void devfreq_boost_kick(enum df_device device)
 	if (!d)
 		return;
 
-	if (!is_display_on())
+	if (!atomic_read(&d->screen_awake))
 		return;
 
 	__devfreq_boost_kick(d->devices + device);
@@ -89,7 +89,7 @@ void devfreq_boost_kick_max(enum df_device device, unsigned int duration_ms)
 	if (!d)
 		return;
 
-	if (!is_display_on())
+	if (!atomic_read(&d->screen_awake))
 		return;
 
 	__devfreq_boost_kick_max(d->devices + device, duration_ms);
@@ -255,13 +255,16 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 	struct df_boost_drv *d = container_of(nb, typeof(*d), msm_drm_notif);
 	struct msm_drm_notifier *evdata = data;
 	int *blank = evdata->data;
+	bool screen_awake;
 
 	/* Parse framebuffer blank events as soon as they occur */
 	if (action != MSM_DRM_EARLY_EVENT_BLANK)
 		return NOTIFY_OK;
 
 	/* Boost when the screen turns on and unboost when it turns off */
-	if (*blank == MSM_DRM_BLANK_UNBLANK) {
+	screen_awake = *blank == MSM_DRM_BLANK_UNBLANK;
+	atomic_set(&d->screen_awake, screen_awake);
+	if (screen_awake) {
 		int i;
 
 		for (i = 0; i < DEVFREQ_MAX; i++)
@@ -281,7 +284,7 @@ static void devfreq_boost_input_event(struct input_handle *handle,
 	struct df_boost_drv *d = handle->handler->private;
 	int i;
 
-	if (!is_display_on())
+	if (!atomic_read(&d->screen_awake))
 		return;
 
 	for (i = 0; i < DEVFREQ_MAX; i++)
