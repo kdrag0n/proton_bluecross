@@ -18,7 +18,7 @@ $IS_ANDROID && cpio=$bin/cpio || cpio=cpio
 
 # ui_print <text>
 ui_print() {
-  $IS_ANDROID && echo ">>> $1" || echo -e "ui_print $1\nui_print" > $OUTFD;
+  $IS_ANDROID && echo "$1" || echo -e "ui_print $1\nui_print" > $OUTFD;
 }
 
 # contains <string> <substring>
