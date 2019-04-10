@@ -29,7 +29,6 @@
 #include <linux/delay.h>
 #include <linux/devfreq_boost.h>
 #include <linux/device.h>
-#include <linux/display_state.h>
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
@@ -446,10 +445,8 @@ static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
 		__pm_wakeup_event(&fpc1020->ttw_wakesrc, FPC_TTW_HOLD_TIME);
 	}
 
-	if (!is_display_on()) {
-		cpu_input_boost_kick_wake();
-		devfreq_boost_kick_wake(DEVFREQ_MSM_CPUBW);
-	}
+	cpu_input_boost_kick_wake();
+	devfreq_boost_kick_wake(DEVFREQ_MSM_CPUBW);
 
 	sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_irq.attr.name);
 
