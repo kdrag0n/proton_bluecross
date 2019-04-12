@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017,2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -478,6 +478,24 @@ void sme_preauth_reassoc_intvl_timer_callback(void *context)
 	if (pUsrCtx)
 		csr_neighbor_roam_request_handoff(pUsrCtx->pMac,
 						  pUsrCtx->sessionId);
+}
+
+void sme_reset_key(tHalHandle mac_handle, uint32_t vdev_id)
+{
+	tpAniSirGlobal mac = PMAC_STRUCT(mac_handle);
+	tCsrRoamSession *session = NULL;
+
+	if (!mac) {
+		sme_err("mac is NULL");
+		return;
+	}
+
+	session = CSR_GET_SESSION(mac, vdev_id);
+	if (!session)
+		return;
+	qdf_mem_zero(&session->psk_pmk, sizeof(session->psk_pmk));
+	session->pmk_len = 0;
+	qdf_mem_zero(&session->eseCckmInfo, sizeof(session->eseCckmInfo));
 }
 
 /* Reset the FT context. */
