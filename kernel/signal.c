@@ -1303,14 +1303,52 @@ struct sighand_struct *__lock_task_sighand(struct task_struct *tsk,
 	return sighand;
 }
 
-static void mark_lmkd_victim(struct task_struct *tsk)
+static int do_lmkd_kill(struct task_struct *p)
 {
-	struct mm_struct *mm = tsk->mm;
+	struct task_struct *vp;
+	int ret;
 
-	if (!cmpxchg(&tsk->signal->oom_mm, NULL, mm)) {
-		atomic_inc(&tsk->signal->oom_mm->mm_count);
-		set_bit(MMF_OOM_VICTIM, &mm->flags);
+	/* Boost CPU and DDR bus to the max */
+	cpu_input_boost_kick_max(200);
+	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 200);
+
+	preempt_disable();
+	get_task_struct(p);
+	vp = find_lock_task_mm(p);
+	if (vp)
+		get_task_struct(vp);
+
+	/* Bypass the signal queue when killing */
+	ret = do_send_sig_info(SIGKILL, SEND_SIG_FORCED, p, true);
+	if (ret) {
+		if (vp) {
+			task_unlock(vp);
+			put_task_struct(vp);
+		}
+		put_task_struct(p);
+		preempt_enable();
+		return ret;
 	}
+
+	if (vp && !test_bit(MMF_OOM_SKIP, &vp->mm->flags)) {
+		if (!cmpxchg(&vp->signal->oom_mm, NULL, vp->mm)) {
+			atomic_inc(&vp->signal->oom_mm->mm_count);
+			set_bit(MMF_OOM_VICTIM, &vp->mm->flags);
+		}
+		task_unlock(vp);
+		wake_oom_reaper(vp);
+		put_task_struct(vp);
+	}
+
+	preempt_enable();
+
+	/* Increase the task's priority */
+	set_user_nice(p, MIN_NICE);
+	/* Allow the task to run on all CPUs */
+	set_cpus_allowed_ptr(p, cpu_all_mask);
+
+	put_task_struct(p);
+	return 0;
 }
 
 /*
@@ -1318,9 +1356,6 @@ static void mark_lmkd_victim(struct task_struct *tsk)
  */
 int group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
-	static const struct sched_param rt_param = {
-		.sched_priority = MAX_RT_PRIO - 1
-	};
 	int ret;
 
 	rcu_read_lock();
@@ -1329,37 +1364,10 @@ int group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 
 	if (!ret && sig) {
 		/* Accelerate lmkd SIGKILL handling */
-		if (sig == SIGKILL && is_lmkd_pid(current->pid)) {
-			/* Boost CPU and DDR bus to the max */
-			cpu_input_boost_kick_max(200);
-			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 200);
-
-			preempt_disable();
-
-			/* Promote the task's priority */
-			sched_setscheduler_nocheck(p, SCHED_FIFO, &rt_param);
-			/* Affine the task to high-performance CPUs */
-			set_cpus_allowed_ptr(p, cpu_perf_mask);
-
-			/* Bypass the signal queue when killing */
-			ret = do_send_sig_info(sig, SEND_SIG_FORCED, p, true);
-
-			/* Invoke the OOM reaper to free anonymous pages fast */
-			if (!ret) {
-				struct task_struct *vp = find_lock_task_mm(p);
-
-				if (vp &&
-				    !test_bit(MMF_OOM_SKIP, &vp->mm->flags)) {
-					mark_lmkd_victim(vp);
-					wake_oom_reaper(vp);
-					task_unlock(vp);
-				}
-			}
-
-			preempt_enable();
-		} else {
+		if (sig == SIGKILL && is_lmkd_pid(current->pid))
+			ret = do_lmkd_kill(p);
+		else
 			ret = do_send_sig_info(sig, info, p, true);
-		}
 	}
 
 	return ret;
