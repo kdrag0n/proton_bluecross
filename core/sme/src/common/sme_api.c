@@ -9350,6 +9350,7 @@ QDF_STATUS sme_stop_roaming(tHalHandle hal, uint8_t session_id, uint8_t reason)
 	status = wma_post_ctrl_msg(mac_ctx, &wma_msg);
 	if (eSIR_SUCCESS != status) {
 		sme_err("Posting WMA_ROAM_SCAN_OFFLOAD_REQ failed");
+		qdf_mem_zero(req, sizeof(tSirRoamOffloadScanReq));
 		qdf_mem_free(req);
 		return QDF_STATUS_E_FAULT;
 	}
@@ -18376,8 +18377,10 @@ send_flush_cmd:
 	    cds_mq_post_message(QDF_MODULE_ID_WMA, &msg)) {
 		sme_err("Not able to post message to WDA");
 
-		if (pmk_cache)
+		if (pmk_cache) {
+			qdf_mem_zero(pmk_cache, sizeof(*pmk_cache));
 			qdf_mem_free(pmk_cache);
+		}
 
 		return QDF_STATUS_E_FAILURE;
 	}

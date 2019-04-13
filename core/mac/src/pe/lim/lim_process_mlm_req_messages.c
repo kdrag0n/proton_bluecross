@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1938,6 +1938,8 @@ lim_process_mlm_set_keys_req(tpAniSirGlobal mac_ctx, uint32_t *msg_buf)
 
 	mlm_set_keys_req = (tLimMlmSetKeysReq *) msg_buf;
 	if (mac_ctx->lim.gpLimMlmSetKeysReq != NULL) {
+		qdf_mem_zero(mac_ctx->lim.gpLimMlmSetKeysReq,
+			     sizeof(tLimMlmSetKeysReq));
 		qdf_mem_free(mac_ctx->lim.gpLimMlmSetKeysReq);
 		mac_ctx->lim.gpLimMlmSetKeysReq = NULL;
 	}
@@ -1947,6 +1949,7 @@ lim_process_mlm_set_keys_req(tpAniSirGlobal mac_ctx, uint32_t *msg_buf)
 				mlm_set_keys_req->sessionId);
 	if (NULL == session) {
 		pe_err("session does not exist for given sessionId");
+		qdf_mem_zero(mlm_set_keys_req, sizeof(tLimMlmSetKeysReq));
 		qdf_mem_free(mlm_set_keys_req);
 		mac_ctx->lim.gpLimMlmSetKeysReq = NULL;
 		return;
