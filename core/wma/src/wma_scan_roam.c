@@ -988,12 +988,11 @@ QDF_STATUS wma_roam_scan_offload_mode(tp_wma_handle wma_handle,
 
 	status = wmi_unified_roam_scan_offload_mode_cmd(wma_handle->wmi_handle,
 				scan_cmd_fp, params);
-	qdf_mem_zero(params, sizeof(struct roam_offload_scan_params));
-	qdf_mem_free(params);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
 	WMA_LOGD("%s: WMA --> WMI_ROAM_SCAN_MODE", __func__);
+	qdf_mem_free(params);
 	return status;
 }
 
@@ -2049,7 +2048,6 @@ QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
 
 	if (NULL == pMac) {
 		WMA_LOGE("%s: pMac is NULL", __func__);
-		qdf_mem_zero(roam_req, sizeof(tSirRoamOffloadScanReq));
 		qdf_mem_free(roam_req);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -2058,7 +2056,6 @@ QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
 		/* roam scan offload is not enabled in firmware.
 		 * Cannot initialize it in the middle of connection.
 		 */
-		qdf_mem_zero(roam_req, sizeof(tSirRoamOffloadScanReq));
 		qdf_mem_free(roam_req);
 		return QDF_STATUS_E_PERM;
 	}
@@ -2420,7 +2417,6 @@ QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
 	default:
 		break;
 	}
-	qdf_mem_zero(roam_req, sizeof(tSirRoamOffloadScanReq));
 	qdf_mem_free(roam_req);
 	return qdf_status;
 }
