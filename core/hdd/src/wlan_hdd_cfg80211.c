@@ -4920,8 +4920,6 @@ static int __wlan_hdd_cfg80211_keymgmt_set_key(struct wiphy *wiphy,
 	qdf_mem_copy(local_pmk, data, data_len);
 	sme_roam_set_psk_pmk(WLAN_HDD_GET_HAL_CTX(hdd_adapter_ptr),
 			hdd_adapter_ptr->sessionId, local_pmk, data_len);
-	qdf_mem_zero(&local_pmk, SIR_ROAM_SCAN_PSK_SIZE);
-
 	return 0;
 }
 
@@ -19910,8 +19908,6 @@ static int __wlan_hdd_cfg80211_set_pmksa(struct wiphy *wiphy,
 	sme_set_del_pmkid_cache(halHandle, pAdapter->sessionId,
 					&pmk_cache, true);
 
-	qdf_mem_zero(&pmk_cache, sizeof(pmk_cache));
-
 	EXIT();
 	return QDF_IS_STATUS_SUCCESS(result) ? 0 : -EINVAL;
 }
@@ -20002,8 +19998,6 @@ static int __wlan_hdd_cfg80211_del_pmksa(struct wiphy *wiphy,
 
 	sme_set_del_pmkid_cache(halHandle, pAdapter->sessionId, &pmk_cache,
 						false);
-	qdf_mem_zero(&pmk_cache, sizeof(pmk_cache));
-
 	EXIT();
 	return status;
 }
