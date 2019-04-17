@@ -58,7 +58,7 @@ case "$1" in
 		little_boost 1056000
 		little_gov_param hispeed_freq 0
 		# CPU: Big
-		big_max 2323200
+		big_max 2803200
 		big_boost 902400
 		big_gov_param hispeed_freq 0
 		# CPU: Governor
