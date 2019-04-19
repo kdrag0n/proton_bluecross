@@ -796,7 +796,7 @@ static ssize_t store_##file_name					\
 									\
 	if (IS_ENABLED(CONFIG_MSM_THERMAL_SIMPLE) &&			\
 	    &policy->object == &policy->max &&				\
-	    tsk_is_booster(current))					\
+	    task_is_booster(current))					\
 		return count;						\
 									\
 	memcpy(&new_policy, policy, sizeof(*policy));			\
@@ -837,7 +837,7 @@ static ssize_t show_cpuinfo_cur_freq(struct cpufreq_policy *policy,
  */
 static ssize_t show_scaling_governor(struct cpufreq_policy *policy, char *buf)
 {
-	if (tsk_is_booster(current))
+	if (task_is_booster(current))
 		return sprintf(buf, "schedutil\n");
 	else if (policy->policy == CPUFREQ_POLICY_POWERSAVE)
 		return sprintf(buf, "powersave\n");

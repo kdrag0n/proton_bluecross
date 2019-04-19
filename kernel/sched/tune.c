@@ -881,7 +881,7 @@ boost_write(struct cgroup_subsys_state *css, struct cftype *cft,
 	unsigned threshold_idx;
 	int boost_pct;
 
-	if (tsk_is_booster(current))
+	if (task_is_booster(current))
 		return 0;
 
 	if (boost < -100 || boost > 100)
