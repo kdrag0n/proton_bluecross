@@ -125,7 +125,7 @@ extern ssize_t read_code(struct file *, unsigned long, loff_t, size_t);
 extern bool task_is_zygote(struct task_struct *p);
 extern bool task_is_lmkd(struct task_struct *p);
 
-static inline bool tsk_is_booster(struct task_struct *tsk)
+static inline bool task_is_booster(struct task_struct *tsk)
 {
 	char comm[sizeof(tsk->comm)];
 
