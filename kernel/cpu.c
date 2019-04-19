@@ -1085,7 +1085,7 @@ static int do_cpu_down(unsigned int cpu, enum cpuhp_state target)
 	cpumask_andnot(&newmask, cpu_online_mask, cpumask_of(cpu));
 	/* One big cluster CPU and one little cluster CPU must remain online */
 	if (!cpumask_intersects(&newmask, cpu_perf_mask) ||
-		!cpumask_intersects(&newmask, cpu_lp_mask))
+	    !cpumask_intersects(&newmask, cpu_lp_mask))
 		return -EINVAL;
 
 	cpu_maps_update_begin();
@@ -2262,19 +2262,20 @@ EXPORT_SYMBOL(__cpu_active_mask);
 struct cpumask __cpu_isolated_mask __read_mostly;
 EXPORT_SYMBOL(__cpu_isolated_mask);
 
-/*
- * This assumes that half of the CPUs are little and that they have lower
- * CPU numbers than the big CPUs (e.g., on an 8-core system, CPUs 0-3 would be
- * little and CPUs 4-7 would be big).
- */
-#define LITTLE_CPU_MASK ((1UL << (NR_CPUS / 2)) - 1)
-#define BIG_CPU_MASK    (((1UL << NR_CPUS) - 1) & ~LITTLE_CPU_MASK)
-static const unsigned long little_cluster_cpus = LITTLE_CPU_MASK;
-const struct cpumask *const cpu_lp_mask = to_cpumask(&little_cluster_cpus);
+#if CONFIG_LITTLE_CPU_MASK
+static const unsigned long lp_cpu_bits = CONFIG_LITTLE_CPU_MASK;
+const struct cpumask *const cpu_lp_mask = to_cpumask(&lp_cpu_bits);
+#else
+const struct cpumask *const cpu_lp_mask = cpu_possible_mask;
+#endif
 EXPORT_SYMBOL(cpu_lp_mask);
 
-static const unsigned long big_cluster_cpus = BIG_CPU_MASK;
-const struct cpumask *const cpu_perf_mask = to_cpumask(&big_cluster_cpus);
+#if CONFIG_BIG_CPU_MASK
+static const unsigned long perf_cpu_bits = CONFIG_BIG_CPU_MASK;
+const struct cpumask *const cpu_perf_mask = to_cpumask(&perf_cpu_bits);
+#else
+const struct cpumask *const cpu_perf_mask = cpu_possible_mask;
+#endif
 EXPORT_SYMBOL(cpu_perf_mask);
 
 void init_cpu_present(const struct cpumask *src)

@@ -122,8 +122,8 @@ extern int prepare_bprm_creds(struct linux_binprm *bprm);
 extern void install_exec_creds(struct linux_binprm *bprm);
 extern void set_binfmt(struct linux_binfmt *new);
 extern ssize_t read_code(struct file *, unsigned long, loff_t, size_t);
-extern bool is_zygote_pid(pid_t pid);
-extern bool is_lmkd_pid(pid_t pid);
+extern bool task_is_zygote(struct task_struct *p);
+extern bool task_is_lmkd(struct task_struct *p);
 
 static inline bool tsk_is_booster(struct task_struct *tsk)
 {

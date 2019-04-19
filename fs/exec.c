@@ -75,18 +75,18 @@ static DEFINE_RWLOCK(binfmt_lock);
 #define ZYGOTE32_BIN	"/system/bin/app_process32"
 #define ZYGOTE64_BIN	"/system/bin/app_process64"
 #define LMKD_BIN	"/system/bin/lmkd"
-static pid_t zygote32_pid;
-static pid_t zygote64_pid;
-static pid_t lmkd_pid;
+static struct signal_struct *zygote32_sig;
+static struct signal_struct *zygote64_sig;
+static struct signal_struct *lmkd_sig;
 
-bool is_zygote_pid(pid_t pid)
+bool task_is_zygote(struct task_struct *p)
 {
-	return pid == zygote32_pid || pid == zygote64_pid;
+	return p->signal == zygote32_sig || p->signal == zygote64_sig;
 }
 
-bool is_lmkd_pid(pid_t pid)
+bool task_is_lmkd(struct task_struct *p)
 {
-	return pid == lmkd_pid;
+	return p->signal == lmkd_sig;
 }
 
 void __register_binfmt(struct linux_binfmt * fmt, int insert)
@@ -1803,13 +1803,13 @@ static int do_execveat_common(int fd, struct filename *filename,
 	if (retval < 0)
 		goto out;
 
-	if (capable(CAP_SYS_ADMIN)) {
+	if (is_global_init(current->parent)) {
 		if (unlikely(!strcmp(filename->name, ZYGOTE32_BIN)))
-			zygote32_pid = current->pid;
+			zygote32_sig = current->signal;
 		else if (unlikely(!strcmp(filename->name, ZYGOTE64_BIN)))
-			zygote64_pid = current->pid;
-	} else if (unlikely(!strcmp(filename->name, LMKD_BIN))) {
-		lmkd_pid = current->pid;
+			zygote64_sig = current->signal;
+		else if (unlikely(!strcmp(filename->name, LMKD_BIN)))
+			lmkd_sig = current->signal;
 	}
 
 	/* execve succeeded */

@@ -1364,7 +1364,7 @@ int group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 
 	if (!ret && sig) {
 		/* Accelerate lmkd SIGKILL handling */
-		if (sig == SIGKILL && is_lmkd_pid(current->pid))
+		if (sig == SIGKILL && task_is_lmkd(current))
 			ret = do_lmkd_kill(p);
 		else
 			ret = do_send_sig_info(sig, info, p, true);

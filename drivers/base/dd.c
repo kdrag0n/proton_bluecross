@@ -118,7 +118,7 @@ static void deferred_probe_work_func(struct work_struct *work)
 
 	/* Keep going if probe deferral is needed after late_initcall */
 	if (driver_deferred_probe_enable && !in_recovery &&
-		!list_empty(&deferred_probe_pending_list))
+	    !list_empty(&deferred_probe_pending_list))
 		driver_deferred_probe_trigger();
 }
 static DECLARE_WORK(deferred_probe_work, deferred_probe_work_func);
