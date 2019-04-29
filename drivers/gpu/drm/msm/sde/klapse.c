@@ -46,14 +46,12 @@ static void klapse_pulse(unsigned long data);
 static void restart_timer(void)
 {
   mod_timer(&pulse_timer, jiffies + msecs_to_jiffies(pulse_freq));
-  printk(KERN_INFO "KLapse pulse timer restarted!!!.\n");
 }
 
 static void flush_timer(void)
 {
   if (timer_pending(&pulse_timer))
     mod_timer_pending(&pulse_timer, jiffies);
-  printk(KERN_INFO "KLapse pulse timer flushed!!!.\n");
 }
 
 static void calc_active_minutes(void)
