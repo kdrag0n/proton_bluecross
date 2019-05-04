@@ -8,8 +8,10 @@ little_min() { echo $1 > /sys/module/cpu_input_boost/parameters/remove_input_boo
 big_min() { echo $1 > /sys/module/cpu_input_boost/parameters/remove_input_boost_freq_perf; }
 little_boost() { echo $1 > /sys/module/cpu_input_boost/parameters/input_boost_freq_lp; }
 big_boost() { echo $1 > /sys/module/cpu_input_boost/parameters/input_boost_freq_hp; }
-little_gov_param() { echo $2 > /sys/devices/system/cpu/cpu0/cpufreq/$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)/$1; }
-big_gov_param() { echo $2 > /sys/devices/system/cpu/cpu4/cpufreq/$(cat /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor)/$1; }
+little_gov() { echo $1 > /sys/devices/system/cpu/cpufreq/policy0/scaling_governor; }
+big_gov() { echo $1 > /sys/devices/system/cpu/cpufreq/policy4/scaling_governor; }
+little_gov_param() { echo $2 > /sys/devices/system/cpu/cpufreq/policy0/$(cat /sys/devices/system/cpu/cpufreq/policy0/scaling_governor)/$1; }
+big_gov_param() { echo $2 > /sys/devices/system/cpu/cpufreq/policy4/$(cat /sys/devices/system/cpu/cpufreq/policy4/scaling_governor)/$1; }
 gov_param() { little_gov_param $1 $2; big_gov_param $1 $2; }
 boost_duration() { echo $1 > /sys/module/cpu_input_boost/parameters/input_boost_duration; }
 boost_timeout() { echo $1 > /sys/module/cpu_input_boost/parameters/frame_boost_timeout; }
@@ -32,10 +34,13 @@ case "$1" in
 		little_min 300000
 		little_max 1516800
 		little_boost 748800
+		little_gov schedutil
 		little_gov_param hispeed_freq 0
 		# CPU: Big
+		big_min 825600
 		big_max 1209600
 		big_boost 0
+		big_gov schedutil
 		big_gov_param hispeed_freq 0
 		# CPU: Governor
 		gov_param hispeed_load 100
@@ -53,13 +58,16 @@ case "$1" in
 		;;
 	'balanced')
 		# CPU: Little
-		little_min 576000
+		little_min 748800
 		little_max 1766400
 		little_boost 1056000
+		little_gov schedutil
 		little_gov_param hispeed_freq 0
 		# CPU: Big
+		big_min 825600
 		big_max 2803200
 		big_boost 902400
+		big_gov schedutil
 		big_gov_param hispeed_freq 0
 		# CPU: Governor
 		gov_param hispeed_load 90
@@ -77,21 +85,23 @@ case "$1" in
 		;;
 	'performance')
 		# CPU: Little
-		little_min 748800
+		little_min 1766400
 		little_max 1766400
-		little_boost 1516800
-		little_gov_param hispeed_freq 1228800
+		little_boost 1766400
+		little_gov performance
 		# CPU: Big
+		big_min 1689600
 		big_max 2803200
-		big_boost 1363200
-		big_gov_param hispeed_freq 1363200
+		big_boost 1689600
+		big_gov schedutil
+		big_gov_param hispeed_freq 1843200
 		# CPU: Governor
-		gov_param hispeed_load 15
-		gov_param iowait_boost_enable 1
-		gov_param up_rate_limit_us 500
-		gov_param down_rate_limit_us 25000
+		big_gov_param hispeed_load 15
+		big_gov_param iowait_boost_enable 1
+		big_gov_param up_rate_limit_us 500
+		big_gov_param down_rate_limit_us 25000
 		# CPU: Boost
-		stune_boost 15
+		stune_boost 1
 		boost_duration 125
 		boost_timeout 15000
 
@@ -101,23 +111,25 @@ case "$1" in
 		;;
 	'turbo')
 		# CPU: Little
-		little_min 748800
+		little_min 1766400
 		little_max 1766400
-		little_boost 1516800
-		little_gov_param hispeed_freq 1228800
+		little_boost 1766400
+		little_gov performance
 		# CPU: Big
+		big_min 1689600
 		big_max 2803200
-		big_boost 1363200
-		big_gov_param hispeed_freq 1363200
+		big_boost 1689600
+		big_gov schedutil
+		big_gov_param hispeed_freq 1843200
 		# CPU: Governor
-		gov_param hispeed_load 15
-		gov_param iowait_boost_enable 1
-		gov_param up_rate_limit_us 400
-		gov_param down_rate_limit_us 25000
+		big_gov_param hispeed_load 15
+		big_gov_param iowait_boost_enable 1
+		big_gov_param up_rate_limit_us 400
+		big_gov_param down_rate_limit_us 25000
 		# CPU: Boost
-		stune_boost 15
+		stune_boost 1
 		boost_duration 125
-		boost_timeout 30000
+		boost_timeout 45000
 
 		# GPU
 		gpu_min 342000000
