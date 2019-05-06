@@ -1256,6 +1256,7 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 				temp = readl(port_array[wIndex]);
 				break;
 			}
+
 			/* Port must be enabled */
 			if (!(temp & PORT_PE)) {
 				retval = -ENODEV;

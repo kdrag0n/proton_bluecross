@@ -529,7 +529,7 @@ static int persistent_ram_buffer_map_alt(struct persistent_ram_zone *prz)
 	if (ret)
 		return ret;
 
-	prz->alt_buffer = prz->alt_vaddr + offset_in_page(alt_start);
+	prz->alt_buffer = prz->alt_vaddr;
 
 	return 0;
 }
@@ -592,7 +592,8 @@ void persistent_ram_free(struct persistent_ram_zone *prz)
 
 	if (prz->alt_vaddr) {
 		if (pfn_valid(prz->alt_paddr >> PAGE_SHIFT)) {
-			vunmap(prz->alt_vaddr);
+			/* We must vunmap() at page-granularity. */
+			vunmap(prz->alt_vaddr - offset_in_page(prz->alt_paddr));
 		} else {
 			iounmap(prz->alt_vaddr);
 			release_mem_region(prz->alt_paddr, prz->size);
