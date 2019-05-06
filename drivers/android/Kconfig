@@ -41,6 +41,39 @@ config ANDROID_BINDER_IPC_SELFTEST
 	  exhaustively with combinations of various buffer sizes and
 	  alignments.
 
+config ANDROID_SIMPLE_LMK
+	bool "Simple Android Low Memory Killer"
+	depends on !ANDROID_LOW_MEMORY_KILLER && !MEMCG
+	---help---
+	  This is a complete low memory killer solution for Android that is
+	  small and simple. Processes are killed according to the priorities
+	  that Android gives them, so that the least important processes are
+	  always killed first. Processes are killed until memory deficits are
+	  satisfied, as observed from kswapd struggling to free up pages. Simple
+	  LMK stops killing processes when kswapd finally goes back to sleep.
+
+if ANDROID_SIMPLE_LMK
+
+config ANDROID_SIMPLE_LMK_AGGRESSION
+	int "Reclaim frequency selection"
+	range 1 3
+	default 1
+	help
+	  This value determines how frequently Simple LMK will perform memory
+	  reclaims. A lower value corresponds to less frequent reclaims, which
+	  maximizes memory usage. The range of values has a logarithmic
+	  correlation; 2 is twice as aggressive as 1, and 3 is twice as
+	  aggressive as 2, which makes 3 four times as aggressive as 1.
+
+config ANDROID_SIMPLE_LMK_MINFREE
+	int "Minimum MiB of memory to free per reclaim"
+	range 8 512
+	default 64
+	help
+	  Simple LMK will try to free at least this much memory per reclaim.
+
+endif
+
 endif # if ANDROID
 
 endmenu
