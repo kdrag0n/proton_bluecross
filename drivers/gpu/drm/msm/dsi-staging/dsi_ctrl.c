@@ -1799,7 +1799,7 @@ static struct platform_driver dsi_ctrl_driver = {
 	},
 };
 
-#if defined(CONFIG_DEBUG_FS)
+#if 0
 
 void dsi_ctrl_debug_dump(void)
 {
