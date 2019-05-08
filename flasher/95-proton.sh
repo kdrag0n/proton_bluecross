@@ -1,6 +1,16 @@
 #!/system/bin/sh
 
 #
+# Write initial values
+#
+
+echo 0 > /dev/stune/blkio.group_idle
+echo 0 > /dev/stune/foreground/blkio.group_idle
+echo 0 > /dev/stune/background/blkio.group_idle
+echo 0 > /dev/stune/top-app/blkio.group_idle
+echo 0 > /dev/stune/rt/blkio.group_idle
+
+#
 # Wait for /data to be mounted
 #
 
@@ -34,6 +44,19 @@ fi
 while [ "$(getprop sys.boot_completed)" != 1 ]; do
 	sleep 2
 done
+
+# Set up block I/O cgroups
+echo 0 > /dev/stune/blkio.group_idle
+echo 1 > /dev/stune/foreground/blkio.group_idle
+echo 0 > /dev/stune/background/blkio.group_idle
+echo 2 > /dev/stune/top-app/blkio.group_idle
+echo 2 > /dev/stune/rt/blkio.group_idle
+
+echo 1000 > /dev/stune/blkio.weight
+echo 1000 > /dev/stune/foreground/blkio.weight
+echo 10 > /dev/stune/background/blkio.weight
+echo 1000 > /dev/stune/top-app/blkio.weight
+echo 1000 > /dev/stune/rt/blkio.weight
 
 # Wait for init to finish processing all boot_completed actions
 sleep 2
