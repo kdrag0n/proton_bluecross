@@ -38,6 +38,11 @@ if [ -d $ramdisk/.backup ]; then
   chmod +x $TMPDIR/overlay/*.sh
   mv $TMPDIR/overlay/init.proton.rc $TMPDIR/overlay/init.$(getprop ro.hardware).rc
   mv $TMPDIR/overlay $ramdisk
+
+  mountpoint -q /system_root && {
+    cp /system_root/init.rc $ramdisk/overlay
+    replace_string $ramdisk/overlay/init.rc blkio schedtune schedtune,blkio
+  }
 else
   patch_cmdline "skip_override" ""
   ui_print '  ! Magisk is not installed; some tweaks will be missing'
