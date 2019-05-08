@@ -45,12 +45,16 @@ struct vm_struct {
 struct vmap_area {
 	unsigned long va_start;
 	unsigned long va_end;
+
+	/*
+	 * Largest available free size in subtree.
+	 */
+	unsigned long subtree_max_size;
 	unsigned long flags;
 	struct rb_node rb_node;         /* address sorted rbtree */
 	struct list_head list;          /* address sorted list */
 	struct llist_node purge_list;    /* "lazy purge" list */
 	struct vm_struct *vm;
-	struct rcu_head rcu_head;
 };
 
 /*
@@ -163,12 +167,6 @@ extern struct list_head vmap_area_list;
 extern __init void vm_area_add_early(struct vm_struct *vm);
 extern __init void vm_area_register_early(struct vm_struct *vm, size_t align);
 extern __init int vm_area_check_early(struct vm_struct *vm);
-#ifdef CONFIG_ENABLE_VMALLOC_SAVING
-extern void mark_vmalloc_reserved_area(void *addr, unsigned long size);
-#else
-static inline void mark_vmalloc_reserved_area(void *addr, unsigned long size)
-{ };
-#endif
 
 #ifdef CONFIG_SMP
 # ifdef CONFIG_MMU
@@ -194,12 +192,7 @@ pcpu_free_vm_areas(struct vm_struct **vms, int nr_vms)
 #endif
 
 #ifdef CONFIG_MMU
-#ifdef CONFIG_ENABLE_VMALLOC_SAVING
-extern unsigned long total_vmalloc_size;
-#define VMALLOC_TOTAL total_vmalloc_size
-#else
 #define VMALLOC_TOTAL (VMALLOC_END - VMALLOC_START)
-#endif
 #else
 #define VMALLOC_TOTAL 0UL
 #endif
