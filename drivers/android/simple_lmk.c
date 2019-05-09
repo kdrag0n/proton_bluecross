@@ -25,14 +25,22 @@
 #define SIG_INFO_TYPE SEND_SIG_PRIV
 #endif
 
+/* The group argument to do_send_sig_info is different in newer kernels */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 18, 0)
+#define KILL_GROUP_TYPE true
+#else
+#define KILL_GROUP_TYPE PIDTYPE_TGID
+#endif
+
 /* The minimum number of pages to free per reclaim */
 #define MIN_FREE_PAGES (CONFIG_ANDROID_SIMPLE_LMK_MINFREE * SZ_1M / PAGE_SIZE)
 
-/* Kill up to this many victims per reclaim. This is limited by stack size. */
-#define MAX_VICTIMS 64
+/* Kill up to this many victims per reclaim */
+#define MAX_VICTIMS 1024
 
 struct victim_info {
 	struct task_struct *tsk;
+	struct mm_struct *mm;
 	unsigned long size;
 };
 
@@ -56,7 +64,10 @@ static const short int adj_prio[] = {
 	0    /* FOREGROUND_APP_ADJ */
 };
 
+static struct victim_info victims[MAX_VICTIMS];
 static DECLARE_WAIT_QUEUE_HEAD(oom_waitq);
+static DECLARE_COMPLETION(reclaim_done);
+static int victims_to_kill;
 static bool needs_reclaim;
 
 static int victim_info_cmp(const void *lhs_ptr, const void *rhs_ptr)
@@ -73,7 +84,7 @@ static bool mm_is_duplicate(struct victim_info *varr, int vlen,
 	int i;
 
 	for (i = 0; i < vlen; i++) {
-		if (varr[i].tsk->mm == mm)
+		if (varr[i].mm == mm)
 			return true;
 	}
 
@@ -109,10 +120,8 @@ static unsigned long find_victims(struct victim_info *varr, int *vindex,
 		if (*vindex == vmaxlen)
 			break;
 
-		/* Don't kill current, kthreads, init, or duplicates */
-		if (same_thread_group(tsk, current) ||
-		    tsk->flags & PF_KTHREAD ||
-		    is_global_init(tsk) ||
+		/* Don't kill kthreads, init, or duplicates */
+		if (tsk->flags & PF_KTHREAD || is_global_init(tsk) ||
 		    vtsk_is_duplicate(varr, *vindex, tsk))
 			continue;
 
@@ -137,6 +146,7 @@ static unsigned long find_victims(struct victim_info *varr, int *vindex,
 
 		/* Store this potential victim away for later */
 		varr[*vindex].tsk = vtsk;
+		varr[*vindex].mm = vtsk->mm;
 		varr[*vindex].size = tasksize;
 		(*vindex)++;
 
@@ -161,20 +171,15 @@ unlock_mm:
 
 static void scan_and_kill(unsigned long pages_needed)
 {
-	static DECLARE_WAIT_QUEUE_HEAD(victim_waitq);
-	struct victim_info victims[MAX_VICTIMS];
 	int i, nr_to_kill = 0, nr_victims = 0;
 	unsigned long pages_found = 0;
-	atomic_t victim_count;
 
 	/*
 	 * Hold the tasklist lock so tasks don't disappear while scanning. This
 	 * is preferred to holding an RCU read lock so that the list of tasks
-	 * is guaranteed to be up to date. Keep preemption disabled until the
-	 * SIGKILLs are sent so the victim kill process isn't interrupted.
+	 * is guaranteed to be up to date.
 	 */
 	read_lock(&tasklist_lock);
-	preempt_disable();
 	for (i = 1; i < ARRAY_SIZE(adj_prio); i++) {
 		pages_found += find_victims(victims, &nr_victims, MAX_VICTIMS,
 					    adj_prio[i], adj_prio[i - 1]);
@@ -190,7 +195,7 @@ static void scan_and_kill(unsigned long pages_needed)
 		struct victim_info *victim = &victims[i];
 		struct task_struct *vtsk = victim->tsk;
 
-		/* The victims' mm lock is taken in find_victims; release it */
+		/* The victim's mm lock is taken in find_victims; release it */
 		if (pages_found >= pages_needed) {
 			task_unlock(vtsk);
 			continue;
@@ -198,7 +203,7 @@ static void scan_and_kill(unsigned long pages_needed)
 
 		/*
 		 * Grab a reference to the victim so it doesn't disappear after
-		 * the tasklist lock is released.
+		 * its mm lock is released later.
 		 */
 		get_task_struct(vtsk);
 		pages_found += victim->size;
@@ -207,7 +212,7 @@ static void scan_and_kill(unsigned long pages_needed)
 	read_unlock(&tasklist_lock);
 
 	/* Kill the victims */
-	victim_count = (atomic_t)ATOMIC_INIT(nr_to_kill);
+	WRITE_ONCE(victims_to_kill, nr_to_kill);
 	for (i = 0; i < nr_to_kill; i++) {
 		struct victim_info *victim = &victims[i];
 		struct task_struct *vtsk = victim->tsk;
@@ -216,17 +221,12 @@ static void scan_and_kill(unsigned long pages_needed)
 			vtsk->signal->oom_score_adj,
 			victim->size << (PAGE_SHIFT - 10));
 
-		/* Configure the victim's mm to notify us when it's freed */
-		vtsk->mm->slmk_waitq = &victim_waitq;
-		vtsk->mm->slmk_counter = &victim_count;
-
 		/* Accelerate the victim's death by forcing the kill signal */
-		do_send_sig_info(SIGKILL, SIG_INFO_TYPE, vtsk, true);
+		do_send_sig_info(SIGKILL, SIG_INFO_TYPE, vtsk, KILL_GROUP_TYPE);
 
 		/* Finally release the victim's mm lock */
 		task_unlock(vtsk);
 	}
-	preempt_enable_no_resched();
 
 	/* Try to speed up the death process now that we can schedule again */
 	for (i = 0; i < nr_to_kill; i++) {
@@ -243,7 +243,7 @@ static void scan_and_kill(unsigned long pages_needed)
 	}
 
 	/* Wait until all the victims die */
-	wait_event(victim_waitq, !atomic_read(&victim_count));
+	wait_for_completion(&reclaim_done);
 }
 
 static int simple_lmk_reclaim_thread(void *data)
@@ -279,10 +279,13 @@ static int simple_lmk_reclaim_thread(void *data)
 	return 0;
 }
 
-void simple_lmk_start_reclaim(void)
+void simple_lmk_decide_reclaim(int kswapd_priority)
 {
-	WRITE_ONCE(needs_reclaim, true);
-	wake_up(&oom_waitq);
+	if (kswapd_priority != CONFIG_ANDROID_SIMPLE_LMK_AGGRESSION)
+		return;
+
+	if (!cmpxchg(&needs_reclaim, false, true))
+		wake_up(&oom_waitq);
 }
 
 void simple_lmk_stop_reclaim(void)
@@ -290,13 +293,31 @@ void simple_lmk_stop_reclaim(void)
 	WRITE_ONCE(needs_reclaim, false);
 }
 
+void simple_lmk_mm_freed(struct mm_struct *mm)
+{
+	static atomic_t nr_killed = ATOMIC_INIT(0);
+	int i, nr_to_kill;
+
+	nr_to_kill = READ_ONCE(victims_to_kill);
+	for (i = 0; i < nr_to_kill; i++) {
+		if (victims[i].mm == mm) {
+			if (atomic_inc_return(&nr_killed) == nr_to_kill) {
+				WRITE_ONCE(victims_to_kill, 0);
+				nr_killed = (atomic_t)ATOMIC_INIT(0);
+				complete(&reclaim_done);
+			}
+			break;
+		}
+	}
+}
+
 /* Initialize Simple LMK when lmkd in Android writes to the minfree parameter */
 static int simple_lmk_init_set(const char *val, const struct kernel_param *kp)
 {
-	static atomic_t init_done = ATOMIC_INIT(0);
+	static bool init_done;
 	struct task_struct *thread;
 
-	if (atomic_cmpxchg(&init_done, 0, 1))
+	if (cmpxchg(&init_done, false, true))
 		return 0;
 
 	thread = kthread_run_perf_critical(simple_lmk_reclaim_thread, NULL,
