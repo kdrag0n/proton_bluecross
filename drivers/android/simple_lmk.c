@@ -186,6 +186,11 @@ static void scan_and_kill(unsigned long pages_needed)
 		if (pages_found >= pages_needed || nr_victims == MAX_VICTIMS)
 			break;
 	}
+	read_unlock(&tasklist_lock);
+
+	/* Pretty unlikely but it can happen */
+	if (unlikely(!nr_victims))
+		return;
 
 	/*
 	 * Calculate the number of tasks that need to be killed and quickly
@@ -209,7 +214,6 @@ static void scan_and_kill(unsigned long pages_needed)
 		pages_found += victim->size;
 		nr_to_kill++;
 	}
-	read_unlock(&tasklist_lock);
 
 	/* Kill the victims */
 	WRITE_ONCE(victims_to_kill, nr_to_kill);
@@ -300,7 +304,7 @@ void simple_lmk_mm_freed(struct mm_struct *mm)
 
 	nr_to_kill = READ_ONCE(victims_to_kill);
 	for (i = 0; i < nr_to_kill; i++) {
-		if (victims[i].mm == mm) {
+		if (cmpxchg(&victims[i].mm, mm, NULL) == mm) {
 			if (atomic_inc_return(&nr_killed) == nr_to_kill) {
 				WRITE_ONCE(victims_to_kill, 0);
 				nr_killed = (atomic_t)ATOMIC_INIT(0);
