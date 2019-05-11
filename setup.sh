@@ -1,13 +1,13 @@
 # Toolchain paths
 
 # Path to the root of the Clang toolchain
-tc_clang=$HOME/toolchains/clang-9.x
+tc_clang=$HOME/toolchains/aosp-clang-9.0.2
 
 # Path to the root of the 64-bit GCC toolchain
-tc_gcc=$HOME/toolchains/gcc-4.x
+tc_gcc=$HOME/toolchains/aosp-gcc-4.9
 
 # Path to the root of the 32-bit GCC toolchain
-tc_gcc32=$HOME/toolchains/gcc32-4.x
+tc_gcc32=$HOME/toolchains/aosp-gcc32-4.9
 
 # Optional: target prefix of the 64-bit GCC toolchain
 # Leave blank for autodetection

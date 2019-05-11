@@ -1,10 +1,10 @@
 # Toolchain paths
 
 # Path to the root of the 64-bit GCC toolchain
-tc=$HOME/toolchains/arm-gcc-8.x
+tc=$HOME/toolchains/arm-gcc-8.2.1
 
 # Path to the root of the 32-bit GCC toolchain
-tc32=$HOME/toolchains/arm-gcc32-8.x
+tc32=$HOME/toolchains/arm-gcc32-8.2.1
 
 # Optional: target prefix of the 64-bit GCC toolchain
 # Leave blank for autodetection
