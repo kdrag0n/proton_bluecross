@@ -39,6 +39,12 @@ MAKEFLAGS=(
     KBUILD_BUILD_HOST=proton
 )
 
+# Get the current build number
+buildnum() {
+    kver=$(cat "$kroot/out/.version")
+    echo $(($kver - 1))
+}
+
 # Make wrapper for kernel compilation
 kmake() {
     make "${MAKEFLAGS[@]}" "$@"
@@ -53,8 +59,8 @@ mkzip() {
 
     cp "$kroot/out/arch/arm64/boot/Image.lz4-dtb" "$kroot/flasher/"
 
-    [ $_RELEASE -eq 0 ] && echo "  • Installing test build $(cat "$kroot/out/.version")" >| "$kroot/flasher/version"
-    [ $_RELEASE -eq 1 ] && echo "  • Installing version v$(cat "$kroot/out/.version")" >| "$kroot/flasher/version"
+    [ $_RELEASE -eq 0 ] && echo "  • Installing test build $(buildnum)" >| "$kroot/flasher/version"
+    [ $_RELEASE -eq 1 ] && echo "  • Installing version v$(buildnum)" >| "$kroot/flasher/version"
     echo "  • Built on $(date "+%a %b %d, %Y")" >> "$kroot/flasher/version"
 
     fn="${1:-proton_kernel.zip}"
@@ -80,7 +86,7 @@ rel() {
     kmake "$@"
 
     # Pack zip
-    mkzip "builds/ProtonKernel-pixel3-v$(cat "$kroot/out/.version").zip"
+    mkzip "builds/ProtonKernel-pixel3-v$(buildnum).zip"
 
     # Revert version
     mv "$kroot/out/.version" "$kroot/out/.relversion" && \
@@ -121,12 +127,12 @@ tbuild() {
 
 # Create a flashable test release zip
 dzip() {
-    mkzip "builds/ProtonKernel-pixel3-test$(cat "$kroot/out/.version").zip"
+    mkzip "builds/ProtonKernel-pixel3-test$(buildnum).zip"
 }
 
 # Create a flashable test release zip, then upload it to transfer.sh
 tzip() {
-    dzip && transfer "builds/ProtonKernel-pixel3-test$(cat "$kroot/out/.version").zip"
+    dzip && transfer "builds/ProtonKernel-pixel3-test$(buildnum).zip"
 }
 
 # Flash the latest kernel ZIP on the connected device via ADB
@@ -180,12 +186,12 @@ vsinc() {
 
 # Incremementally build the kernel, push the ZIP, and flash it on the device via SSH over LAN
 psinc() {
-    dbuild "$@" && fn="builds/ProtonKernel-pixel3-test$(cat "$kroot/out/.version").zip" && scp "$fn" phone:/sdcard && sktest "$fn"
+    dbuild "$@" && fn="builds/ProtonKernel-pixel3-test$(buildnum).zip" && scp "$fn" phone:/sdcard && sktest "$fn"
 }
 
 # Incremementally build the kernel, push the ZIP, and flash it on the device via SSH over VPN
 pvsinc() {
-    dbuild "$@" && fn="builds/ProtonKernel-pixel3-test$(cat "$kroot/out/.version").zip" && scp "$fn" vphone:/sdcard && vsktest "$fn"
+    dbuild "$@" && fn="builds/ProtonKernel-pixel3-test$(buildnum).zip" && scp "$fn" vphone:/sdcard && vsktest "$fn"
 }
 
 # Show differences between the committed defconfig and current config
