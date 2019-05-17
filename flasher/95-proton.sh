@@ -76,3 +76,7 @@ echo 64 > /sys/block/dm-0/queue/read_ahead_kb
 echo 64 > /sys/block/dm-1/queue/read_ahead_kb
 echo 64 > /sys/block/dm-2/queue/read_ahead_kb
 echo 64 > /sys/block/dm-3/queue/read_ahead_kb
+
+# Tune dirty ratios
+sysctl vm.dirty_ratio=7
+sysctl vm.dirty_background_ratio=3
