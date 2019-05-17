@@ -65,7 +65,6 @@ sleep 2
 # Apply overrides and tweaks
 #
 
-echo 85 > /proc/sys/vm/swappiness # Reduce kswapd cpu usage
 echo $(cat /sys/module/cpu_input_boost/parameters/input_boost_duration) > /sys/class/drm/card0/device/idle_timeout_ms # Reduce default PowerHAL interaction boost timeout
 echo 1 > /sys/module/printk/parameters/console_suspend # Marginally reduce suspend latency
 echo 3000 > /proc/sys/vm/dirty_expire_centisecs # Allow dirty writeback to be less frequent
