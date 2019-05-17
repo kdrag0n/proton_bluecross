@@ -68,3 +68,11 @@ sleep 2
 echo $(cat /sys/module/cpu_input_boost/parameters/input_boost_duration) > /sys/class/drm/card0/device/idle_timeout_ms # Reduce default PowerHAL interaction boost timeout
 echo 1 > /sys/module/printk/parameters/console_suspend # Marginally reduce suspend latency
 echo 3000 > /proc/sys/vm/dirty_expire_centisecs # Allow dirty writeback to be less frequent
+
+# Reduce I/O read-ahead to 64 KiB
+echo 64 > /sys/block/sda/queue/read_ahead_kb
+echo 64 > /sys/block/sdf/queue/read_ahead_kb
+echo 64 > /sys/block/dm-0/queue/read_ahead_kb
+echo 64 > /sys/block/dm-1/queue/read_ahead_kb
+echo 64 > /sys/block/dm-2/queue/read_ahead_kb
+echo 64 > /sys/block/dm-3/queue/read_ahead_kb
