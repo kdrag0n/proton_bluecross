@@ -43,6 +43,5 @@ MAKEFLAGS+=(
     CROSS_COMPILE_ARM32=$gcc32_bin/$prefix_gcc32
     CLANG_TRIPLE=aarch64-linux-gnu-
 
-    HOSTCC=clang
     KBUILD_COMPILER_STRING="$(get_clang_version clang)"
 )
