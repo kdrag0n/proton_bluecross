@@ -109,8 +109,8 @@
       "Name": "TASchedtuneBoost",
       "Path": "/dev/stune/top-app/schedtune.boost",
       "Values": [
-        "20",
-        "1"
+        "50",
+        "10"
       ],
       "ResetOnInit": true
     },
@@ -280,6 +280,12 @@
       "Node": "VRKernelCpuSet",
       "Duration": 0,
       "Value": "2,3"
+    },
+    {
+      "PowerHint": "INTERACTION",
+      "Node": "TASchedtuneBoost",
+      "Duration": 0,
+      "Value": "50"
     },
     {
       "PowerHint": "INTERACTION",
