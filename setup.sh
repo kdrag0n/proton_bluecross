@@ -1,21 +1,19 @@
-# Toolchain paths
+# Configuration
 
-# Path to the root of the 64-bit GCC toolchain
+# 64-bit GCC root path
 tc=$HOME/toolchains/cust-gcc-9.1.0
 
-# Path to the root of the 32-bit GCC toolchain
+# 32-bit GCC target triple prefix
 tc32=$HOME/toolchains/cust-gcc32-9.1.0
 
-# Optional: target prefix of the 64-bit GCC toolchain
-# Leave blank for autodetection
+# 64-bit GCC target triple prefix
 prefix=aarch64-elf-
 
-# Optional: target prefix of the 32-bit GCC toolchain
-# Leave blank for autodetection
+# 32-bit GCC target triple prefix
 prefix32=arm-eabi-
 
 # Number of parallel jobs to run
-# Do not remove, set to 1 for no parallelism.
+# Do not remove; set to 1 for no parallelism.
 jobs=6
 
 # Do not edit below this point
@@ -26,14 +24,12 @@ source helpers.sh
 
 gcc_bin=$tc/bin
 gcc32_bin=$tc32/bin
-[ -z $prefix ] && prefix=$(get_gcc_prefix $gcc_bin)
-[ -z $prefix32 ] && prefix32=$(get_gcc_prefix $gcc32_bin)
 
 export PATH=$gcc_bin:$gcc32_bin:$PATH
 
 MAKEFLAGS+=(
-    CROSS_COMPILE=$prefix
-    CROSS_COMPILE_ARM32=$prefix32
+	CROSS_COMPILE=$prefix
+	CROSS_COMPILE_ARM32=$prefix32
 
-    KBUILD_COMPILER_STRING="$(get_gcc_version ${prefix}gcc)"
+	KBUILD_COMPILER_STRING="$(get_gcc_version ${prefix}gcc)"
 )
