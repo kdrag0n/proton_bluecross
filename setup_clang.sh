@@ -38,7 +38,6 @@ export PATH=$clang_bin:$PATH
 
 MAKEFLAGS+=(
     CC=clang
-    O=out
     CROSS_COMPILE=$gcc_bin/$prefix_gcc
     CROSS_COMPILE_ARM32=$gcc32_bin/$prefix_gcc32
     CLANG_TRIPLE=aarch64-linux-gnu-
