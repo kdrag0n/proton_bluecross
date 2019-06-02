@@ -145,7 +145,10 @@ static void msm_iommu_map_destroy(struct kref *kref)
 	list_del(&map->lnode);
 	write_unlock(&meta->lock);
 
+	mutex_lock(&meta->map_lock);
 	dma_unmap_sg(map->dev, &map->sgl, map->nents, map->dir);
+	mutex_unlock(&meta->map_lock);
+
 	kfree(map);
 }
 
